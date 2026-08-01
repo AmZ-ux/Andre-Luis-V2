@@ -46,18 +46,52 @@ export const realAuth = {
 }
 
 // --- Passengers ---
+// O servidor guarda/retorna endereco em campos achatados (zip_code, street, ...),
+// enquanto o frontend usa um objeto aninhado `address`. Mapeamento abaixo.
+function toPassengerAddress(p: any): Passenger {
+  const { zipCode, street, number, complement, neighborhood, city, state, ...rest } = p
+  return {
+    ...rest,
+    address: {
+      zipCode: zipCode || '',
+      street: street || '',
+      number: number || '',
+      complement: complement || '',
+      neighborhood: neighborhood || '',
+      city: city || '',
+      state: state || '',
+    },
+  }
+}
+
+function flattenPassenger(data: any): any {
+  const { address, ...rest } = data
+  return {
+    ...rest,
+    zipCode: address?.zipCode || '',
+    street: address?.street || '',
+    number: address?.number || '',
+    complement: address?.complement || '',
+    neighborhood: address?.neighborhood || '',
+    city: address?.city || '',
+    state: address?.state || '',
+  }
+}
+
 export const realPassengers = {
-  list: (filters: PassengerFilters, sort: SortState, page: number, pageSize: number) =>
-    api.get<{ data: Passenger[]; total: number }>('/passengers', { ...filters, sortField: sort.field, sortDirection: sort.direction, page, pageSize }),
+  list: async (filters: PassengerFilters, sort: SortState, page: number, pageSize: number) => {
+    const r = await api.get<{ data: any[]; total: number }>('/passengers', { ...filters, sortField: sort.field, sortDirection: sort.direction, page, pageSize })
+    return { data: r.data.map(toPassengerAddress), total: r.total }
+  },
 
-  getById: (id: string) =>
-    api.get<Passenger>(`/passengers/${id}`),
+  getById: async (id: string) =>
+    toPassengerAddress(await api.get<any>(`/passengers/${id}`)),
 
-  create: (data: Omit<Passenger, 'id' | 'createdAt' | 'updatedAt'>) =>
-    api.post<Passenger>('/passengers', data),
+  create: async (data: Omit<Passenger, 'id' | 'createdAt' | 'updatedAt'>) =>
+    toPassengerAddress(await api.post<any>('/passengers', flattenPassenger(data))),
 
-  update: (id: string, data: Partial<Passenger>) =>
-    api.put<Passenger>(`/passengers/${id}`, data),
+  update: async (id: string, data: Partial<Passenger>) =>
+    toPassengerAddress(await api.put<any>(`/passengers/${id}`, flattenPassenger(data))),
 
   remove: (id: string) =>
     api.delete<void>(`/passengers/${id}`),
