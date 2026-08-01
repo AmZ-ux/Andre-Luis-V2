@@ -1,5 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { reportClientError } from '../../utils/errorReporter'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -23,6 +24,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught:', error, errorInfo)
+    reportClientError(error, 'react-error-boundary')
   }
 
   handleRetry = () => {

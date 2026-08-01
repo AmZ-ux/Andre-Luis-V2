@@ -18,6 +18,7 @@ import availabilityRoutes from './routes/availability.js'
 import dashboardRoutes from './routes/dashboard.js'
 import communicationRoutes from './routes/communication.js'
 import settingsRoutes from './routes/settings.js'
+import clientErrorRoutes from './routes/clientError.js'
 import { pixRouter, handleStripeWebhook } from './routes/pix.js'
 import { startScheduler } from './services/scheduler.js'
 
@@ -59,6 +60,7 @@ if (process.env.SEED === 'true') {
 
 // Public routes
 app.use('/api/auth', authRoutes)
+app.use('/api/client-error', clientErrorRoutes)
 
 // Protected routes
 app.use('/api/passengers', authMiddleware, passengerRoutes)
