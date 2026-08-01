@@ -1,21 +1,17 @@
-# Stage 1: Build
-FROM node:22-alpine AS builder
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts
-RUN npm install --include=dev --ignore-scripts
-
-COPY . .
+# Build
+FROM node:22-alpine AS build
+WORKDIR /app/server
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY server/ .
 RUN npm run build
 
-# Stage 2: Serve
-FROM nginx:1.27-alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
-
-CMD ["nginx", "-g", "daemon off;"]
+# Runtime
+FROM node:22-alpine
+ENV NODE_ENV=production
+WORKDIR /app/server
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY --from=build /app/server/dist ./dist
+EXPOSE 3001
+CMD ["node", "dist/index.js"]

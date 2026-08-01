@@ -169,7 +169,7 @@ async function sendVerificationEmail(to: string, name: string, code: string): Pr
     }),
   })
   if (!res.ok) {
-    logger.error(await res.text(), 'Resend send failed')
+    logger.error({ error: await res.text() }, 'Resend send failed')
   }
 }
 
