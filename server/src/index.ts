@@ -24,6 +24,10 @@ import { startScheduler } from './services/scheduler.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
+
+// Confia no proxy (Railway) para X-Forwarded-For: necessario para o rate limit identificar IPs reais
+app.set('trust proxy', 1)
+
 const PORT = Number(process.env.PORT) || 3001
 
 // Security
