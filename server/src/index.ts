@@ -47,6 +47,12 @@ app.use(sanitizeBody)
 // Migrations
 await runMigrations()
 
+// Seed em producao: SEED=true executa uma vez (idempotente) no boot
+if (process.env.SEED === 'true') {
+  const { runSeed } = await import('./services/seedDatabase.js')
+  await runSeed()
+}
+
 // Public routes
 app.use('/api/auth', authRoutes)
 
