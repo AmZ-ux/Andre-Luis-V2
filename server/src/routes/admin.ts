@@ -55,11 +55,15 @@ router.post('/admins', requireSuperAdmin, validateBody('email', 'password'), (re
     return
   }
   const id = uuid()
+  // Servidor exige cpf UNIQUE; admins criados não têm CPF real, então usa-se
+  // um placeholder determinístico e exclusivo por conta.
+  const cpfRaw = id.replace(/-/g, '').slice(0, 11).split('').map((ch) => String(parseInt(ch, 16) % 10)).join('')
+  const cpf = `${cpfRaw.slice(0, 3)}.${cpfRaw.slice(3, 6)}.${cpfRaw.slice(6, 9)}-${cpfRaw.slice(9, 11)}`
   // Conta criada diretamente pelo super admin: as credenciais são entregues ao
   // responsável do transporte, então o email já nasce verificado (ele entra direto).
   db.prepare(
     'INSERT INTO users (id, name, email, cpf, phone, role, password_hash, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)'
-  ).run(id, name, String(email).trim().toLowerCase(), '', '', 'admin', bcrypt.hashSync(String(password), 10))
+  ).run(id, name, String(email).trim().toLowerCase(), cpf, '', 'admin', bcrypt.hashSync(String(password), 10))
   res.status(201).json({ id, name, email: String(email).trim().toLowerCase(), role: 'admin', superAdmin: false, emailVerified: true })
 })
 
@@ -91,6 +95,22 @@ router.post('/demote', requireSuperAdmin, validateBody('userId'), (req, res) => 
   }
   db.prepare("UPDATE users SET role = 'passenger' WHERE id = ?").run(userId)
   res.json({ success: true, id: userId, name: user.name, role: 'passenger' })
+})
+
+router.delete('/admins/:id', requireSuperAdmin, (req, res) => {
+  const db = getDb()
+  const user = db.prepare('SELECT id, name, role, super_admin FROM users WHERE id = ?').get(req.params.id) as any
+  if (!user) { res.status(404).json({ error: 'Usuário não encontrado' }); return }
+  if (user.super_admin) {
+    res.status(400).json({ error: 'O super administrador não pode ser removido' })
+    return
+  }
+  if (user.role !== 'admin') {
+    res.status(400).json({ error: 'Este usuário não é administrador' })
+    return
+  }
+  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id)
+  res.json({ success: true, id: req.params.id })
 })
 
 export default router

@@ -22,6 +22,7 @@ export function AdminsManager() {
   const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [demotingId, setDemotingId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [formErrors, setFormErrors] = useState<{ name?: string; email?: string; password?: string }>({})
 
@@ -94,6 +95,22 @@ export function AdminsManager() {
       addToast('error', 'Não foi possível rebaixar', message)
     } finally {
       setDemotingId(null)
+    }
+  }
+
+  const handleRemove = async (admin: AdminUser) => {
+    if (admin.superAdmin) return
+    if (!window.confirm(`Remover a conta de ${admin.name} (${admin.email})? Esta ação não pode ser desfeita.`)) return
+    setRemovingId(admin.id)
+    try {
+      await adminService.remove(admin.id)
+      addToast('success', 'Administrador removido.')
+      await load()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao remover'
+      addToast('error', 'Não foi possível remover', message)
+    } finally {
+      setRemovingId(null)
     }
   }
 
@@ -210,14 +227,24 @@ export function AdminsManager() {
                 </p>
               </div>
               {!admin.superAdmin && (
-                <Button
-                  variant="danger"
-                  size="sm"
-                  loading={demotingId === admin.id}
-                  onClick={() => void handleDemote(admin)}
-                >
-                  Rebaixar
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    loading={demotingId === admin.id}
+                    onClick={() => void handleDemote(admin)}
+                  >
+                    Rebaixar
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    loading={removingId === admin.id}
+                    onClick={() => void handleRemove(admin)}
+                  >
+                    Remover
+                  </Button>
+                </div>
               )}
             </div>
           </Card>

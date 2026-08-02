@@ -37,4 +37,13 @@ export const adminService = {
     await delay(400)
     throw new Error('Disponível apenas com a API real')
   },
+
+  async remove(userId: string): Promise<void> {
+    if (config.realApi) {
+      await realAdmin.remove(userId)
+      return
+    }
+    await delay(400)
+    throw new Error('Disponível apenas com a API real')
+  },
 }

@@ -75,6 +75,9 @@ export const realAdmin = {
 
   demote: (userId: string) =>
     api.post<{ success: boolean }>('/admin/demote', { userId }),
+
+  remove: (userId: string) =>
+    api.delete<{ success: boolean }>(`/admin/admins/${userId}`),
 }
 
 // --- Passengers ---

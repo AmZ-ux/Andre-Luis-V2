@@ -135,4 +135,32 @@ describe('Admin management (super admin only)', () => {
       .send({ userId: superAdmin.id })
     expect(res.status).toBe(400)
   })
+
+  it('should remove an admin and block its account', async () => {
+    const res = await request(app)
+      .post('/api/admin/admins')
+      .set('Authorization', `Bearer ${getSuperAdminToken()}`)
+      .send({ name: 'Remover Teste', email: 'remove.me@teste.com', password: 'Senha@1234' })
+    expect(res.status).toBe(201)
+    expect(res.body.emailVerified).toBe(true)
+
+    const del = await request(app)
+      .delete(`/api/admin/admins/${res.body.id}`)
+      .set('Authorization', `Bearer ${getSuperAdminToken()}`)
+    expect(del.status).toBe(200)
+
+    const db = getDb()
+    const gone = db.prepare('SELECT id FROM users WHERE id = ?').get(res.body.id)
+    expect(gone).toBeUndefined()
+  })
+
+  it('should not remove the super admin', async () => {
+    const db = getDb()
+    const superAdmin = db.prepare("SELECT id FROM users WHERE super_admin = 1").get() as { id: string } | undefined
+    if (!superAdmin) return
+    const res = await request(app)
+      .delete(`/api/admin/admins/${superAdmin.id}`)
+      .set('Authorization', `Bearer ${getSuperAdminToken()}`)
+    expect(res.status).toBe(400)
+  })
 })
