@@ -36,7 +36,7 @@ router.post('/cleanup-test-data', authMiddleware, (req, res) => {
 
   if (ids.length > 0) {
     const placeholders = ids.map(() => '?').join(', ')
-    db.prepare(`DELETE FROM payments WHERE fee_id IN (SELECT id FROM monthly_fees WHERE passenger_id IN (${placeholders}))`).run(...ids)
+    db.prepare(`DELETE FROM payments WHERE monthly_fee_id IN (SELECT id FROM monthly_fees WHERE passenger_id IN (${placeholders}))`).run(...ids)
     db.prepare(`DELETE FROM monthly_fees WHERE passenger_id IN (${placeholders})`).run(...ids)
     db.prepare(`DELETE FROM receipts WHERE passenger_id IN (${placeholders})`).run(...ids)
     db.prepare(`DELETE FROM availability WHERE passenger_id IN (${placeholders})`).run(...ids)
