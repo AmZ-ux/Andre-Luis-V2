@@ -21,6 +21,7 @@ import settingsRoutes from './routes/settings.js'
 import clientErrorRoutes from './routes/clientError.js'
 import { paymentsRouter, handleStripeWebhook } from './routes/payments.js'
 import maintenanceRoutes from './routes/maintenance.js'
+import adminRoutes from './routes/admin.js'
 import { startScheduler } from './services/scheduler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -75,6 +76,8 @@ app.use('/api/payments', authMiddleware, paymentsRouter)
 
 // TEMPORÁRIO: remover após limpeza dos dados de teste
 app.use('/api/maintenance', maintenanceRoutes)
+
+app.use('/api/admin', adminRoutes)
 
 // Health check
 app.get('/api/health', (_req, res) => {

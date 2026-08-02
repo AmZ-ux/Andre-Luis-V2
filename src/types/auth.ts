@@ -8,6 +8,7 @@ export interface User {
   phone: string
   photo?: string
   role: UserRole
+  superAdmin?: boolean
   emailVerified?: boolean
   createdAt: string
   lastAccess: string

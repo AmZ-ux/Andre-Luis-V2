@@ -27,8 +27,8 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
     return
   }
 
-  // Produção real: passageiro precisa verificar o email antes de entrar.
-  if (user.role === 'passenger' && !user.email_verified) {
+  // Produção real: todo usuário (exceto o super admin) precisa verificar o email antes de entrar.
+  if (!user.super_admin && !user.email_verified) {
     res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Verifique seu email para acessar o sistema.' })
     return
   }
@@ -45,6 +45,7 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
       phone: user.phone,
       photo: user.photo,
       role: user.role,
+      superAdmin: !!user.super_admin,
       emailVerified: !!user.email_verified,
       createdAt: user.created_at,
       lastAccess: user.last_access,
@@ -122,7 +123,7 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
 
   const token = signToken({ userId: id, role: 'passenger' })
   res.status(201).json({
-    user: { id, name, email, cpf, phone: phone || '', photo: '', role: 'passenger', emailVerified: false, createdAt: new Date().toISOString(), lastAccess: new Date().toISOString() },
+    user: { id, name, email, cpf, phone: phone || '', photo: '', role: 'passenger', superAdmin: false, emailVerified: false, createdAt: new Date().toISOString(), lastAccess: new Date().toISOString() },
     token,
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
   })
@@ -136,6 +137,7 @@ router.get('/me', authMiddleware, (req, res) => {
   res.json({
     id: user.id, name: user.name, email: user.email, cpf: user.cpf,
     phone: user.phone, photo: user.photo, role: user.role,
+    superAdmin: !!user.super_admin,
     emailVerified: !!user.email_verified,
     createdAt: user.created_at, lastAccess: user.last_access,
   })

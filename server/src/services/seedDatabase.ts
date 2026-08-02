@@ -11,10 +11,10 @@ export async function runSeed(): Promise<void> {
   const ADMIN_ID = uuid()
   const PASSWORD_HASH = bcrypt.hashSync('admin123', 10)
 
-  // Default admin user
+  // Default admin user (super admin — o criador do projeto)
   db.prepare(`
-    INSERT OR IGNORE INTO users (id, name, email, cpf, phone, role, password_hash)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO users (id, name, email, cpf, phone, role, super_admin, password_hash)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?)
   `).run(ADMIN_ID, 'Administrador', 'admin@transporte.com', '000.000.000-00', '(11) 99999-9999', 'admin', PASSWORD_HASH)
 
   // Default passenger user

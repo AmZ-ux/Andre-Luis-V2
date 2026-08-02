@@ -129,7 +129,7 @@ export function ProfilePage() {
           <div className="flex-1 text-center sm:text-left">
             <h2 className="text-lg font-bold text-text">{user.name}</h2>
             <Badge variant="primary" className="mt-1">
-              {getRoleLabel(user.role)}
+              {user.superAdmin ? 'Super Admin' : getRoleLabel(user.role)}
             </Badge>
             <div className="mt-1">
               {user.emailVerified ? (

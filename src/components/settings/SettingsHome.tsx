@@ -12,6 +12,7 @@ import { SystemSettingsForm } from './SystemSettingsForm'
 import { useSettings } from '../../hooks/useSettings'
 import { SETTINGS_CATEGORIES } from '../../types/settings'
 import type { SettingsCategory } from '../../types/settings'
+import { AdminsManager } from './AdminsManager'
 import { Search, History, FileText, Settings as SettingsIcon } from 'lucide-react'
 import { cn } from '../../utils/cn'
 
@@ -83,7 +84,7 @@ export function SettingsHome() {
         case 'system':
           return <SystemSettingsForm settings={settings.system} onSave={(v) => updateCategory('system', v)} saved={saved} />
         case 'users':
-          return <UserSettingsInfo settings={settings.users} />
+          return <AdminsManager />
         default:
           return null
       }
@@ -157,36 +158,6 @@ export function SettingsHome() {
           {renderContent()}
         </motion.div>
       )}
-    </div>
-  )
-}
-
-function UserSettingsInfo({ settings }: { settings: { admins: number; operators: number; roles: { name: string; permissions: string[] }[] } }) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
-          <p className="text-xs text-primary font-medium">Administradores</p>
-          <p className="text-2xl font-bold text-text mt-1">{settings.admins}</p>
-        </div>
-        <div className="p-4 rounded-xl bg-warning/10 border border-warning/20">
-          <p className="text-xs text-warning font-medium">Operadores</p>
-          <p className="text-2xl font-bold text-text mt-1">{settings.operators}</p>
-        </div>
-      </div>
-      <div>
-        <p className="text-sm font-medium text-text mb-3">Papéis e permissões</p>
-        {settings.roles.map((role) => (
-          <div key={role.name} className="p-3 rounded-xl border border-gray-100 dark:border-gray-800 mb-2">
-            <p className="text-sm font-medium text-text capitalize">{role.name}</p>
-            <div className="flex gap-1 mt-1.5 flex-wrap">
-              {role.permissions.map((p) => (
-                <span key={p} className="text-[10px] bg-primary/5 text-primary px-2 py-0.5 rounded-full">{p}</span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }

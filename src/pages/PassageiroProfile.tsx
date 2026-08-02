@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { passengerService } from '../services/passengerService'
+import { adminService } from '../services/adminService'
+import { useAuth } from '../auth/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { PassengerAvatar } from '../components/passengers/PassengerAvatar'
 import { PassengerStatusBadge } from '../components/passengers/PassengerStatusBadge'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
-import { ArrowLeft, Pencil, Phone, Mail, MapPin, Calendar, DollarSign, CreditCard, FileText, Building2, BookOpen, Briefcase } from 'lucide-react'
+import { ArrowLeft, Pencil, Phone, Mail, MapPin, Calendar, DollarSign, CreditCard, FileText, Building2, BookOpen, Briefcase, ShieldCheck } from 'lucide-react'
 import type { Passenger } from '../types/passenger'
 
 const typeLabel: Record<string, string> = {
@@ -28,9 +31,13 @@ const statusLabel: Record<string, string> = {
 export function PassageiroProfile() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { addToast } = useToast()
   const [passenger, setPassenger] = useState<Passenger | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [promoting, setPromoting] = useState(false)
+  const isSuperAdmin = user?.superAdmin === true
 
   useEffect(() => {
     if (!id) return
@@ -44,6 +51,21 @@ export function PassageiroProfile() {
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [id])
+
+  const handlePromote = async () => {
+    if (!passenger) return
+    if (!window.confirm(`Promover ${passenger.name} a administrador? Ele passará a acessar o painel administrativo do transporte.`)) return
+    setPromoting(true)
+    try {
+      await adminService.promote(passenger.id)
+      addToast('success', `${passenger.name} agora é administrador.`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao promover'
+      addToast('error', 'Não foi possível promover', message)
+    } finally {
+      setPromoting(false)
+    }
+  }
 
   if (loading) return <PageSpinner />
   if (error || !passenger) {
@@ -114,6 +136,17 @@ export function PassageiroProfile() {
           >
             Editar
           </Button>
+          {isSuperAdmin && (
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={promoting}
+              icon={<ShieldCheck className="h-4 w-4" />}
+              onClick={() => void handlePromote()}
+            >
+              Promover a administrador
+            </Button>
+          )}
         </div>
       </Card>
 

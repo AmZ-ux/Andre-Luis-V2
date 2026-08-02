@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT NOT NULL DEFAULT '',
   photo TEXT DEFAULT '',
   role TEXT NOT NULL DEFAULT 'passenger',
+  super_admin INTEGER NOT NULL DEFAULT 0,
   password_hash TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_access TEXT NOT NULL DEFAULT (datetime('now')),
@@ -225,6 +226,7 @@ export async function runMigrations(): Promise<void> {
   try { db.exec("ALTER TABLE users ADD COLUMN reset_token TEXT DEFAULT NULL") } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN reset_token_expires INTEGER DEFAULT NULL") } catch {}
   try { db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0') } catch {}
+  try { db.exec('ALTER TABLE users ADD COLUMN super_admin INTEGER NOT NULL DEFAULT 0') } catch {}
   try { db.exec('ALTER TABLE users ADD COLUMN verify_token TEXT DEFAULT NULL') } catch {}
   try { db.exec('ALTER TABLE users ADD COLUMN verify_token_expires INTEGER DEFAULT NULL') } catch {}
   try { db.exec('ALTER TABLE passengers ADD COLUMN pickup_point TEXT DEFAULT \'\'') } catch {}

@@ -51,6 +51,32 @@ export const realAuth = {
     api.post<{ message: string }>('/auth/reset-password', { token, password }, true),
 }
 
+// --- Admin management (super admin) ---
+export interface AdminUser {
+  id: string
+  name: string
+  email: string
+  phone: string
+  role: string
+  superAdmin: boolean
+  emailVerified: boolean
+  lastAccess: string
+  createdAt: string
+}
+
+export const realAdmin = {
+  list: () => api.get<AdminUser[]>('/admin/admins'),
+
+  create: (data: { name: string; email: string; password: string }) =>
+    api.post<AdminUser>('/admin/admins', data),
+
+  promote: (userId: string) =>
+    api.post<{ success: boolean }>('/admin/promote', { userId }),
+
+  demote: (userId: string) =>
+    api.post<{ success: boolean }>('/admin/demote', { userId }),
+}
+
 // --- Passengers ---
 // O servidor guarda/retorna endereco em campos achatados (zip_code, street, ...),
 // enquanto o frontend usa um objeto aninhado `address`. Mapeamento abaixo.

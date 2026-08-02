@@ -46,13 +46,22 @@ router.post('/cleanup-test-data', authMiddleware, (req, res) => {
   }
   result.usersRemoved = ids.length
 
-  if (req.body?.newAdminPassword && typeof req.body.newAdminPassword === 'string' && req.body.newAdminPassword.length >= 8) {
-    db.prepare('UPDATE users SET password_hash = ? WHERE role = ? AND email = ?')
-      .run(bcrypt.hashSync(req.body.newAdminPassword, 10), 'admin', 'admin@transporte.com')
-    result.adminPasswordChanged = true
+  // O admin@transporte.com vira o super admin (criador do projeto).
+  const superAdmin = db.prepare('SELECT id FROM users WHERE role = ? AND email = ?').get('admin', 'admin@transporte.com') as { id: string } | undefined
+  if (superAdmin) {
+    if (req.body?.newAdminEmail && typeof req.body.newAdminEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.body.newAdminEmail)) {
+      db.prepare('UPDATE users SET email = ?, email_verified = 1 WHERE id = ?').run(req.body.newAdminEmail.trim().toLowerCase(), superAdmin.id)
+      result.adminEmailChanged = true
+    }
+    db.prepare('UPDATE users SET super_admin = 1, email_verified = 1 WHERE id = ?').run(superAdmin.id)
+    result.superAdminReady = true
   }
 
-  db.prepare("UPDATE users SET email_verified = 1 WHERE role = 'admin'").run()
+  if (req.body?.newAdminPassword && typeof req.body.newAdminPassword === 'string' && req.body.newAdminPassword.length >= 8) {
+    db.prepare('UPDATE users SET password_hash = ? WHERE role = ? AND super_admin = 1')
+      .run(bcrypt.hashSync(req.body.newAdminPassword, 10), 'admin')
+    result.adminPasswordChanged = true
+  }
 
   saveDb()
   res.json({ success: true, ...result })
