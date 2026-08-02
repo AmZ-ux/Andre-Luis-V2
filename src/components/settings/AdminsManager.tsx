@@ -61,7 +61,6 @@ export function AdminsManager() {
     e.preventDefault()
 
     const errors: typeof formErrors = {}
-    if (!form.name.trim()) errors.name = 'Informe o nome'
     const emailCheck = validateEmail(form.email)
     if (!emailCheck.valid) errors.email = emailCheck.error
     if (form.password.length < 8) errors.password = 'Mínimo de 8 caracteres'
@@ -70,8 +69,8 @@ export function AdminsManager() {
 
     setCreating(true)
     try {
-      await adminService.create({ name: form.name.trim(), email: form.email.trim(), password: form.password })
-      addToast('success', 'Administrador criado!', 'Ele receberá o código de verificação de email no primeiro acesso.')
+      await adminService.create({ name: form.name.trim() || 'Administrador', email: form.email.trim(), password: form.password })
+      addToast('success', 'Administrador criado!', 'Envie o e-mail e a senha para o responsável — ele já entra como administrador.')
       setForm({ name: '', email: '', password: '' })
       setShowCreate(false)
       await load()
@@ -136,13 +135,13 @@ export function AdminsManager() {
         <Card>
           <h3 className="text-sm font-semibold text-text mb-1">Criar conta de administrador</h3>
           <p className="text-xs text-gray-500 mb-4">
-            Use o email e a senha fornecidos pelo responsável (ex.: o André Luis). Ele precisará
-            verificar o email no primeiro acesso.
+            Cadastre as credenciais (e-mail e senha) do responsável do transporte (ex.: o André
+            Luis). Ele já entra direto como administrador — sem precisar se cadastrar como passageiro.
           </p>
           <form onSubmit={handleCreate} className="space-y-4">
             <Input
               label="Nome completo"
-              placeholder="Nome do administrador"
+              placeholder="Opcional — ex.: André Luis"
               value={form.name}
               onChange={(e) => {
                 setForm((p) => ({ ...p, name: e.target.value }))

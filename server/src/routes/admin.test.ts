@@ -58,7 +58,7 @@ describe('Admin management (super admin only)', () => {
     expect(res.status).toBe(201)
     expect(res.body.role).toBe('admin')
     expect(res.body.superAdmin).toBe(false)
-    expect(res.body.emailVerified).toBe(false)
+    expect(res.body.emailVerified).toBe(true)
   })
 
   it('should reject creating admin with short password', async () => {

@@ -41,12 +41,13 @@ router.get('/admins', requireSuperAdmin, (req, res) => {
   })))
 })
 
-router.post('/admins', requireSuperAdmin, validateBody('name', 'email', 'password'), (req, res) => {
-  const { name, email, password } = req.body
+router.post('/admins', requireSuperAdmin, validateBody('email', 'password'), (req, res) => {
+  const { email, password } = req.body
   if (String(password).length < 8) {
     res.status(400).json({ error: 'A senha deve ter no mínimo 8 caracteres' })
     return
   }
+  const name = String(req.body.name ?? '').trim() || 'Administrador'
   const db = getDb()
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(String(email).trim().toLowerCase())
   if (existing) {
@@ -54,10 +55,12 @@ router.post('/admins', requireSuperAdmin, validateBody('name', 'email', 'passwor
     return
   }
   const id = uuid()
+  // Conta criada diretamente pelo super admin: as credenciais são entregues ao
+  // responsável do transporte, então o email já nasce verificado (ele entra direto).
   db.prepare(
-    'INSERT INTO users (id, name, email, cpf, phone, role, password_hash, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 0)'
-  ).run(id, String(name).trim(), String(email).trim().toLowerCase(), '', '', 'admin', bcrypt.hashSync(String(password), 10))
-  res.status(201).json({ id, name: String(name).trim(), email: String(email).trim().toLowerCase(), role: 'admin', superAdmin: false, emailVerified: false })
+    'INSERT INTO users (id, name, email, cpf, phone, role, password_hash, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)'
+  ).run(id, name, String(email).trim().toLowerCase(), '', '', 'admin', bcrypt.hashSync(String(password), 10))
+  res.status(201).json({ id, name, email: String(email).trim().toLowerCase(), role: 'admin', superAdmin: false, emailVerified: true })
 })
 
 router.post('/promote', requireSuperAdmin, validateBody('userId'), (req, res) => {
