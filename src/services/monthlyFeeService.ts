@@ -309,16 +309,16 @@ export const monthlyFeeService = {
     saveFees(fees.filter((f) => f.id !== id))
   },
 
-  async ensureCurrent(): Promise<MonthlyFee> {
+  async ensureCurrent(): Promise<{ next: MonthlyFee | null; created: number }> {
     if (config.realApi) return realMonthlyFees.ensureCurrent()
     const { sessionManager } = await import('../auth/sessionManager')
     const session = sessionManager.load()
     if (!session?.user) throw new Error('Não autenticado')
     await this.ensureContractFees(session.user.id)
-    const now = new Date()
     const fees = loadFees()
-    const fee = fees.find((f) => f.passengerId === session.user.id && f.month === now.getMonth() + 1 && f.year === now.getFullYear())
-    if (!fee) throw new Error('Mensalidade indisponível para este mês')
-    return fee
+      .filter((f) => f.passengerId === session.user!.id)
+      .sort((a, b) => (a.year - b.year) || (a.month - b.month))
+    const next = fees.find((f) => f.status === 'pending' || f.status === 'overdue') || fees[fees.length - 1] || null
+    return { next, created: 0 }
   },
 }

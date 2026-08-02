@@ -2,7 +2,7 @@
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
-import { generateMonthlyFees } from '../services/monthlyFeeGenerator.js'
+import { generateMonthlyFees, ensureContractFees } from '../services/monthlyFeeGenerator.js'
 import { calculateDueFromFee } from '../services/billingRules.js'
 import { notifyPaymentReceived } from '../services/feeAutomation.js'
 
@@ -14,36 +14,31 @@ function requireAdmin(req: any, res: any): boolean {
   return true
 }
 
-// Garante a mensalidade do mes corrente para o passageiro autenticado,
-// criando-a sob demanda (regras de inatividade/ferias) se ainda nao existir.
+// Garante a serie de mensalidades do passageiro autenticado a partir do seu
+// contrato (primeira competencia = mes seguinte ao inicio), criando sob demanda
+// os ciclos ja vencidos que ainda nao existem. O admin nao gera mensalidades.
 router.post('/ensure-current', (req, res) => {
   if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
   if (req.user.role !== 'passenger') { res.status(403).json({ error: 'Apenas passageiros' }); return }
 
   const db = getDb()
-  const now = new Date()
-  const month = now.getMonth() + 1
-  const year = now.getFullYear()
+  const result = ensureContractFees(req.user.userId, db)
 
-  const existing = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? AND month = ? AND year = ?')
-    .get(req.user.userId, month, year) as any
-  if (existing) {
-    const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(existing.id)
-    res.json({ ...existing, payment: payment || null, ensured: false })
-    return
-  }
+  const fees = db.prepare(`
+    SELECT mf.* FROM monthly_fees mf
+    WHERE mf.passenger_id = ?
+    ORDER BY mf.year ASC, mf.month ASC
+  `).all(req.user.userId) as any[]
 
-  const result = generateMonthlyFees({ month, year, passengerIds: [req.user.userId] }, db)
-  const created = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? AND month = ? AND year = ?')
-    .get(req.user.userId, month, year) as any
+  const next = fees.find((f) => f.status === 'pending' || f.status === 'overdue') || fees[fees.length - 1] || null
 
-  if (!created) {
-    res.status(400).json({ error: 'Mensalidade indisponível para este mês' })
-    return
-  }
-
-  const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(created.id)
-  res.status(201).json({ ...created, payment: payment || null, ensured: true, skipped: result.skippedInactive + result.skippedVacation })
+  res.json({
+    created: result.created,
+    ensured: result.created > 0,
+    next: next
+      ? { ...next, payment: db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(next.id) || null }
+      : null,
+  })
 })
 
 router.get('/', (req, res) => {

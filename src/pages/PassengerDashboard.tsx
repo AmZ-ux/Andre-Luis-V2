@@ -7,6 +7,7 @@ import { monthlyFeeService } from '../services/monthlyFeeService'
 import { receiptService } from '../services/receiptService'
 import { availabilityService } from '../services/availabilityService'
 import { calculateStatus } from '../services/statusCalculator'
+import { FeeCheckoutModal } from '../components/monthlyFees/FeeCheckoutModal'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
@@ -98,12 +99,14 @@ export function PassengerDashboard() {
   const [fees, setFees] = useState<MonthlyFee[]>([])
   const [receipts, setReceipts] = useState<Receipt[]>([])
   const [availabilities, setAvailabilities] = useState<Availability[]>([])
+  const [checkoutFee, setCheckoutFee] = useState<MonthlyFee | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
     try {
+      try { await monthlyFeeService.ensureCurrent() } catch {}
       const [passengerData, feeData, receiptData, availabilityData] = await Promise.all([
         passengerService.getById(user.id),
         monthlyFeeService.getByPassengerId(user.id),
@@ -134,7 +137,10 @@ export function PassengerDashboard() {
   const firstName = user.name.split(' ')[0]
 
   const sortedFees = [...fees].sort((a, b) => b.year - a.year || b.month - a.month)
-  const currentFee = sortedFees[0] || null
+  const nextUnpaid = [...fees]
+    .sort((a, b) => a.year - b.year || a.month - b.month)
+    .find((f) => f.status === 'pending' || f.status === 'overdue')
+  const currentFee = nextUnpaid || sortedFees[0] || null
   const feeStatus = currentFee ? calculateStatus(currentFee, currentFee.payment) : null
 
   const upcoming = availabilities
@@ -226,10 +232,16 @@ export function PassengerDashboard() {
                 </div>
 
                 {(feeStatus === 'pending' || feeStatus === 'overdue') && (
-                  <div className="pt-2">
-                    <Button onClick={() => navigate('/meus-comprovantes')}>
-                      Enviar comprovante de pagamento
+                  <div className="pt-2 flex flex-wrap items-center gap-3">
+                    <Button onClick={() => setCheckoutFee(currentFee)}>
+                      Efetuar pagamento
                     </Button>
+              <button
+                onClick={() => navigate('/minhas-mensalidades')}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Ver tudo
+              </button>
                   </div>
                 )}
               </div>
@@ -412,6 +424,12 @@ export function PassengerDashboard() {
           </Card>
         </div>
       </div>
+
+      <FeeCheckoutModal
+        fee={checkoutFee}
+        onClose={() => setCheckoutFee(null)}
+        onPaid={() => { setCheckoutFee(null); load() }}
+      />
     </motion.div>
   )
 }

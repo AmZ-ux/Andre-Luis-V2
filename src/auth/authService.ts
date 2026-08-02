@@ -140,6 +140,7 @@ export const authService = {
       const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(credentials.contractStartDate)
       return match ? Number(match[3]) : 5
     })()
+    const monthlyFee = Number(String(credentials.monthlyFee || '').replace(',', '.')) || 0
 
     await passengerService.create(
       {
@@ -160,7 +161,7 @@ export const authService = {
           state: '',
         },
         transportType: credentials.transportType,
-        monthlyFee: 0,
+        monthlyFee,
         dueDay,
         paymentMethod: 'pix',
         status: 'active',
@@ -172,7 +173,16 @@ export const authService = {
       { id }
     )
 
+    // Primeira mensalidade: competencia do mes seguinte ao inicio do contrato
     const now = new Date()
+    const startMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(credentials.contractStartDate)
+    let feeMonth = now.getMonth() + 1
+    let feeYear = now.getFullYear()
+    if (startMatch) {
+      feeMonth = Number(startMatch[2]) + 1
+      feeYear = Number(startMatch[1])
+      if (feeMonth > 12) { feeMonth = 1; feeYear++ }
+    }
     await monthlyFeeService.create({
       passengerId: user.id,
       passengerName: user.name,
@@ -180,9 +190,9 @@ export const authService = {
       transportType: credentials.transportType,
       institution: undefined,
       company: undefined,
-      month: now.getMonth() + 1,
-      year: now.getFullYear(),
-      amount: 0,
+      month: feeMonth,
+      year: feeYear,
+      amount: monthlyFee,
       dueDay,
     })
 

@@ -48,8 +48,14 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
 })
 
 router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req, res) => {
-  const { name, email, cpf, password, phone, transportType, pickupPoint, destination, contractStartDate } = req.body
+  const { name, email, cpf, password, phone, transportType, pickupPoint, destination, contractStartDate, monthlyFee } = req.body
   const db = getDb()
+
+  const feeValue = Number(monthlyFee)
+  if (!Number.isFinite(feeValue) || feeValue <= 0) {
+    res.status(400).json({ error: 'Informe o valor da mensalidade' })
+    return
+  }
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ? OR cpf = ?').get(email, cpf)
   if (existing) {
@@ -78,23 +84,33 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
   db.prepare(`
     INSERT INTO passengers (
       id, name, cpf, birth_date, phone, email, transport_type, status,
-      pickup_point, destination, contract_start_date, due_day
+      pickup_point, destination, contract_start_date, due_day, monthly_fee
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
   `).run(
     id, name, cpf, '2000-01-01', phone || '', email, type,
-    pickupPoint || '', destination || '', contractStartDate || '', dueDay
+    pickupPoint || '', destination || '', contractStartDate || '', dueDay, feeValue
   )
 
-  // Create current month fee automatically
+  // First fee: competencia do mes seguinte ao inicio do contrato (1 mes de uso),
+  // vencendo no dia do contrato. Aparece pendente no dashboard logo apos o cadastro.
   const now = new Date()
+  let feeMonth = now.getMonth() + 1
+  let feeYear = now.getFullYear()
+  if (contractStartDate && /^\d{4}-\d{2}-\d{2}$/.test(contractStartDate)) {
+    const [y0, m0] = contractStartDate.split('-').map(Number)
+    feeMonth = m0 + 1
+    feeYear = y0
+    if (feeMonth > 12) { feeMonth = 1; feeYear++ }
+  }
+
   db.prepare(`
     INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)
-    VALUES (?, ?, ?, ?, ?, '', '', ?, ?, 0, ?, ?, 'pending')
+    VALUES (?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, 'pending')
   `).run(
     uuid(), id, name, cpf, type,
-    now.getMonth() + 1, now.getFullYear(), dueDay,
-    `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+    feeMonth, feeYear, feeValue, dueDay,
+    `${String(dueDay).padStart(2, '0')}/${String(feeMonth).padStart(2, '0')}/${feeYear}`
   )
 
   const token = signToken({ userId: id, role: 'passenger' })

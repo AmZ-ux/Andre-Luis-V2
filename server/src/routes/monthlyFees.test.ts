@@ -304,11 +304,12 @@ describe('POST /api/monthly-fees/ensure-current', () => {
     const res = await request(app)
       .post('/api/monthly-fees/ensure-current')
       .set('Authorization', `Bearer ${passengerToken}`)
-    expect(res.status).toBe(201)
-    expect(res.body.passenger_id).toBe(pid)
-    expect(res.body.month).toBe(currentMonth)
-    expect(res.body.year).toBe(currentYear)
-    expect(res.body.status).toBe('pending')
+    expect(res.status).toBe(200)
+    expect(res.body.ensured).toBe(true)
+    expect(res.body.next.passenger_id).toBe(pid)
+    expect(res.body.next.month).toBe(currentMonth)
+    expect(res.body.next.year).toBe(currentYear)
+    expect(res.body.next.status).toBe('pending')
   })
 
   it('should return the existing fee without duplicating', async () => {
@@ -318,18 +319,20 @@ describe('POST /api/monthly-fees/ensure-current', () => {
       .post('/api/monthly-fees/ensure-current')
       .set('Authorization', `Bearer ${passengerToken}`)
     expect(res.status).toBe(200)
-    expect(res.body.id).toBe(feeId)
+    expect(res.body.next.id).toBe(feeId)
     expect(res.body.ensured).toBe(false)
     const count = getDb().prepare('SELECT COUNT(*) as c FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
     expect(count.c).toBe(1)
   })
 
-  it('should reject inactive passengers', async () => {
+  it('should not generate fees for inactive passengers', async () => {
     const { token: passengerToken } = seedPassengerUser('inactive')
     const res = await request(app)
       .post('/api/monthly-fees/ensure-current')
       .set('Authorization', `Bearer ${passengerToken}`)
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    expect(res.body.created).toBe(0)
+    expect(res.body.next).toBeNull()
   })
 
   it('should deny admin users', async () => {

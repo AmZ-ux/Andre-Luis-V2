@@ -3,23 +3,18 @@ import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
 import { monthlyFeeService } from '../services/monthlyFeeService'
-import { realPayments } from '../services/realApi'
 import { MonthlyFeeStatus } from '../components/monthlyFees/MonthlyFeeStatus'
-import { PixCheckout } from '../components/monthlyFees/PixCheckout'
-import { CardCheckout } from '../components/monthlyFees/CardCheckout'
-import { Modal } from '../components/ui/Modal'
+import { FeeCheckoutModal } from '../components/monthlyFees/FeeCheckoutModal'
 import { Button } from '../components/ui/Button'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useToast } from '../contexts/ToastContext'
-import { Wallet, QrCode, CreditCard, RefreshCw } from 'lucide-react'
+import { Wallet, RefreshCw, CreditCard } from 'lucide-react'
 import type { MonthlyFee } from '../types/monthlyFee'
 
 const monthNames = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ]
-
-type CheckoutMethod = 'pix' | 'card' | null
 
 export function MinhasMensalidades() {
   const { user } = useAuth()
@@ -28,17 +23,16 @@ export function MinhasMensalidades() {
   const [fees, setFees] = useState<MonthlyFee[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [selectedFee, setSelectedFee] = useState<MonthlyFee | null>(null)
-  const [checkoutMethod, setCheckoutMethod] = useState<CheckoutMethod>(null)
-  const [cardClientSecret, setCardClientSecret] = useState('')
-  const [preparingCard, setPreparingCard] = useState(false)
-  const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [checkoutFee, setCheckoutFee] = useState<MonthlyFee | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (ensure = true) => {
     if (!user) return
     setLoading(true)
     setLoadError(null)
     try {
+      if (ensure) {
+        try { await monthlyFeeService.ensureCurrent() } catch {}
+      }
       let fees = await monthlyFeeService.getByPassengerId(user.id)
       fees = fees.sort((a, b) => (b.year - a.year) || (b.month - a.month))
       setFees(fees)
@@ -58,7 +52,7 @@ export function MinhasMensalidades() {
     if (redirectStatus === 'succeeded') {
       addToast('success', 'Pagamento confirmado!')
       setSearchParams({}, { replace: true })
-      load()
+      load(false)
     } else if (redirectStatus === 'failed' || redirectStatus === 'canceled') {
       addToast('error', 'O pagamento não foi concluído')
       setSearchParams({}, { replace: true })
@@ -68,41 +62,18 @@ export function MinhasMensalidades() {
   const handleEnsureCurrent = async () => {
     try {
       await monthlyFeeService.ensureCurrent()
-      await load()
-      addToast('success', 'Mensalidade deste mês gerada!')
+      await load(false)
+      addToast('success', 'Mensalidades atualizadas!')
     } catch (err: any) {
-      addToast('error', err?.message || 'Não foi possível gerar a mensalidade deste mês')
+      addToast('error', err?.message || 'Não foi possível atualizar as mensalidades')
     }
-  }
-
-  const openCheckout = (fee: MonthlyFee, method: 'pix' | 'card') => {
-    setPaymentError(null)
-    setSelectedFee(fee)
-    setCheckoutMethod(method)
-    setCardClientSecret('')
-    if (method === 'card') {
-      setPreparingCard(true)
-      realPayments.create(fee.id, 'card')
-        .then((res) => setCardClientSecret(res.clientSecret))
-        .catch((err: any) => setPaymentError(err?.message || 'Falha ao preparar o pagamento'))
-        .finally(() => setPreparingCard(false))
-    }
-  }
-
-  const closeCheckout = () => {
-    setSelectedFee(null)
-    setCheckoutMethod(null)
-    setCardClientSecret('')
-    setPaymentError(null)
   }
 
   const handlePaid = () => {
     addToast('success', 'Pagamento confirmado!')
-    closeCheckout()
-    load()
+    setCheckoutFee(null)
+    load(false)
   }
-
-  const payable = fees.filter((f) => f.status === 'pending' || f.status === 'overdue')
 
   return (
     <div className="space-y-6">
@@ -120,7 +91,7 @@ export function MinhasMensalidades() {
           icon={<RefreshCw className="h-4 w-4" />}
           onClick={handleEnsureCurrent}
         >
-          Gerar mês atual
+          Atualizar
         </Button>
       </div>
 
@@ -129,13 +100,13 @@ export function MinhasMensalidades() {
       ) : loadError ? (
         <div className="text-center py-12">
           <p className="text-sm text-error">{loadError}</p>
-          <Button variant="secondary" className="mt-4" onClick={load}>Tentar novamente</Button>
+          <Button variant="secondary" className="mt-4" onClick={() => load()}>Tentar novamente</Button>
         </div>
       ) : fees.length === 0 ? (
         <div className="text-center py-16">
           <Wallet className="h-10 w-10 text-gray-300 mx-auto mb-3" />
           <p className="text-sm text-gray-400">Nenhuma mensalidade encontrada</p>
-          <Button className="mt-4" onClick={handleEnsureCurrent}>Gerar mensalidade deste mês</Button>
+          <Button className="mt-4" onClick={handleEnsureCurrent}>Gerar mensalidades</Button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -163,23 +134,9 @@ export function MinhasMensalidades() {
                     R$ {fee.amount.toFixed(2).replace('.', ',')}
                   </p>
                   {canPay && (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<QrCode className="h-4 w-4" />}
-                        onClick={() => openCheckout(fee, 'pix')}
-                      >
-                        PIX
-                      </Button>
-                      <Button
-                        size="sm"
-                        icon={<CreditCard className="h-4 w-4" />}
-                        onClick={() => openCheckout(fee, 'card')}
-                      >
-                        Cartão
-                      </Button>
-                    </div>
+                    <Button size="sm" icon={<CreditCard className="h-4 w-4" />} onClick={() => setCheckoutFee(fee)}>
+                      Efetuar pagamento
+                    </Button>
                   )}
                   {fee.status === 'paid' && fee.payment && (
                     <p className="text-sm text-success">Pago em {fee.payment.paymentDate}</p>
@@ -191,67 +148,7 @@ export function MinhasMensalidades() {
         </div>
       )}
 
-      <Modal
-        isOpen={!!selectedFee}
-        onClose={closeCheckout}
-        title={selectedFee ? `Pagamento - ${monthNames[(selectedFee.month - 1) % 12]} ${selectedFee.year}` : 'Pagamento'}
-      >
-        {selectedFee && (
-          <div className="space-y-4">
-            {paymentError && (
-              <div className="bg-error/5 border border-error/20 rounded-xl px-4 py-3 text-sm text-error">
-                {paymentError}
-              </div>
-            )}
-
-            {checkoutMethod === null && (
-              <div className="grid grid-cols-1 gap-3">
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  className="justify-start"
-                  icon={<QrCode className="h-5 w-5" />}
-                  onClick={() => openCheckout(selectedFee, 'pix')}
-                >
-                  Pagar com PIX
-                </Button>
-                <Button
-                  fullWidth
-                  className="justify-start"
-                  icon={<CreditCard className="h-5 w-5" />}
-                  loading={preparingCard}
-                  onClick={() => openCheckout(selectedFee, 'card')}
-                >
-                  Pagar com cartão
-                </Button>
-              </div>
-            )}
-
-            {checkoutMethod === 'pix' && (
-              <PixCheckout
-                fee={selectedFee}
-                onPaid={handlePaid}
-                onBack={() => { setCheckoutMethod(null); setPaymentError(null) }}
-                onError={(message) => setPaymentError(message)}
-              />
-            )}
-
-            {checkoutMethod === 'card' && (preparingCard ? (
-              <p className="text-sm text-center text-gray-500 py-8">Preparando pagamento...</p>
-            ) : cardClientSecret ? (
-              <CardCheckout
-                fee={selectedFee}
-                clientSecret={cardClientSecret}
-                onPaid={handlePaid}
-                onBack={() => { setCheckoutMethod(null); setPaymentError(null) }}
-                onError={(message) => setPaymentError(message)}
-              />
-            ) : (
-              <p className="text-sm text-center text-gray-500 py-8">Não foi possível iniciar o pagamento</p>
-            ))}
-          </div>
-        )}
-      </Modal>
+      <FeeCheckoutModal fee={checkoutFee} onClose={() => setCheckoutFee(null)} onPaid={handlePaid} />
     </div>
   )
 }

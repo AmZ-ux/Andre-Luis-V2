@@ -109,7 +109,7 @@ export const realMonthlyFees = {
     api.get<MonthlyFee[]>(`/monthly-fees/passenger/${passengerId}`),
 
   ensureCurrent: () =>
-    api.post<MonthlyFee>('/monthly-fees/ensure-current'),
+    api.post<{ next: MonthlyFee | null; created: number }>('/monthly-fees/ensure-current'),
 
   create: (data: any) =>
     api.post<MonthlyFee>('/monthly-fees', data),

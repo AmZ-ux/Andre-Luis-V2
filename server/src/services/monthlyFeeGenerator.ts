@@ -95,3 +95,52 @@ export function generateMonthlyFees(request: GenerationRequest, db: any = getDb(
 
   return result
 }
+
+const MAX_CONTRACT_CYCLES = 60
+
+// Garante a serie de mensalidades de UM passageiro a partir do seu contrato:
+// a primeira competencia e o mes seguinte ao inicio do contrato (1 mes de uso),
+// e as demais sao criadas um ciclo por mes ate o mes corrente.
+export function ensureContractFees(passengerId: string, db: any = getDb()): GenerationResult {
+  const result: GenerationResult = { created: 0, skippedExisting: 0, skippedInactive: 0, skippedVacation: 0 }
+
+  const passenger = db.prepare('SELECT * FROM passengers WHERE id = ?').get(passengerId) as any
+  if (!passenger || passenger.status === 'inactive' || passenger.status === 'blocked') {
+    result.skippedInactive++
+    return result
+  }
+
+  const now = new Date()
+  const nowMonth = now.getMonth() + 1
+  const nowYear = now.getFullYear()
+
+  let firstYear: number
+  let firstMonth: number
+  const start = passenger.contract_start_date
+  if (typeof start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(start)) {
+    const [y, m] = start.split('-').map(Number)
+    firstMonth = m + 1
+    firstYear = y
+    if (firstMonth > 12) { firstMonth = 1; firstYear++ }
+  } else {
+    firstYear = nowYear
+    firstMonth = nowMonth
+  }
+
+  let y = firstYear
+  let m = firstMonth
+  let cycles = 0
+  while (y < nowYear || (y === nowYear && m <= nowMonth)) {
+    if (cycles >= MAX_CONTRACT_CYCLES) break
+    const r = generateMonthlyFees({ month: m, year: y, passengerIds: [passengerId] }, db)
+    result.created += r.created
+    result.skippedExisting += r.skippedExisting
+    result.skippedInactive += r.skippedInactive
+    result.skippedVacation += r.skippedVacation
+    m++
+    if (m > 12) { m = 1; y++ }
+    cycles++
+  }
+
+  return result
+}

@@ -1,7 +1,7 @@
 import cron from 'node-cron'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from './settingsService.js'
-import { generateMonthlyFees } from './monthlyFeeGenerator.js'
+import { ensureContractFees } from './monthlyFeeGenerator.js'
 import { markOverdueFees, sendPaymentReminders } from './feeAutomation.js'
 import { logger } from '../utils/logger.js'
 
@@ -23,13 +23,17 @@ function runDaily(): void {
   }
 }
 
-function runMonthlyGeneration(): void {
+// Gera as mensalidades de cada passageiro conforme o proprio contrato
+// (primeiro ciclo = mes seguinte ao inicio; demais, um por mes ate o atual).
+function runContractGeneration(): void {
   try {
     const db = getDb()
-    const now = new Date()
-    generateMonthlyFees({ month: now.getMonth() + 1, year: now.getFullYear() }, db)
+    const passengers = db.prepare("SELECT id FROM passengers WHERE status = 'active'").all() as any[]
+    for (const p of passengers) {
+      ensureContractFees(p.id, db)
+    }
   } catch (err) {
-    logger.error({ err }, 'Monthly fee generation task failed')
+    logger.error({ err }, 'Contract fee generation task failed')
   }
 }
 
@@ -38,7 +42,7 @@ export function startScheduler(): void {
   started = true
 
   cron.schedule('0 6 * * *', runDaily)
-  cron.schedule('0 7 1 * *', runMonthlyGeneration)
+  cron.schedule('0 7 * * *', runContractGeneration)
 
-  logger.info('Scheduler started (daily 06:00: overdue + reminders; monthly 1st 07:00: fee generation)')
+  logger.info('Scheduler started (daily 06:00: overdue + reminders; daily 07:00: fee generation per contract)')
 }

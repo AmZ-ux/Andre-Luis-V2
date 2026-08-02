@@ -36,6 +36,7 @@ export interface RegisterCredentials {
   pickupPoint: string
   destination: string
   contractStartDate: string
+  monthlyFee: string
 }
 
 export interface ForgotPasswordData {

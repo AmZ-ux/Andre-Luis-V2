@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import { PasswordInput } from '../../components/auth/PasswordInput'
 import { Button } from '../../components/ui/Button'
-import { UserPlus, ArrowRight, ArrowLeft, MapPin, CalendarClock } from 'lucide-react'
+import { UserPlus, ArrowRight, ArrowLeft, MapPin, CalendarClock, Wallet } from 'lucide-react'
 import {
   validateEmail,
   validateNewPassword,
@@ -33,6 +33,7 @@ interface RegisterErrors {
   pickupPoint?: string
   destination?: string
   contractStartDate?: string
+  monthlyFee?: string
 }
 
 export function RegisterPage() {
@@ -51,6 +52,7 @@ export function RegisterPage() {
     pickupPoint: '',
     destination: '',
     contractStartDate: '',
+    monthlyFee: '',
   })
   const [confirmPassword, setConfirmPassword] = useState('')
   const [errors, setErrors] = useState<RegisterErrors>({})
@@ -86,6 +88,10 @@ export function RegisterPage() {
     if (!form.pickupPoint.trim()) nextErrors.pickupPoint = 'Informe o ponto de saída'
     if (!form.destination.trim()) nextErrors.destination = 'Informe o destino'
     if (!form.contractStartDate) nextErrors.contractStartDate = 'Informe a data de início'
+    const feeValue = Number(String(form.monthlyFee).replace(',', '.'))
+    if (!form.monthlyFee || !Number.isFinite(feeValue) || feeValue <= 0) {
+      nextErrors.monthlyFee = 'Informe o valor da mensalidade'
+    }
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -115,6 +121,14 @@ export function RegisterPage() {
     const [y, m, d] = iso.split('-')
     return `${d}/${m}/${y}`
   }
+  const firstDueDateLabel = (() => {
+    if (!form.contractStartDate) return '-'
+    const [y, m, d] = form.contractStartDate.split('-').map(Number)
+    let nextMonth = m + 1
+    let nextYear = y
+    if (nextMonth > 12) { nextMonth = 1; nextYear++ }
+    return `${String(d).padStart(2, '0')}/${String(nextMonth).padStart(2, '0')}/${nextYear}`
+  })()
 
   return (
     <AuthLayout
@@ -254,13 +268,27 @@ export function RegisterPage() {
               icon={<CalendarClock className="h-4 w-4" />}
             />
 
+            <Input
+              label="Valor da mensalidade (R$)"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Ex.: 189,90"
+              value={form.monthlyFee}
+              onChange={(e) => handleChange('monthlyFee', e.target.value)}
+              error={errors.monthlyFee}
+              icon={<Wallet className="h-4 w-4" />}
+            />
+
             <div className="bg-primary/5 border border-primary/10 rounded-xl px-4 py-3 flex items-start gap-2">
               <CalendarClock className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <p className="text-xs text-gray-600 dark:text-gray-300">
                 {form.contractStartDate ? (
                   <>
                     Contrato iniciando em <strong className="text-text">{formatBRDate(form.contractStartDate)}</strong>.
-                    Sua mensalidade vencerá todo dia <strong className="text-text">{Number(form.contractStartDate.slice(8, 10))}</strong> de cada mês.
+                    Sua primeira mensalidade vencerá 1 mês após o início, em{' '}
+                    <strong className="text-text">{firstDueDateLabel}</strong>, e depois todo dia{' '}
+                    <strong className="text-text">{Number(form.contractStartDate.slice(8, 10))}</strong> de cada mês.
                   </>
                 ) : (
                   <>A data de início define o dia de vencimento da mensalidade todo mês.</>
