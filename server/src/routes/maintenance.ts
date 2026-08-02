@@ -45,7 +45,6 @@ router.post('/cleanup-test-data', authMiddleware, (req, res) => {
     db.prepare(`DELETE FROM users WHERE id IN (${placeholders})`).run(...ids)
   }
   result.usersRemoved = ids.length
-
   // O admin@transporte.com vira o super admin (criador do projeto).
   const superAdmin = db.prepare('SELECT id FROM users WHERE role = ? AND email = ?').get('admin', 'admin@transporte.com') as { id: string } | undefined
   if (superAdmin) {
