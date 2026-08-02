@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { v4 as uuid } from 'uuid'
 import { runMigrations } from '../database/schema.js'
 import { resetDb, getDb } from '../database/connection.js'
-import { markOverdueFees, sendPaymentReminders } from './feeAutomation.js'
+import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySummaryToAdmins, notifyPaymentReceived } from './feeAutomation.js'
 import { DEFAULT_SETTINGS } from './settingsService.js'
 import { generateMonthlyFees } from './monthlyFeeGenerator.js'
 
@@ -156,12 +156,75 @@ describe('sendPaymentReminders', () => {
     expect(notifications[0].user_id).toBe(pid)
   })
 
-  it('sends reminders for overdue fees', async () => {
+it('sends reminders for overdue fees', async () => {
     const pid = seedPassenger()
     seedFee(pid, { month: 7, year: 2026, dueDay: 1 }) // due 01/07 => 45 days late
     const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
     settings.communication.autoMessages = true
     const result = await sendPaymentReminders(getDb(), settings, today)
     expect(result.remindersSent).toBe(1)
+  })
+})
+
+describe('buildDailySummary & notifyDailySummaryToAdmins', () => {
+  it('counts pending and overdue fees', () => {
+    const pid = seedPassenger()
+    seedFee(pid, { month: 6, year: 2026, dueDay: 5, status: 'pending' })
+    seedFee(pid, { month: 8, year: 2026, dueDay: 20, status: 'overdue' })
+    const summary = buildDailySummary(getDb())
+    expect(summary.pending).toBe(1)
+    expect(summary.overdue).toBe(1)
+    expect(summary.total).toBe(2)
+  })
+
+  it('notifies all admins when there are pending fees', () => {
+    const db = getDb()
+    const admin1 = uuid()
+    const admin2 = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, role, password_hash) VALUES (?, ?, ?, ?, 'admin', 'x')")
+      .run(admin1, 'Admin1', 'admin1@test.com', '111.111.111-11')
+    db.prepare("INSERT INTO users (id, name, email, cpf, role, password_hash) VALUES (?, ?, ?, ?, 'admin', 'x')")
+      .run(admin2, 'Admin2', '111.111.111-12', '111.111.111-12')
+
+    const pid = seedPassenger()
+    seedFee(pid, { status: 'pending' })
+    notifyDailySummaryToAdmins(db, buildDailySummary(db))
+
+    const forAdmin1 = db.prepare('SELECT * FROM notifications WHERE user_id = ?').all(admin1)
+    const forAdmin2 = db.prepare('SELECT * FROM notifications WHERE user_id = ?').all(admin2)
+    expect(forAdmin1.length).toBe(1)
+    expect(forAdmin2.length).toBe(1)
+    expect(forAdmin1[0].title).toBe('Resumo diário de pagamentos')
+  })
+
+  it('does not notify admins when there is nothing pending', () => {
+    const db = getDb()
+    const admin = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, role, password_hash) VALUES (?, ?, ?, ?, 'admin', 'x')")
+      .run(admin, 'Admin', 'admin-sum@test.com', '222.222.222-22')
+    notifyDailySummaryToAdmins(db, { pending: 0, overdue: 0, total: 0 })
+    const rows = db.prepare('SELECT * FROM notifications').all()
+    expect(rows.length).toBe(0)
+  })
+})
+
+describe('notifyPaymentReceived', () => {
+  it('notifies the passenger and all admins', () => {
+    const db = getDb()
+    const outerAdmin = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, role, password_hash) VALUES (?, ?, ?, ?, 'admin', 'x')")
+      .run(outerAdmin, 'Admin', 'outer@test.com', '333.333.333-33')
+
+    const pid = seedPassenger()
+    const feeId = seedFee(pid, { month: 7, year: 2026, amount: 189.9, passengerName: 'Cliente Exemplo' })
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(feeId)
+    notifyPaymentReceived(db, fee, { amount: 189.9 })
+
+    const passengerNotif = db.prepare('SELECT * FROM notifications WHERE user_id = ?').all(pid)
+    const adminNotif = db.prepare('SELECT * FROM notifications WHERE user_id = ?').all(outerAdmin)
+    expect(passengerNotif.length).toBe(1)
+    expect(passengerNotif[0].title).toBe('Pagamento registrado')
+    expect(adminNotif.length).toBe(1)
+expect(adminNotif[0].title).toContain('Cliente Exemplo')
   })
 })

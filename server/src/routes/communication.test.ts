@@ -190,3 +190,81 @@ describe('GET /api/communication/notifications', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('Notification status actions', () => {
+  it('should return unread count for current user', async () => {
+    seedNotification({ userId: adminId, title: 'Unread 1' })
+    seedNotification({ userId: adminId, title: 'Unread 2' })
+    seedNotification({ userId: adminId, title: 'Read', status: 'read' })
+    const res = await request(app).get('/api/communication/notifications/unread').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.count).toBe(2)
+  })
+
+  it('should mark a notification as read', async () => {
+    const notifId = seedNotification({ userId: adminId, title: 'Test' })
+    const res = await request(app)
+      .patch(`/api/communication/notifications/${notifId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'read' })
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    const row = getDb().prepare('SELECT status FROM notifications WHERE id = ?').get(notifId) as any
+    expect(row.status).toBe('read')
+  })
+
+  it('should mark a notification as favorite', async () => {
+    const notifId = seedNotification({ userId: adminId, title: 'Test' })
+    const res = await request(app)
+      .patch(`/api/communication/notifications/${notifId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'favorite' })
+    expect(res.status).toBe(200)
+    const row = getDb().prepare('SELECT status, read_at FROM notifications WHERE id = ?').get(notifId) as any
+    expect(row.status).toBe('favorite')
+    expect(row.read_at).toBeTruthy()
+  })
+
+  it('should reject an invalid status', async () => {
+    const notifId = seedNotification({ userId: adminId, title: 'Test' })
+    const res = await request(app)
+      .patch(`/api/communication/notifications/${notifId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'spam' })
+    expect(res.status).toBe(400)
+  })
+
+  it('should not update notification of another user', async () => {
+    const otherId = uuid()
+    const notifId = seedNotification({ userId: otherId, title: 'Other' })
+    const res = await request(app)
+      .patch(`/api/communication/notifications/${notifId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'read' })
+    expect(res.status).toBe(200)
+    const row = getDb().prepare('SELECT status FROM notifications WHERE id = ?').get(notifId) as any
+    expect(row.status).toBe('unread')
+  })
+
+  it('should archive a notification and hide it from the list', async () => {
+    const notifId = seedNotification({ userId: adminId, title: 'To archive' })
+    const res = await request(app)
+      .patch(`/api/communication/notifications/${notifId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'archived' })
+    expect(res.status).toBe(200)
+    const list = await request(app).get('/api/communication/notifications').set('Authorization', `Bearer ${token}`)
+    expect(list.body.some((n: any) => n.id === notifId)).toBe(false)
+  })
+
+  it('should mark all notifications as read', async () => {
+    seedNotification({ userId: adminId, title: 'A' })
+    seedNotification({ userId: adminId, title: 'B' })
+    const res = await request(app)
+      .post('/api/communication/notifications/read-all')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    const unread = getDb().prepare("SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND status = 'unread'").get(adminId) as any
+    expect(unread.count).toBe(0)
+  })
+})

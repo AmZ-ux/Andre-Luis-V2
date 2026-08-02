@@ -129,6 +129,34 @@ router.get('/notifications', (req, res) => {
   res.json(db.prepare("SELECT * FROM notifications WHERE user_id = ? AND status != 'archived' ORDER BY created_at DESC LIMIT 50").all(req.user.userId))
 })
 
+router.get('/notifications/unread', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  const db = getDb()
+  res.json({ count: (db.prepare("SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND status = 'unread'").get(req.user.userId) as any).count })
+})
+
+// Atualiza status de uma notificação (read | favorite | archived)
+router.patch('/notifications/:id', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  const { status } = req.body || {}
+  if (!['read', 'favorite', 'archived'].includes(status)) {
+    res.status(400).json({ error: 'Status inválido. Use read, favorite ou archived' })
+    return
+  }
+  const db = getDb()
+  db.prepare('UPDATE notifications SET status = ?, read_at = CASE WHEN ? IN (\'read\', \'favorite\') THEN datetime(\'now\') ELSE read_at END WHERE id = ? AND user_id = ?')
+    .run(status, status, req.params.id, req.user.userId)
+  res.json({ success: true, id: req.params.id, status })
+})
+
+// Marca todas as notificações do usuário como lidas
+router.post('/notifications/read-all', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  const db = getDb()
+  db.prepare("UPDATE notifications SET status = 'read', read_at = datetime('now') WHERE user_id = ? AND status = 'unread'").run(req.user.userId)
+  res.json({ success: true })
+})
+
 // Channel status
 router.get('/channels', (_req, res) => {
   res.json([

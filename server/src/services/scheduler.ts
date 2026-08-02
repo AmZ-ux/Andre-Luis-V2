@@ -2,7 +2,7 @@ import cron from 'node-cron'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from './settingsService.js'
 import { ensureContractFees } from './monthlyFeeGenerator.js'
-import { markOverdueFees, sendPaymentReminders } from './feeAutomation.js'
+import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySummaryToAdmins } from './feeAutomation.js'
 import { logger } from '../utils/logger.js'
 
 let started = false
@@ -18,6 +18,7 @@ function runDaily(): void {
     const settings = loadSettings(db)
     markOverdueFees(db, settings, today())
     sendPaymentReminders(db, settings, today())
+    notifyDailySummaryToAdmins(db, buildDailySummary(db))
   } catch (err) {
     logger.error({ err }, 'Daily automation task failed')
   }

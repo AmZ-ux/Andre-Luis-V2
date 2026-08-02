@@ -4,6 +4,7 @@ import { loadSettings, type AppSettings } from './settingsService.js'
 import { buildDueDate, daysLate, calculateDueFromFee } from './billingRules.js'
 import { whatsappService } from './whatsapp.js'
 import { pushService } from './push.js'
+import { getAdminIds } from './notificationService.js'
 import { logger } from '../utils/logger.js'
 
 const MONTH_NAMES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
@@ -115,10 +116,40 @@ export async function sendPaymentReminders(db: any = getDb(), settings: AppSetti
 export function notifyPaymentReceived(db: any = getDb(), fee: any, payment: any): void {
   try {
     const monthName = MONTH_NAMES[Number(fee.month) - 1] || String(fee.month)
-    const message = `Pagamento de ${monthName} registrado no valor de R$ ${fmt(Number(payment.amount) || 0)}. Obrigado!`
+    const amount = fmt(Number(payment.amount) || 0)
+    const message = `Pagamento de ${monthName} registrado no valor de R$ ${amount}. Obrigado!`
     addNotification(db, fee.passenger_id, 'Pagamento registrado', message, '/mensalidades')
     pushService.send(fee.passenger_id, 'Pagamento registrado', message).catch(() => undefined)
+
+    const adminTitle = `${fee.passenger_name} pagou a mensalidade`
+    const adminMessage = `Pagamento de ${monthName} no valor de R$ ${amount} confirmado por ${fee.passenger_name}.`
+    for (const adminId of getAdminIds(db)) {
+      addNotification(db, adminId, adminTitle, adminMessage, '/mensalidades')
+    }
   } catch (err) {
     logger.warn({ err }, 'Failed to notify payment received')
+  }
+}
+
+export interface DailySummary {
+  pending: number
+  overdue: number
+  total: number
+}
+
+export function buildDailySummary(db: any = getDb()): DailySummary {
+  const pending = db.prepare("SELECT COUNT(*) AS count FROM monthly_fees WHERE status = 'pending'").get() as any
+  const overdue = db.prepare("SELECT COUNT(*) AS count FROM monthly_fees WHERE status = 'overdue'").get() as any
+  const pendingCount = Number(pending?.count ?? 0)
+  const overdueCount = Number(overdue?.count ?? 0)
+  return { pending: pendingCount, overdue: overdueCount, total: pendingCount + overdueCount }
+}
+
+export function notifyDailySummaryToAdmins(db: any = getDb(), summary: DailySummary): void {
+  const { pending, overdue } = summary
+  if (pending + overdue === 0) return
+  const message = `Resumo do dia: ${pending} mensalidade(s) pendente(s) e ${overdue} em atraso.`
+  for (const adminId of getAdminIds(db)) {
+    addNotification(db, adminId, 'Resumo diário de pagamentos', message, '/mensalidades')
   }
 }
