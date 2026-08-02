@@ -42,8 +42,8 @@ export function startScheduler(): void {
   if (started) return
   started = true
 
-  cron.schedule('0 8 * * *', runDaily)
-  cron.schedule('0 9 * * *', runContractGeneration)
+  cron.schedule('0 8 * * *', runDaily, { timezone: 'America/Sao_Paulo' })
+  cron.schedule('0 9 * * *', runContractGeneration, { timezone: 'America/Sao_Paulo' })
 
-  logger.info('Scheduler started (daily 08:00: overdue + reminders; daily 09:00: fee generation per contract)')
+  logger.info('Scheduler started (daily 08:00 BRT: overdue + reminders; daily 09:00 BRT: fee generation per contract)')
 }
