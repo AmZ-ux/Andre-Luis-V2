@@ -29,6 +29,12 @@ export const realAuth = {
   confirmVerificationEmail: (code: string) =>
     api.post<{ success: boolean }>('/auth/verify-email/confirm', { code }),
 
+  sendVerificationEmailPublic: (email: string) =>
+    api.post<{ success: boolean; demoCode?: string; alreadyVerified?: boolean }>('/auth/verify-email/send-public', { email }, true),
+
+  confirmVerificationEmailPublic: (email: string, code: string) =>
+    api.post<{ success: boolean }>('/auth/verify-email/confirm-public', { email, code }, true),
+
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     api.post<{ success: boolean }>('/auth/change-password', data),
 

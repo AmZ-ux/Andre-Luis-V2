@@ -1,0 +1,61 @@
+import { Router } from 'express'
+import bcrypt from 'bcryptjs'
+import { getDb, saveDb } from '../database/connection.js'
+import { authMiddleware } from '../middleware/auth.js'
+
+// TEMPORÁRIO: limpeza única dos dados de teste em produção.
+// Remover este arquivo e a montagem em index.ts após o uso.
+
+const TEST_EMAILS = [
+  'lenovo.teste2026@mail.com',
+  'passageiro@email.com',
+  'maria.silva@email.com',
+  'carlos.oliveira@email.com',
+  'ana.santos@email.com',
+  'pedro.costa@email.com',
+  'julia.pereira@email.com',
+]
+
+const router = Router()
+
+router.post('/cleanup-test-data', authMiddleware, (req, res) => {
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({ error: 'Apenas administradores' })
+    return
+  }
+  if (req.body?.confirm !== true) {
+    res.status(400).json({ error: 'Envie confirm: true para executar a limpeza' })
+    return
+  }
+
+  const db = getDb()
+  const result: Record<string, number | boolean> = {}
+
+  const users = db.prepare('SELECT id FROM users WHERE email IN (SELECT value FROM json_each(?))').all(JSON.stringify(TEST_EMAILS)) as { id: string }[]
+  const ids = users.map((u) => u.id)
+
+  if (ids.length > 0) {
+    const placeholders = ids.map(() => '?').join(', ')
+    db.prepare(`DELETE FROM payments WHERE fee_id IN (SELECT id FROM monthly_fees WHERE passenger_id IN (${placeholders}))`).run(...ids)
+    db.prepare(`DELETE FROM monthly_fees WHERE passenger_id IN (${placeholders})`).run(...ids)
+    db.prepare(`DELETE FROM receipts WHERE passenger_id IN (${placeholders})`).run(...ids)
+    db.prepare(`DELETE FROM availability WHERE passenger_id IN (${placeholders})`).run(...ids)
+    db.prepare(`DELETE FROM notifications WHERE user_id IN (${placeholders})`).run(...ids)
+    db.prepare(`DELETE FROM passengers WHERE id IN (${placeholders})`).run(...ids)
+    db.prepare(`DELETE FROM users WHERE id IN (${placeholders})`).run(...ids)
+  }
+  result.usersRemoved = ids.length
+
+  if (req.body?.newAdminPassword && typeof req.body.newAdminPassword === 'string' && req.body.newAdminPassword.length >= 8) {
+    db.prepare('UPDATE users SET password_hash = ? WHERE role = ? AND email = ?')
+      .run(bcrypt.hashSync(req.body.newAdminPassword, 10), 'admin', 'admin@transporte.com')
+    result.adminPasswordChanged = true
+  }
+
+  db.prepare("UPDATE users SET email_verified = 1 WHERE role = 'admin'").run()
+
+  saveDb()
+  res.json({ success: true, ...result })
+})
+
+export default router

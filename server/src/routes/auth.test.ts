@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 import { runMigrations } from '../database/schema.js'
@@ -6,7 +6,11 @@ import { sanitizeBody } from '../middleware/validation.js'
 import { resetDb } from '../database/connection.js'
 import authRoutes from '../routes/auth.js'
 
-process.env.DATABASE_PATH = ':memory:'
+vi.hoisted(() => {
+  process.env.DATABASE_PATH = ':memory:'
+  process.env.LOGIN_RATE_LIMIT_MAX = '100'
+  process.env.VERIFY_RATE_LIMIT_MAX = '100'
+})
 
 const app = express()
 app.use(express.json())
@@ -242,13 +246,34 @@ describe('POST /api/auth/login', () => {
       .send({ name: 'Login Test', email: 'login@teste.com', cpf: '111.222.333-44', password: 'Senha@123', monthlyFee: 189.9 })
   })
 
-  it('should login with valid credentials', async () => {
+  it('should block unverified passenger login with EMAIL_NOT_VERIFIED', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'login@teste.com', password: 'Senha@123' })
+    expect(res.status).toBe(403)
+    expect(res.body.code).toBe('EMAIL_NOT_VERIFIED')
+  })
+
+  it('should verify email through the public flow and then login', async () => {
+    const sendRes = await request(app)
+      .post('/api/auth/verify-email/send-public')
+      .send({ email: 'login@teste.com' })
+    expect(sendRes.status).toBe(200)
+    expect(sendRes.body.demoCode).toMatch(/^\d{6}$/)
+
+    const confirmRes = await request(app)
+      .post('/api/auth/verify-email/confirm-public')
+      .send({ email: 'login@teste.com', code: sendRes.body.demoCode })
+    expect(confirmRes.status).toBe(200)
+    expect(confirmRes.body.success).toBe(true)
+
     const res = await request(app)
       .post('/api/auth/login')
       .send({ login: 'login@teste.com', password: 'Senha@123' })
     expect(res.status).toBe(200)
     expect(res.body).toHaveProperty('token')
     expect(res.body.user.name).toBe('Login Test')
+    expect(res.body.user.emailVerified).toBe(true)
   })
 
   it('should login with CPF', async () => {

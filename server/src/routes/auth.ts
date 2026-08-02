@@ -11,7 +11,7 @@ const router = Router()
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: Number(process.env.LOGIN_RATE_LIMIT_MAX) || 5,
   message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -27,6 +27,12 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
     return
   }
 
+  // Produção real: passageiro precisa verificar o email antes de entrar.
+  if (user.role === 'passenger' && !user.email_verified) {
+    res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Verifique seu email para acessar o sistema.' })
+    return
+  }
+
   db.prepare('UPDATE users SET last_access = datetime(\'now\') WHERE id = ?').run(user.id)
 
   const token = signToken({ userId: user.id, role: user.role })
@@ -39,6 +45,7 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
       phone: user.phone,
       photo: user.photo,
       role: user.role,
+      emailVerified: !!user.email_verified,
       createdAt: user.created_at,
       lastAccess: user.last_access,
     },
@@ -167,33 +174,78 @@ router.put('/profile', authMiddleware, (req, res) => {
   res.json({ success: true })
 })
 
-async function sendVerificationEmail(to: string, name: string, code: string): Promise<void> {
+async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
+    throw new Error('Envio de email não configurado (RESEND_API_KEY ausente)')
+  }
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
-    logger.info({ to, code }, 'Resend not configured — verification code (dev mode)')
+    logger.info({ to, subject }, 'Resend not configured — email would be sent (dev mode)')
     return
   }
   const from = process.env.RESEND_FROM || 'Transporte André Luis <onboarding@resend.dev>'
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to,
-      subject: 'Código de verificação de email',
-      html: `<p>Olá, ${name}!</p><p>Seu código de verificação é:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>O código expira em 30 minutos.</p>`,
-    }),
+    body: JSON.stringify({ from, to, subject, html }),
   })
   if (!res.ok) {
     logger.error({ error: await res.text() }, 'Resend send failed')
+    throw new Error('Falha ao enviar email')
   }
 }
+
+async function sendVerificationEmail(to: string, name: string, code: string): Promise<void> {
+  await sendEmail(
+    to,
+    'Código de verificação de email',
+    `<p>Olá, ${name}!</p><p>Seu código de verificação é:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>O código expira em 30 minutos.</p>`
+  )
+}
+
+const verifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.VERIFY_RATE_LIMIT_MAX) || 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 router.post('/verify-email/send', authMiddleware, (req, res) => {
   if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
   const db = getDb()
-  const user = db.prepare('SELECT id, name, email, email_verified FROM users WHERE id = ?').get(req.user.userId) as any
+  const user = db.prepare('SELECT id, name, email, email_verified, verify_token, verify_token_expires FROM users WHERE id = ?').get(req.user.userId) as any
   if (!user) { res.status(404).json({ error: 'Usuário não encontrado' }); return }
+  if (user.email_verified) {
+    res.json({ success: true, alreadyVerified: true })
+    return
+  }
+
+  const now = Date.now()
+  const code = String(Math.floor(100000 + Math.random() * 900000))
+  const expiresAt = now + 30 * 60 * 1000
+  db.prepare('UPDATE users SET verify_token = ?, verify_token_expires = ? WHERE id = ?').run(code, expiresAt, user.id)
+
+  const isProd = process.env.NODE_ENV === 'production'
+  if (!process.env.RESEND_API_KEY && isProd) {
+    res.status(503).json({ error: 'Envio de email indisponível no momento. Contate o suporte.' })
+    return
+  }
+  void sendVerificationEmail(user.email, user.name, code).catch((err) => {
+    logger.error({ err: String(err) }, 'Verification email failed')
+  })
+
+  res.json({
+    success: true,
+    demoCode: isProd ? undefined : code,
+  })
+})
+
+// Verificação pública (antes do login): o código chega ao email do próprio passageiro.
+router.post('/verify-email/send-public', verifyLimiter, validateBody('email'), (req, res) => {
+  const { email } = req.body
+  const db = getDb()
+  const user = db.prepare('SELECT id, name, email, email_verified, verify_token, verify_token_expires FROM users WHERE email = ?').get(email) as any
+  if (!user) { res.json({ success: true }); return }
   if (user.email_verified) {
     res.json({ success: true, alreadyVerified: true })
     return
@@ -202,12 +254,36 @@ router.post('/verify-email/send', authMiddleware, (req, res) => {
   const code = String(Math.floor(100000 + Math.random() * 900000))
   const expiresAt = Date.now() + 30 * 60 * 1000
   db.prepare('UPDATE users SET verify_token = ?, verify_token_expires = ? WHERE id = ?').run(code, expiresAt, user.id)
-  sendVerificationEmail(user.email, user.name, code)
 
-  res.json({
-    success: true,
-    demoCode: process.env.RESEND_API_KEY ? undefined : code,
+  const isProd = process.env.NODE_ENV === 'production'
+  if (!process.env.RESEND_API_KEY && isProd) {
+    res.status(503).json({ error: 'Envio de email indisponível no momento. Contate o suporte.' })
+    return
+  }
+  void sendVerificationEmail(user.email, user.name, code).catch((err) => {
+    logger.error({ err: String(err) }, 'Verification email failed')
   })
+
+  res.json({ success: true, demoCode: isProd ? undefined : code })
+})
+
+router.post('/verify-email/confirm-public', verifyLimiter, validateBody('email', 'code'), (req, res) => {
+  const { email, code } = req.body
+  const db = getDb()
+  const user = db.prepare('SELECT id, email_verified, verify_token, verify_token_expires FROM users WHERE email = ?').get(email) as any
+  if (!user) { res.status(404).json({ error: 'Usuário não encontrado' }); return }
+
+  if (!user.verify_token || !user.verify_token_expires || Date.now() > user.verify_token_expires) {
+    res.status(400).json({ error: 'Código expirado. Solicite um novo.' })
+    return
+  }
+  if (String(code).trim() !== user.verify_token) {
+    res.status(400).json({ error: 'Código incorreto' })
+    return
+  }
+
+  db.prepare('UPDATE users SET email_verified = 1, verify_token = NULL, verify_token_expires = NULL WHERE id = ?').run(user.id)
+  res.json({ success: true })
 })
 
 router.post('/verify-email/confirm', authMiddleware, validateBody('code'), (req, res) => {
@@ -253,7 +329,7 @@ router.post('/logout', authMiddleware, (_req, res) => {
   res.json({ success: true })
 })
 
-router.post('/forgot-password', validateBody('email'), (req, res) => {
+router.post('/forgot-password', validateBody('email'), async (req, res) => {
   const { email } = req.body
   const db = getDb()
 
@@ -269,8 +345,19 @@ router.post('/forgot-password', validateBody('email'), (req, res) => {
   db.prepare('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?')
     .run(resetToken, expiresAt, user.id)
 
-  // In production, send email via nodemailer / SendGrid / etc.
-  logger.info({ email }, 'Password reset token generated')
+  const appUrl = process.env.APP_URL || 'https://andre-luis-v2.vercel.app'
+  const resetLink = `${appUrl}/redefinir-senha?token=${resetToken}`
+  try {
+    await sendEmail(
+      user.email,
+      'Redefinição de senha',
+      `<p>Olá, ${user.name}!</p><p>Recebemos um pedido de redefinição de senha.</p><p><a href="${resetLink}" style="background:#4f46e5;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:bold">Redefinir senha</a></p><p>O link expira em 1 hora. Se não foi você, ignore este email.</p>`
+    )
+  } catch (err) {
+    logger.error({ err: String(err) }, 'Password reset email failed')
+    res.status(503).json({ error: 'Envio de email indisponível no momento. Tente novamente mais tarde.' })
+    return
+  }
 
   res.json({ success: true, message: 'Se o email existir, você receberá instruções.' })
 })

@@ -7,6 +7,7 @@ const MAX_RETRIES = 2
 interface ApiError {
   status: number
   message: string
+  code?: string
   errors?: Record<string, string[]>
 }
 
@@ -54,6 +55,7 @@ async function request<T>(
     try {
       const data = await res.json()
       error.message = data.error || error.message
+      error.code = data.code
       error.errors = data.errors
     } catch {}
     throw error

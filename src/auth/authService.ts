@@ -406,4 +406,23 @@ export const authService = {
     const { passwordHash: _, ...safeUser } = updated
     return safeUser
   },
+
+  async sendVerificationEmailPublic(email: string): Promise<{ demoCode?: string; alreadyVerified?: boolean }> {
+    if (config.realApi) {
+      return realAuth.sendVerificationEmailPublic(email)
+    }
+
+    await delay(600)
+    return { demoCode: undefined }
+  },
+
+  async confirmVerificationEmailPublic(email: string, code: string): Promise<boolean> {
+    if (config.realApi) {
+      const res = await realAuth.confirmVerificationEmailPublic(email, code)
+      return res.success
+    }
+
+    await delay(600)
+    return true
+  },
 }
