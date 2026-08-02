@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronUp, ChevronDown, Pencil, DollarSign, XCircle, CheckCircle } from 'lucide-react'
+import { ChevronUp, ChevronDown, Pencil, XCircle, CheckCircle } from 'lucide-react'
 import { MonthlyFeeStatus } from './MonthlyFeeStatus'
 import { cn } from '../../utils/cn'
 import { useIsMobile } from '../../hooks/useBreakpoint'
@@ -10,7 +10,6 @@ interface MonthlyFeeTableProps {
   fees: MonthlyFee[]
   sort: MonthlyFeeSort
   onSort: (field: MonthlyFeeSort['field']) => void
-  onPay: (fee: MonthlyFee) => void
   onCancel: (fee: MonthlyFee) => void
   onExempt: (fee: MonthlyFee) => void
   onEdit: (fee: MonthlyFee) => void
@@ -55,7 +54,6 @@ export function MonthlyFeeTable({
   fees,
   sort,
   onSort,
-  onPay,
   onCancel,
   onExempt,
   onEdit,
@@ -127,16 +125,6 @@ export function MonthlyFeeTable({
               </div>
 
               <div className="flex items-center justify-end gap-1 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
-                {canPay && (
-                  <button
-                    onClick={() => onPay(fee)}
-                    className={cn(actionButtonClass, 'text-success hover:text-success')}
-                    aria-label="Registrar pagamento"
-                    title="Registrar pagamento"
-                  >
-                    <DollarSign className="h-4 w-4" />
-                  </button>
-                )}
                 {canExempt && (
                   <button
                     onClick={() => onExempt(fee)}
@@ -233,16 +221,6 @@ export function MonthlyFeeTable({
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex items-center gap-1">
-                    {canPay && (
-                      <button
-                        onClick={() => onPay(fee)}
-                        className={cn(actionButtonClass, 'text-success hover:text-success')}
-                        aria-label="Registrar pagamento"
-                        title="Registrar pagamento"
-                      >
-                        <DollarSign className="h-4 w-4" />
-                      </button>
-                    )}
                     {canExempt && (
                       <button
                         onClick={() => onExempt(fee)}

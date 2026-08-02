@@ -108,6 +108,9 @@ export const realMonthlyFees = {
   getByPassengerId: (passengerId: string) =>
     api.get<MonthlyFee[]>(`/monthly-fees/passenger/${passengerId}`),
 
+  ensureCurrent: () =>
+    api.post<MonthlyFee>('/monthly-fees/ensure-current'),
+
   create: (data: any) =>
     api.post<MonthlyFee>('/monthly-fees', data),
 
@@ -116,12 +119,6 @@ export const realMonthlyFees = {
 
   pay: (id: string, data: { paymentMethod: string; amount: number; paymentDate: string; notes?: string }) =>
     api.post<MonthlyFee & { payment?: Payment; breakdown?: any }>(`/monthly-fees/${id}/pay`, data),
-
-  generateMissing: (month: number, year: number, passengerIds?: string[]) =>
-    api.post<{ created: number; skippedExisting: number; skippedInactive: number; skippedVacation: number }>(
-      '/monthly-fees/generate',
-      { month, year, passengerIds }
-    ),
 
   remove: (id: string) =>
     api.delete<void>(`/monthly-fees/${id}`),
@@ -189,13 +186,13 @@ export const realDashboard = {
     api.get<DashboardData>('/dashboard'),
 }
 
-// --- PIX (Stripe) ---
-export const realPix = {
-  create: (monthlyFeeId: string) =>
-    api.post<{ clientSecret: string; amount: number; currency: string; breakdown: any; paymentIntentId: string }>('/pix/create', { monthlyFeeId }),
+// --- Pagamentos (Stripe: PIX e cartão) ---
+export const realPayments = {
+  create: (monthlyFeeId: string, method: 'pix' | 'card' = 'pix') =>
+    api.post<{ clientSecret: string; amount: number; currency: string; breakdown: any; paymentIntentId: string; method: 'pix' | 'card' }>('/payments/create', { monthlyFeeId, method }),
 
   status: (monthlyFeeId: string) =>
-    api.get<{ status: string }>('/pix/status', { monthlyFeeId }),
+    api.get<{ status: string }>('/payments/status', { monthlyFeeId }),
 }
 
 // --- Communication ---

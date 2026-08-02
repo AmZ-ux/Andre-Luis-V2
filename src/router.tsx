@@ -9,6 +9,7 @@ import { MensalidadeProfile } from './pages/MensalidadeProfile'
 import { MeusComprovantes } from './pages/MeusComprovantes'
 import { ComprovanteDetails } from './pages/ComprovanteDetails'
 import { MinhaDisponibilidade } from './pages/MinhaDisponibilidade'
+import { MinhasMensalidades } from './pages/MinhasMensalidades'
 import { DisponibilidadeDetails } from './pages/DisponibilidadeDetails'
 import { CentralComunicacao } from './pages/CentralComunicacao'
 import { Configuracoes } from './pages/Configuracoes'
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
       { path: 'disponibilidade', element: <Navigate to="/passageiros?tab=disponibilidade" replace /> },
       { path: 'disponibilidade/:id', element: protect(<DisponibilidadeDetails />) },
       { path: 'minha-disponibilidade', element: protect(<MinhaDisponibilidade />) },
+      { path: 'minhas-mensalidades', element: protect(<MinhasMensalidades />) },
       { path: 'comunicacao', element: protect(<CentralComunicacao />) },
       { path: 'relatorios', element: <Navigate to="/?tab=relatorios" replace /> },
       { path: 'configuracoes', element: protect(<Configuracoes />) },

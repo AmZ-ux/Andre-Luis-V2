@@ -283,39 +283,101 @@ describe('POST /api/monthly-fees/:id/pay', () => {
   })
 })
 
-describe('POST /api/monthly-fees/generate', () => {
-  it('should generate fees for active passengers', async () => {
-    const pid = seedPassenger()
-    const res = await request(app)
-      .post('/api/monthly-fees/generate')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ month: 7, year: 2026 })
-    expect(res.status).toBe(201)
-    expect(res.body.created).toBe(1)
-    const fee = getDb().prepare('SELECT * FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-    expect(fee).toBeTruthy()
-    expect(fee.status).toBe('pending')
-  })
+describe('POST /api/monthly-fees/ensure-current', () => {
+  const now = new Date()
+  const currentMonth = now.getMonth() + 1
+  const currentYear = now.getFullYear()
 
-  it('should be idempotent', async () => {
-    seedPassenger()
-    await request(app).post('/api/monthly-fees/generate').set('Authorization', `Bearer ${token}`).send({ month: 7, year: 2026 })
-    const res = await request(app).post('/api/monthly-fees/generate').set('Authorization', `Bearer ${token}`).send({ month: 7, year: 2026 })
-    expect(res.status).toBe(201)
-    expect(res.body.created).toBe(0)
-    expect(res.body.skippedExisting).toBe(1)
-  })
-
-  it('should deny non-admin users', async () => {
+  function seedPassengerUser(status = 'active'): { pid: string; token: string } {
     const db = getDb()
-    const passengerId = uuid()
+    const pid = uuid()
     db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
-      .run(passengerId, 'Passenger', 'pass@test.com', '999.999.999-99', '', bcrypt.hashSync('password', 10))
-    const passengerToken = jwt.sign({ userId: passengerId, role: 'passenger' }, 'dev-secret-change-in-production')
+      .run(pid, 'Passenger', `pass-${pid}@test.com`, '999.999.999-99', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', ?, 189.90, 5)")
+      .run(pid, 'Passenger', '999.999.999-99', '2000-01-01', status)
+    const passengerToken = jwt.sign({ userId: pid, role: 'passenger' }, 'dev-secret-change-in-production')
+    return { pid, token: passengerToken }
+  }
+
+  it('should create the current month fee on demand for a passenger', async () => {
+    const { pid, token: passengerToken } = seedPassengerUser()
     const res = await request(app)
-      .post('/api/monthly-fees/generate')
+      .post('/api/monthly-fees/ensure-current')
       .set('Authorization', `Bearer ${passengerToken}`)
-      .send({ month: 7, year: 2026 })
+    expect(res.status).toBe(201)
+    expect(res.body.passenger_id).toBe(pid)
+    expect(res.body.month).toBe(currentMonth)
+    expect(res.body.year).toBe(currentYear)
+    expect(res.body.status).toBe('pending')
+  })
+
+  it('should return the existing fee without duplicating', async () => {
+    const { pid, token: passengerToken } = seedPassengerUser()
+    const feeId = seedMonthlyFee(pid, { month: currentMonth, year: currentYear })
+    const res = await request(app)
+      .post('/api/monthly-fees/ensure-current')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body.id).toBe(feeId)
+    expect(res.body.ensured).toBe(false)
+    const count = getDb().prepare('SELECT COUNT(*) as c FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+    expect(count.c).toBe(1)
+  })
+
+  it('should reject inactive passengers', async () => {
+    const { token: passengerToken } = seedPassengerUser('inactive')
+    const res = await request(app)
+      .post('/api/monthly-fees/ensure-current')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(400)
+  })
+
+  it('should deny admin users', async () => {
+    const res = await request(app)
+      .post('/api/monthly-fees/ensure-current')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+  })
+})
+
+describe('Role checks on admin-only endpoints', () => {
+  function seedPassengerToken(): string {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pid, 'Passenger', `role-${pid}@test.com`, '999.999.999-99', '', bcrypt.hashSync('password', 10))
+    return jwt.sign({ userId: pid, role: 'passenger' }, 'dev-secret-change-in-production')
+  }
+
+  it('should deny passenger creating a fee manually', async () => {
+    const pid = seedPassenger()
+    const passengerToken = seedPassengerToken()
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${passengerToken}`)
+      .send({ passengerId: pid, passengerName: 'X', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 100, dueDay: 5 })
+    expect(res.status).toBe(403)
+  })
+
+  it('should deny passenger registering a payment', async () => {
+    const pid = seedPassenger()
+    const feeId = seedMonthlyFee(pid)
+    const passengerToken = seedPassengerToken()
+    const res = await request(app)
+      .post(`/api/monthly-fees/${feeId}/pay`)
+      .set('Authorization', `Bearer ${passengerToken}`)
+      .send({ amount: 189.9, paymentDate: '15/07/2026', paymentMethod: 'pix' })
+    expect(res.status).toBe(403)
+  })
+
+  it('should deny passenger updating a fee', async () => {
+    const pid = seedPassenger()
+    const feeId = seedMonthlyFee(pid)
+    const passengerToken = seedPassengerToken()
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${passengerToken}`)
+      .send({ amount: 200 })
     expect(res.status).toBe(403)
   })
 })

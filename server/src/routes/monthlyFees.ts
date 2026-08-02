@@ -8,15 +8,42 @@ import { notifyPaymentReceived } from '../services/feeAutomation.js'
 
 const router = Router()
 
-router.post('/generate', (req, res) => {
-  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
-  if (req.user.role !== 'admin') { res.status(403).json({ error: 'Apenas administradores' }); return }
+function requireAdmin(req: any, res: any): boolean {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return false }
+  if (req.user.role !== 'admin') { res.status(403).json({ error: 'Apenas administradores' }); return false }
+  return true
+}
 
-  const now = new Date()
-  const { month = now.getMonth() + 1, year = now.getFullYear(), passengerIds } = req.body || {}
+// Garante a mensalidade do mes corrente para o passageiro autenticado,
+// criando-a sob demanda (regras de inatividade/ferias) se ainda nao existir.
+router.post('/ensure-current', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  if (req.user.role !== 'passenger') { res.status(403).json({ error: 'Apenas passageiros' }); return }
+
   const db = getDb()
-  const result = generateMonthlyFees({ month: Number(month), year: Number(year), passengerIds }, db)
-  res.status(201).json(result)
+  const now = new Date()
+  const month = now.getMonth() + 1
+  const year = now.getFullYear()
+
+  const existing = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? AND month = ? AND year = ?')
+    .get(req.user.userId, month, year) as any
+  if (existing) {
+    const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(existing.id)
+    res.json({ ...existing, payment: payment || null, ensured: false })
+    return
+  }
+
+  const result = generateMonthlyFees({ month, year, passengerIds: [req.user.userId] }, db)
+  const created = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? AND month = ? AND year = ?')
+    .get(req.user.userId, month, year) as any
+
+  if (!created) {
+    res.status(400).json({ error: 'Mensalidade indisponível para este mês' })
+    return
+  }
+
+  const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(created.id)
+  res.status(201).json({ ...created, payment: payment || null, ensured: true, skipped: result.skippedInactive + result.skippedVacation })
 })
 
 router.get('/', (req, res) => {
@@ -49,6 +76,7 @@ router.get('/', (req, res) => {
 })
 
 router.get('/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return
   const db = getDb()
   const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id) as any
   if (!fee) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
@@ -58,6 +86,7 @@ router.get('/:id', (req, res) => {
 })
 
 router.post('/', (req, res) => {
+  if (!requireAdmin(req, res)) return
   const db = getDb()
   const { passengerId, passengerName, cpf, transportType, institution, company, month, year, amount, dueDay } = req.body
   const id = uuid()
@@ -72,6 +101,7 @@ router.post('/', (req, res) => {
 })
 
 router.put('/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return
   const db = getDb()
   const existing = db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(req.params.id)
   if (!existing) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
@@ -90,6 +120,7 @@ router.put('/:id', (req, res) => {
 })
 
 router.post('/:id/pay', (req, res) => {
+  if (!requireAdmin(req, res)) return
   const db = getDb()
   const { amount, paymentDate, paymentMethod, notes } = req.body
   const existing = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id) as any
@@ -143,6 +174,7 @@ router.get('/passenger/:passengerId', (req, res) => {
 })
 
 router.delete('/:id', (req, res) => {
+  if (!requireAdmin(req, res)) return
   const db = getDb()
   const existing = db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(req.params.id)
   if (!existing) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }

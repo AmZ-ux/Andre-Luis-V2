@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Button } from '../ui/Button'
 import { config } from '../../config'
-import { realPix } from '../../services/realApi'
+import { realPayments } from '../../services/realApi'
 import type { MonthlyFee } from '../../types/monthlyFee'
 
 interface PixCheckoutProps {
@@ -30,7 +30,7 @@ export function PixCheckout({ fee, onPaid, onBack, onError }: PixCheckoutProps) 
 
     const init = async () => {
       try {
-        const res = await realPix.create(fee.id)
+        const res = await realPayments.create(fee.id, 'pix')
         if (!res.clientSecret) throw new Error('Sem clientSecret na resposta do servidor')
 
         const stripe: any = await loadStripe(config.stripePublishableKey)
@@ -60,7 +60,7 @@ export function PixCheckout({ fee, onPaid, onBack, onError }: PixCheckoutProps) 
       pollTimer.current = window.setTimeout(async function tick() {
         if (!mountedRef.current) return
         try {
-          const status = await realPix.status(fee.id)
+          const status = await realPayments.status(fee.id)
           if (status.status === 'paid') {
             onPaid()
             return

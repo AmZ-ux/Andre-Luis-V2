@@ -12,6 +12,7 @@ export const PROFILE_ITEM: NavItem = { label: 'Meu Perfil', path: '/perfil', ico
 
 export const PASSENGER_NAV_ITEMS: NavItem[] = [
   { label: 'Início', path: '/', icon: 'House' },
+  { label: 'Mensalidades', path: '/minhas-mensalidades', icon: 'Wallet' },
   { label: 'Comprovantes', path: '/meus-comprovantes', icon: 'FileCheck' },
   { label: 'Disponibilidade', path: '/minha-disponibilidade', icon: 'CalendarOff' },
 ]

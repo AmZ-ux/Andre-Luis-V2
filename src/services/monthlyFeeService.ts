@@ -309,12 +309,16 @@ export const monthlyFeeService = {
     saveFees(fees.filter((f) => f.id !== id))
   },
 
-  async generateMissing(month: number, year: number): Promise<MonthlyFee[]> {
-    if (config.realApi) {
-      await realMonthlyFees.generateMissing(month, year)
-      return []
-    }
-    const { monthlyGenerator } = await import('./monthlyGenerator')
-    return monthlyGenerator.generate({ month, year })
+  async ensureCurrent(): Promise<MonthlyFee> {
+    if (config.realApi) return realMonthlyFees.ensureCurrent()
+    const { sessionManager } = await import('../auth/sessionManager')
+    const session = sessionManager.load()
+    if (!session?.user) throw new Error('Não autenticado')
+    await this.ensureContractFees(session.user.id)
+    const now = new Date()
+    const fees = loadFees()
+    const fee = fees.find((f) => f.passengerId === session.user.id && f.month === now.getMonth() + 1 && f.year === now.getFullYear())
+    if (!fee) throw new Error('Mensalidade indisponível para este mês')
+    return fee
   },
 }

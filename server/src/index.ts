@@ -19,7 +19,7 @@ import dashboardRoutes from './routes/dashboard.js'
 import communicationRoutes from './routes/communication.js'
 import settingsRoutes from './routes/settings.js'
 import clientErrorRoutes from './routes/clientError.js'
-import { pixRouter, handleStripeWebhook } from './routes/pix.js'
+import { paymentsRouter, handleStripeWebhook } from './routes/payments.js'
 import { startScheduler } from './services/scheduler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -70,7 +70,7 @@ app.use('/api/availability', authMiddleware, availabilityRoutes)
 app.use('/api/dashboard', authMiddleware, dashboardRoutes)
 app.use('/api/communication', authMiddleware, communicationRoutes)
 app.use('/api/settings', authMiddleware, settingsRoutes)
-app.use('/api/pix', authMiddleware, pixRouter)
+app.use('/api/payments', authMiddleware, paymentsRouter)
 
 // Health check
 app.get('/api/health', (_req, res) => {

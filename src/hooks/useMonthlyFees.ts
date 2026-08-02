@@ -138,12 +138,6 @@ export function useMonthlyFees(pageSize = 15) {
     []
   )
 
-  const generateFees = useCallback(async (month: number, year: number) => {
-    const created = await monthlyFeeService.generateMissing(month, year)
-    await load()
-    return created
-  }, [load])
-
   const totalPages = Math.ceil(pagination.total / pagination.pageSize)
 
   return {
@@ -162,7 +156,6 @@ export function useMonthlyFees(pageSize = 15) {
     cancelFee,
     exemptFee,
     updateFee,
-    generateFees,
     reload: load,
   }
 }

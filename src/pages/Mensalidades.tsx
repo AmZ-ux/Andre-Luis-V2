@@ -7,7 +7,6 @@ import { MonthlyFilters } from '../components/monthlyFees/MonthlyFilters'
 import { FinancialSummary } from '../components/monthlyFees/FinancialSummary'
 import { MonthlyFeeTable } from '../components/monthlyFees/MonthlyFeeTable'
 import { MonthlyFeeCard } from '../components/monthlyFees/MonthlyFeeCard'
-import { PaymentModal } from '../components/monthlyFees/PaymentModal'
 import { CancelModal } from '../components/monthlyFees/CancelModal'
 import { ExemptionModal } from '../components/monthlyFees/ExemptionModal'
 import { EditFeeModal } from '../components/monthlyFees/EditFeeModal'
@@ -16,15 +15,13 @@ import { BillingSettingsForm } from '../components/settings/BillingSettings'
 import { PageTabs } from '../components/ui/PageTabs'
 import { ViewToggle } from '../components/passengers/ViewToggle'
 import { Button } from '../components/ui/Button'
-import { Select } from '../components/ui/Select'
 import { Card } from '../components/ui/Card'
 import { useToast } from '../contexts/ToastContext'
 import { useIsMobile } from '../hooks/useBreakpoint'
-import { Zap, ChevronLeft, ChevronRight, Wallet, FileCheck, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Wallet, FileCheck, SlidersHorizontal } from 'lucide-react'
 import { cn } from '../utils/cn'
-import type { MonthlyFee, PaymentFormData } from '../types/monthlyFee'
+import type { MonthlyFee } from '../types/monthlyFee'
 import type { ViewMode } from '../types/passenger'
-import type { PaymentMethod } from '../types/passenger'
 
 const tabs = [
   { key: 'faturas', label: 'Faturas', icon: Wallet },
@@ -32,33 +29,12 @@ const tabs = [
   { key: 'regras', label: 'Regras de cobrança', icon: SlidersHorizontal },
 ]
 
-const monthOptions = [
-  { value: '1', label: 'Janeiro' },
-  { value: '2', label: 'Fevereiro' },
-  { value: '3', label: 'Março' },
-  { value: '4', label: 'Abril' },
-  { value: '5', label: 'Maio' },
-  { value: '6', label: 'Junho' },
-  { value: '7', label: 'Julho' },
-  { value: '8', label: 'Agosto' },
-  { value: '9', label: 'Setembro' },
-  { value: '10', label: 'Outubro' },
-  { value: '11', label: 'Novembro' },
-  { value: '12', label: 'Dezembro' },
-]
-
-const currentYear = new Date().getFullYear()
-const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i).map((y) => ({
-  value: String(y),
-  label: String(y),
-}))
-
 export function Mensalidades() {
   const [searchParams, setSearchParams] = useSearchParams()
   const {
     fees, loading, error, filters, sort, pagination, totalPages,
     updateFilters, resetFilters, setPage, setSortField,
-    registerPayment, cancelFee, exemptFee, updateFee, generateFees, reload,
+    cancelFee, exemptFee, updateFee, reload,
   } = useMonthlyFees()
   const { settings, updateCategory, saved } = useSettings()
   const { addToast } = useToast()
@@ -72,18 +48,9 @@ export function Mensalidades() {
     setSearchParams(key === 'faturas' ? {} : { tab: key }, { replace: true })
   }
   const [selectedFee, setSelectedFee] = useState<MonthlyFee | null>(null)
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [exemptionModalOpen, setExemptionModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [genMonth, setGenMonth] = useState(String(new Date().getMonth() + 1))
-  const [genYear, setGenYear] = useState(String(currentYear))
-
-  const handlePay = useCallback((fee: MonthlyFee) => {
-    setSelectedFee(fee)
-    setPaymentModalOpen(true)
-  }, [])
 
   const handleCancel = useCallback((fee: MonthlyFee) => {
     setSelectedFee(fee)
@@ -99,20 +66,6 @@ export function Mensalidades() {
     setSelectedFee(fee)
     setEditModalOpen(true)
   }, [])
-
-  const handlePaymentConfirm = useCallback(
-    async (data: PaymentFormData) => {
-      if (!selectedFee) return
-      await registerPayment(selectedFee.id, {
-        amount: parseFloat(data.amount.replace(',', '.')),
-        paymentDate: data.paymentDate,
-        paymentMethod: data.paymentMethod as PaymentMethod,
-        notes: data.notes,
-      })
-      addToast('success', 'Pagamento registrado com sucesso!')
-    },
-    [selectedFee, registerPayment, addToast]
-  )
 
   const handleCancelConfirm = useCallback(
     async (reason: string) => {
@@ -140,22 +93,6 @@ export function Mensalidades() {
     },
     [selectedFee, updateFee, addToast]
   )
-
-  const handleGenerate = useCallback(async () => {
-    setGenerating(true)
-    try {
-      const created = await generateFees(parseInt(genMonth), parseInt(genYear))
-      if (created.length === 0) {
-        addToast('info', 'Nenhuma nova mensalidade para gerar')
-      } else {
-        addToast('success', `${created.length} mensalidade(s) gerada(s) com sucesso!`)
-      }
-    } catch {
-      addToast('error', 'Erro ao gerar mensalidades')
-    } finally {
-      setGenerating(false)
-    }
-  }, [genMonth, genYear, generateFees, addToast])
 
   if (loading && fees.length === 0) {
     return (
@@ -233,28 +170,6 @@ export function Mensalidades() {
             className="flex-1"
           />
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Select
-                options={monthOptions}
-                value={genMonth}
-                onChange={(e) => setGenMonth(e.target.value)}
-                className="w-32"
-              />
-              <Select
-                options={yearOptions}
-                value={genYear}
-                onChange={(e) => setGenYear(e.target.value)}
-                className="w-24"
-              />
-              <Button
-                size="sm"
-                icon={<Zap className="h-4 w-4" />}
-                loading={generating}
-                onClick={handleGenerate}
-              >
-                Gerar
-              </Button>
-            </div>
             <MonthlyFilters
               filters={filters}
               onChange={updateFilters}
@@ -271,7 +186,6 @@ export function Mensalidades() {
             fees={fees}
             sort={sort}
             onSort={setSortField}
-            onPay={handlePay}
             onCancel={handleCancel}
             onExempt={handleExempt}
             onEdit={handleEdit}
@@ -283,7 +197,6 @@ export function Mensalidades() {
             <MonthlyFeeCard
               key={fee.id}
               fee={fee}
-              onPay={handlePay}
               onCancel={handleCancel}
               onExempt={handleExempt}
               onEdit={handleEdit}
@@ -329,17 +242,6 @@ export function Mensalidades() {
           </button>
         </div>
       )}
-
-      <PaymentModal
-        isOpen={paymentModalOpen}
-        onClose={() => { setPaymentModalOpen(false); setSelectedFee(null) }}
-        onConfirm={handlePaymentConfirm}
-        onPixPaid={() => {
-          addToast('success', 'Pagamento PIX confirmado!')
-          reload()
-        }}
-        fee={selectedFee}
-      />
 
       <CancelModal
         isOpen={cancelModalOpen}
