@@ -19,9 +19,7 @@ export function AdminsManager() {
   const [admins, setAdmins] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [demotingId, setDemotingId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [formErrors, setFormErrors] = useState<{ name?: string; email?: string; password?: string }>({})
@@ -73,28 +71,12 @@ export function AdminsManager() {
       await adminService.create({ name: form.name.trim() || 'Administrador', email: form.email.trim(), password: form.password })
       addToast('success', 'Administrador criado!', 'Envie o e-mail e a senha para o responsável — ele já entra como administrador.')
       setForm({ name: '', email: '', password: '' })
-      setShowCreate(false)
       await load()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao criar administrador'
       addToast('error', 'Não foi possível criar', message)
     } finally {
       setCreating(false)
-    }
-  }
-
-  const handleDemote = async (admin: AdminUser) => {
-    if (admin.superAdmin) return
-    setDemotingId(admin.id)
-    try {
-      await adminService.demote(admin.id)
-      addToast('success', `${admin.name} voltou a ser passageiro.`)
-      await load()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao rebaixar'
-      addToast('error', 'Não foi possível rebaixar', message)
-    } finally {
-      setDemotingId(null)
     }
   }
 
@@ -121,19 +103,70 @@ export function AdminsManager() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <p className="text-sm text-gray-500">
-            {admins.length} {admins.length === 1 ? 'administrador cadastrado' : 'administradores cadastrados'}
+            Defina abaixo o e-mail e a senha de cada responsável. Ele entra direto como administrador — sem
+            precisar se cadastrar como passageiro na plataforma.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" icon={<RefreshCw className="h-4 w-4" />} onClick={() => void load()}>
             Atualizar
           </Button>
-          {!showCreate && (
-            <Button size="sm" icon={<UserPlus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
-              Novo administrador
-            </Button>
-          )}
         </div>
+      </div>
+
+      <Card>
+        <h3 className="text-sm font-semibold text-text mb-1 flex items-center gap-2">
+          <UserPlus className="h-4 w-4 text-primary" /> Cadastrar responsável (administrador)
+        </h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Crie as credenciais do responsável pelo transporte (ex.: o André Luis) e envie o e-mail
+          e a senha para ele — ele já entra como administrador, sem verificação.
+        </p>
+        <form onSubmit={handleCreate} className="space-y-4">
+          <Input
+            label="Nome completo"
+            placeholder="Opcional — ex.: André Luis"
+            value={form.name}
+            onChange={(e) => {
+              setForm((p) => ({ ...p, name: e.target.value }))
+              if (formErrors.name) setFormErrors((p) => ({ ...p, name: undefined }))
+            }}
+            error={formErrors.name}
+          />
+          <Input
+            label="Email"
+            type="email"
+            placeholder="email@exemplo.com"
+            value={form.email}
+            onChange={(e) => {
+              setForm((p) => ({ ...p, email: e.target.value }))
+              if (formErrors.email) setFormErrors((p) => ({ ...p, email: undefined }))
+            }}
+            error={formErrors.email}
+          />
+          <PasswordInput
+            label="Senha"
+            placeholder="Mínimo de 8 caracteres"
+            value={form.password}
+            onChange={(e) => {
+              setForm((p) => ({ ...p, password: e.target.value }))
+              if (formErrors.password) setFormErrors((p) => ({ ...p, password: undefined }))
+            }}
+            error={formErrors.password}
+            autoComplete="new-password"
+          />
+          <div className="flex gap-3">
+            <Button type="submit" loading={creating} icon={<UserCog className="h-4 w-4" />}>
+              Criar administrador
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <div className="flex items-center gap-2">
+        <p className="text-sm text-gray-500">
+          {admins.length} {admins.length === 1 ? 'administrador cadastrado' : 'administradores cadastrados'}
+        </p>
       </div>
 
       {error && (
@@ -146,58 +179,6 @@ export function AdminsManager() {
             </Button>
           </div>
         </div>
-      )}
-
-      {showCreate && (
-        <Card>
-          <h3 className="text-sm font-semibold text-text mb-1">Criar conta de administrador</h3>
-          <p className="text-xs text-gray-500 mb-4">
-            Cadastre as credenciais (e-mail e senha) do responsável do transporte (ex.: o André
-            Luis). Ele já entra direto como administrador — sem precisar se cadastrar como passageiro.
-          </p>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <Input
-              label="Nome completo"
-              placeholder="Opcional — ex.: André Luis"
-              value={form.name}
-              onChange={(e) => {
-                setForm((p) => ({ ...p, name: e.target.value }))
-                if (formErrors.name) setFormErrors((p) => ({ ...p, name: undefined }))
-              }}
-              error={formErrors.name}
-            />
-            <Input
-              label="Email"
-              type="email"
-              placeholder="email@exemplo.com"
-              value={form.email}
-              onChange={(e) => {
-                setForm((p) => ({ ...p, email: e.target.value }))
-                if (formErrors.email) setFormErrors((p) => ({ ...p, email: undefined }))
-              }}
-              error={formErrors.email}
-            />
-            <PasswordInput
-              label="Senha"
-              placeholder="Mínimo de 8 caracteres"
-              value={form.password}
-              onChange={(e) => {
-                setForm((p) => ({ ...p, password: e.target.value }))
-                if (formErrors.password) setFormErrors((p) => ({ ...p, password: undefined }))
-              }}
-              error={formErrors.password}
-              autoComplete="new-password"
-            />
-            <div className="flex gap-3">
-              <Button type="button" variant="secondary" onClick={() => setShowCreate(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" loading={creating} icon={<UserCog className="h-4 w-4" />}>
-                Criar administrador
-              </Button>
-            </div>
-          </form>
-        </Card>
       )}
 
       <div className="space-y-2">
@@ -227,24 +208,14 @@ export function AdminsManager() {
                 </p>
               </div>
               {!admin.superAdmin && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    loading={demotingId === admin.id}
-                    onClick={() => void handleDemote(admin)}
-                  >
-                    Rebaixar
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    loading={removingId === admin.id}
-                    onClick={() => void handleRemove(admin)}
-                  >
-                    Remover
-                  </Button>
-                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  loading={removingId === admin.id}
+                  onClick={() => void handleRemove(admin)}
+                >
+                  Remover
+                </Button>
               )}
             </div>
           </Card>
