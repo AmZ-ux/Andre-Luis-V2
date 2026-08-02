@@ -347,7 +347,7 @@ router.post('/forgot-password', validateBody('email'), async (req, res) => {
   db.prepare('UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?')
     .run(resetToken, expiresAt, user.id)
 
-  const appUrl = process.env.APP_URL || 'https://andre-luis-v2.vercel.app'
+  const appUrl = process.env.APP_URL || 'https://andre-luis-v2-production.up.railway.app'
   const resetLink = `${appUrl}/redefinir-senha?token=${resetToken}`
   try {
     await sendEmail(
