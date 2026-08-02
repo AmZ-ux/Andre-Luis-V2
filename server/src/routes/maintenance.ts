@@ -39,8 +39,11 @@ router.post('/cleanup-test-data', authMiddleware, (req, res) => {
     db.prepare(`DELETE FROM payments WHERE monthly_fee_id IN (SELECT id FROM monthly_fees WHERE passenger_id IN (${placeholders}))`).run(...ids)
     db.prepare(`DELETE FROM monthly_fees WHERE passenger_id IN (${placeholders})`).run(...ids)
     db.prepare(`DELETE FROM receipts WHERE passenger_id IN (${placeholders})`).run(...ids)
-    db.prepare(`DELETE FROM availability WHERE passenger_id IN (${placeholders})`).run(...ids)
+    db.prepare(`DELETE FROM receipt_history WHERE receipt_id IN (SELECT id FROM receipts WHERE passenger_id IN (${placeholders}))`).run(...ids)
+    db.prepare(`DELETE FROM availabilities WHERE passenger_id IN (${placeholders})`).run(...ids)
+    db.prepare(`DELETE FROM availability_history WHERE availability_id IN (SELECT id FROM availabilities WHERE passenger_id IN (${placeholders}))`).run(...ids)
     db.prepare(`DELETE FROM notifications WHERE user_id IN (${placeholders})`).run(...ids)
+    db.prepare(`DELETE FROM pix_charges WHERE monthly_fee_id IN (SELECT id FROM monthly_fees WHERE passenger_id IN (${placeholders}))`).run(...ids)
     db.prepare(`DELETE FROM passengers WHERE id IN (${placeholders})`).run(...ids)
     db.prepare(`DELETE FROM users WHERE id IN (${placeholders})`).run(...ids)
   }
