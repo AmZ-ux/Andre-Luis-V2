@@ -8,6 +8,14 @@ export async function runSeed(): Promise<void> {
   await runMigrations()
   const db = getDb()
 
+  // Seed apenas em banco novo (vazio). Em produção com dados reais o seed
+  // nunca deve recriar as contas de demonstração.
+  const existing = db.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }
+  if (existing.c > 0) {
+    logger.info({ users: existing.c }, 'Database already has data — seed skipped')
+    return
+  }
+
   const ADMIN_ID = uuid()
   const PASSWORD_HASH = bcrypt.hashSync('admin123', 10)
 

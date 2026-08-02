@@ -20,7 +20,6 @@ import communicationRoutes from './routes/communication.js'
 import settingsRoutes from './routes/settings.js'
 import clientErrorRoutes from './routes/clientError.js'
 import { paymentsRouter, handleStripeWebhook } from './routes/payments.js'
-import maintenanceRoutes from './routes/maintenance.js'
 import adminRoutes from './routes/admin.js'
 import { startScheduler } from './services/scheduler.js'
 
@@ -73,9 +72,6 @@ app.use('/api/dashboard', authMiddleware, dashboardRoutes)
 app.use('/api/communication', authMiddleware, communicationRoutes)
 app.use('/api/settings', authMiddleware, settingsRoutes)
 app.use('/api/payments', authMiddleware, paymentsRouter)
-
-// TEMPORÁRIO: remover após limpeza dos dados de teste
-app.use('/api/maintenance', maintenanceRoutes)
 
 app.use('/api/admin', adminRoutes)
 
