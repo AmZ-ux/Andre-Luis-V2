@@ -41,7 +41,7 @@ function finalizePayment(db: any, fee: any, paymentIntentId: string, amountRecei
   db.prepare(`
     INSERT INTO notifications (id, user_id, title, message, type, status)
     VALUES (?, ?, ?, ?, 'payment', 'unread')
-  `).run(uuid(), fee.passenger_id, `${methodLabel} confirmado`, `Pagamento ${methodLabel} de R$ ${amount.toFixed(2)} confirmado para a mensalidade ${String(fee.month).padStart(2, '0')}/${fee.year}.`, '')
+  `).run(uuid(), fee.passenger_id, `${methodLabel} confirmado`, `Pagamento ${methodLabel} de R$ ${amount.toFixed(2)} confirmado para a mensalidade ${String(fee.month).padStart(2, '0')}/${fee.year}.`)
 
   logger.info({ feeId: fee.id, paymentIntentId, method }, 'Pagamento confirmado')
 }
@@ -180,7 +180,7 @@ export function handleStripeWebhook(req: Request, res: Response): void {
           db.prepare(`
             INSERT INTO notifications (id, user_id, title, message, type, status)
             VALUES (?, ?, ?, ?, 'warning', 'unread')
-          `).run(uuid(), fee.passenger_id, `${methodLabel} não confirmado`, `A cobrança ${methodLabel} gerada não foi paga ou expirou. Gere uma nova cobrança quando desejar.`, '')
+          `).run(uuid(), fee.passenger_id, `${methodLabel} não confirmado`, `A cobrança ${methodLabel} gerada não foi paga ou expirou. Gere uma nova cobrança quando desejar.`)
         }
       }
       break
