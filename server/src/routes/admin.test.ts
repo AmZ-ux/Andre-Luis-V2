@@ -164,3 +164,48 @@ describe('Admin management (super admin only)', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('POST /api/admin/reset-data', () => {
+  it('should require super admin', async () => {
+    const res = await request(app)
+      .post('/api/admin/reset-data')
+      .set('Authorization', `Bearer ${getAdminToken()}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('should clear operational data but keep super admin and settings', async () => {
+    const db = getDb()
+    const { v4 } = await import('uuid')
+
+    const passengerId = v4()
+    db.prepare(`
+      INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day)
+      VALUES (?, ?, ?, ?, 'university', 'active', 200, 5)
+    `).run(passengerId, 'Teste Reset', '111.222.333-44', '1990-01-01')
+
+    const feeId = v4()
+    db.prepare(`
+      INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status)
+      VALUES (?, ?, ?, ?, 'university', 8, 2026, 200, 5, '05/08/2026', 'pending')
+    `).run(feeId, passengerId, 'Teste Reset', '111.222.333-44')
+
+    db.prepare(`
+      INSERT INTO notifications (id, user_id, title, message, status, type)
+      VALUES (?, ?, ?, ?, 'unread', 'info')
+    `).run(v4(), passengerId, 'Notif Teste', 'msg')
+
+    const res = await request(app)
+      .post('/api/admin/reset-data')
+      .set('Authorization', `Bearer ${getSuperAdminToken()}`)
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+
+    expect(db.prepare('SELECT id FROM passengers').all()).toHaveLength(0)
+    expect(db.prepare('SELECT id FROM monthly_fees').all()).toHaveLength(0)
+    expect(db.prepare('SELECT id FROM notifications').all()).toHaveLength(0)
+
+    const superAdmin = db.prepare("SELECT id, super_admin FROM users WHERE super_admin = 1").get() as any
+    expect(superAdmin).toBeDefined()
+    expect(db.prepare('SELECT id FROM users').all()).toHaveLength(1)
+  })
+})
