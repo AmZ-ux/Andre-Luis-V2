@@ -113,4 +113,33 @@ router.delete('/admins/:id', requireSuperAdmin, (req, res) => {
   res.json({ success: true, id: req.params.id })
 })
 
+// Limpa todos os dados operacionais (passageiros, mensalidades, pagamentos,
+// notificações, etc.), preservando apenas o super admin e as configurações.
+// Uso: preparação para entrada em produção real — os passageiros passam a se
+// cadastrar sozinhos via link público.
+router.post('/reset-data', requireSuperAdmin, (req, res) => {
+  const db = getDb()
+  const superAdminId = req.user?.userId
+
+  const tables = [
+    'receipt_history',
+    'availability_history',
+    'pix_charges',
+    'payments',
+    'notifications',
+    'audit_logs',
+    'messages',
+    'receipts',
+    'availabilities',
+    'monthly_fees',
+    'passengers',
+  ]
+  for (const table of tables) {
+    db.prepare(`DELETE FROM "${table}"`).run()
+  }
+  db.prepare('DELETE FROM users WHERE id != ?').run(superAdminId)
+
+  res.json({ success: true, message: 'Dados operacionais limpos. Mantidos: super admin e configurações.' })
+})
+
 export default router
