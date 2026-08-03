@@ -44,6 +44,7 @@ app.use(cors({
 
 // Stripe webhook (precisa do body raw, antes do express.json)
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook)
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook)
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
