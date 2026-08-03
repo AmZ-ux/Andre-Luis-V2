@@ -5,36 +5,48 @@ interface WhatsAppProvider {
   send(to: string, message: string): Promise<{ success: boolean; messageId?: string }>
 }
 
-class TwilioProvider implements WhatsAppProvider {
-  async send(to: string, message: string): Promise<{ success: boolean; messageId?: string }> {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID
-    const authToken = process.env.TWILIO_AUTH_TOKEN
-    const from = process.env.TWILIO_WHATSAPP_NUMBER
+// Evolution API (self-hosted) — envia via instancia conectada por QRCode.
+// Requer EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE.
+class EvolutionProvider implements WhatsAppProvider {
+  private baseUrl: string
+  private apiKey: string
+  private instance: string
 
-    if (!accountSid || !authToken || !from) {
-      throw new Error('Twilio não configurado. Defina TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN e TWILIO_WHATSAPP_NUMBER')
+  constructor() {
+    this.baseUrl = process.env.EVOLUTION_API_URL || ''
+    this.apiKey = process.env.EVOLUTION_API_KEY || ''
+    this.instance = process.env.EVOLUTION_INSTANCE || ''
+
+    if (!this.baseUrl || !this.apiKey || !this.instance) {
+      throw new Error('Evolution API não configurado. Defina EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE')
     }
+    this.baseUrl = this.baseUrl.replace(/\/+$/, '')
+  }
 
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ To: `whatsapp:${to}`, From: `whatsapp:${from}`, Body: message }),
-      }
-    )
+  async send(to: string, message: string): Promise<{ success: boolean; messageId?: string }> {
+    const number = to.replace(/[^\d]/g, '')
+    const res = await fetch(`${this.baseUrl}/message/sendText/${this.instance}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: this.apiKey,
+      },
+      body: JSON.stringify({ number, text: message }),
+    })
 
     if (!res.ok) {
       const err = await res.text()
-      throw new Error(`Twilio error: ${err}`)
+      throw new Error(`Evolution error ${res.status}: ${err}`)
     }
 
     const data = await res.json() as any
-    return { success: true, messageId: data.sid }
+    return { success: true, messageId: data?.key?.id || data?.messageId || `evolution-${Date.now()}` }
   }
+}
+
+// Evolution em modo silencioso: registra apenas a intenção de envio (sem chamar a API).
+function evolutionConfigured(): boolean {
+  return !!(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE)
 }
 
 class MockProvider implements WhatsAppProvider {
@@ -48,7 +60,7 @@ let provider: WhatsAppProvider
 
 function getProvider(): WhatsAppProvider {
   if (!provider) {
-    provider = process.env.TWILIO_ACCOUNT_SID ? new TwilioProvider() : new MockProvider()
+    provider = evolutionConfigured() ? new EvolutionProvider() : new MockProvider()
   }
   return provider
 }

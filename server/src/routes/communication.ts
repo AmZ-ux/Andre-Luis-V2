@@ -161,7 +161,7 @@ router.post('/notifications/read-all', (req, res) => {
 router.get('/channels', (_req, res) => {
   res.json([
     { type: 'app', name: 'Notificação no App', icon: 'Bell', status: 'connected', enabled: true, configurable: false },
-    { type: 'whatsapp', name: 'WhatsApp', icon: 'MessageCircle', status: process.env.TWILIO_ACCOUNT_SID ? 'connected' : 'disconnected', enabled: true, configurable: true },
+    { type: 'whatsapp', name: 'WhatsApp', icon: 'MessageCircle', status: (process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE) ? 'connected' : 'disconnected', enabled: true, configurable: true },
     { type: 'push', name: 'Push Notification', icon: 'BellRing', status: pushService.isAvailable() ? 'connected' : 'disconnected', enabled: true, configurable: true },
     { type: 'email', name: 'E-mail', icon: 'Mail', status: 'disconnected', enabled: true, configurable: true },
     { type: 'sms', name: 'SMS', icon: 'MessageSquare', status: 'disconnected', enabled: true, configurable: true },
