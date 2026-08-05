@@ -1,3 +1,5 @@
+import { config } from '../config'
+import { realReports } from './realApi'
 import type { ReceiptReportData } from '../types/reports'
 import type { Receipt } from '../types/receipt'
 
@@ -8,6 +10,21 @@ function loadReceipts(): Receipt[] {
 
 export const receiptAnalytics = {
   async getReportData(): Promise<ReceiptReportData> {
+    if (config.realApi) {
+      const overview = await realReports.overview()
+      const r = overview.receipts
+      return {
+        aprovados: r.aprovados,
+        rejeitados: r.rejeitados,
+        pendentes: r.pendentes,
+        cancelados: r.cancelados,
+        total: r.total,
+        tempoMedioAprovacao: r.tempoMedioAprovacao,
+        byStatus: r.byStatus,
+        byMonth: r.byMonth,
+      }
+    }
+
     const receipts = loadReceipts()
 
     const aprovados = receipts.filter((r) => r.status === 'approved').length
@@ -50,6 +67,32 @@ export const receiptAnalytics = {
     chartData: Record<string, unknown>[]
     tableData: Record<string, unknown>[]
   }> {
+    if (config.realApi) {
+      const overview = await realReports.overview()
+      const data = overview.receipts
+      const statusMap: Record<string, string> = {
+        approved: 'approved', rejected: 'rejected', pending: 'awaiting',
+      }
+      const titleMap: Record<string, string> = {
+        approved: 'Comprovantes Aprovados',
+        rejected: 'Comprovantes Rejeitados',
+        pending: 'Comprovantes Pendentes',
+      }
+      const list: any[] = data.receipts || []
+      const filtered = list.filter((r) => r.status === statusMap[type])
+      return {
+        title: titleMap[type],
+        chartData: data.byMonth,
+        tableData: filtered.map((r) => ({
+          passageiro: r.passengerName,
+          competencia: `${String(r.month).padStart(2, '0')}/${r.year}`,
+          valor: r.amount,
+          arquivo: r.fileName,
+          envio: r.createdAt,
+        })),
+      }
+    }
+
     const data = await this.getReportData()
     const receipts = loadReceipts()
 

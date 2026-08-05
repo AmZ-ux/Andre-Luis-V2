@@ -94,6 +94,128 @@ describe('PUT /api/settings/:category', () => {
     expect(res.body.company.name).toBe('Updated Co')
     expect(res.body.financial.defaultMonthlyFee).toBe(189.90)
   })
+
+  it('should merge with previously saved values (no data loss)', async () => {
+    const db = getDb()
+    db.prepare('INSERT INTO settings (id, category, data) VALUES (?, ?, ?)')
+      .run(uuid(), 'financial', JSON.stringify({ currency: 'BRL', currencyFormat: 'BRL', decimalPlaces: 2, defaultDueDay: 5, allowCustomDueDate: true, defaultMonthlyFee: 250, allowDiscount: false, allowLateFee: false, allowInterest: false }))
+    const res = await request(app)
+      .put('/api/settings/financial')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ allowDiscount: true })
+    expect(res.status).toBe(200)
+    expect(res.body.financial.defaultMonthlyFee).toBe(250)
+    expect(res.body.financial.allowDiscount).toBe(true)
+    expect(res.body.financial.currency).toBe('BRL')
+  })
+
+  it('should write audit log and app log on update', async () => {
+    const db = getDb()
+    db.prepare('INSERT INTO settings (id, category, data) VALUES (?, ?, ?)')
+      .run(uuid(), 'company', JSON.stringify({ name: 'Old Co' }))
+    await request(app)
+      .put('/api/settings/company')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Audited Co' })
+    const audit = db.prepare('SELECT * FROM audit_logs').all() as any[]
+    expect(audit.length).toBeGreaterThan(0)
+    expect(audit[0].action).toBe('settings_update')
+    const logs = db.prepare('SELECT * FROM app_logs').all() as any[]
+    expect(logs.some((l) => l.action === 'settings_update')).toBe(true)
+  })
+})
+
+describe('Backup endpoints', () => {
+  it('should create and list a backup', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(uuid(), 'Passenger One', '111.111.111-11', '2000-01-01')
+    const created = await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    expect(created.status).toBe(200)
+    expect(created.body).toHaveProperty('id')
+
+    const res = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].id).toBe(created.body.id)
+  })
+
+  it('should restore a backup', async () => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(passengerId, 'Original', '111.111.111-11', '2000-01-01')
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+
+    db.prepare('DELETE FROM passengers').run()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'blocked')")
+      .run(passengerId, 'Changed', '111.111.111-11', '2000-01-01')
+
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const restored = await request(app)
+      .post(`/api/settings/backups/${list.body[0].id}/restore`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(restored.status).toBe(200)
+    expect(restored.body.success).toBe(true)
+
+    const row = db.prepare('SELECT * FROM passengers WHERE id = ?').get(passengerId) as any
+    expect(row.name).toBe('Original')
+    expect(row.status).toBe('active')
+  })
+
+  it('should return 404 when restoring a missing backup', async () => {
+    const res = await request(app)
+      .post('/api/settings/backups/missing-id/restore')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
+  })
+
+  it('should delete a backup', async () => {
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .delete(`/api/settings/backups/${list.body[0].id}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(204)
+    const after = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    expect(after.body).toHaveLength(0)
+  })
+})
+
+describe('GET /api/settings/logs', () => {
+  it('should return empty logs initially', async () => {
+    const res = await request(app).get('/api/settings/logs').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty('data')
+    expect(res.body.data).toEqual([])
+    expect(res.body.total).toBe(0)
+  })
+
+  it('should return logged actions and clear them', async () => {
+    await request(app)
+      .put('/api/settings/company')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Log Co' })
+    const res = await request(app).get('/api/settings/logs').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.data.length).toBeGreaterThan(0)
+    expect(res.body.data[0]).toHaveProperty('action')
+
+    const cleared = await request(app).delete('/api/settings/logs').set('Authorization', `Bearer ${token}`)
+    expect(cleared.status).toBe(204)
+    const after = await request(app).get('/api/settings/logs').set('Authorization', `Bearer ${token}`)
+    expect(after.body.data).toEqual([])
+  })
+
+  it('should require admin', async () => {
+    const passengerId = uuid()
+    const db = getDb()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Pass', 'pass@test.com', '555.555.555-55', '', bcrypt.hashSync('pass', 10))
+    const passengerToken = jwt.sign({ userId: passengerId, role: 'passenger' }, 'dev-secret-change-in-production')
+    const res = await request(app).get('/api/settings/logs').set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
 })
 
 describe('GET /api/settings/users', () => {

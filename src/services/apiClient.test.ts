@@ -39,6 +39,7 @@ describe('apiClient', () => {
 
     mockFetch.mockResolvedValue({
       ok: true,
+      headers: { get: () => null },
       json: async () => ({ user: { name: 'Test' } }),
     })
 
@@ -59,6 +60,7 @@ describe('apiClient', () => {
 
     mockFetch.mockResolvedValue({
       ok: true,
+      headers: { get: () => null },
       json: async () => ({ data: [], total: 0 }),
     })
 
@@ -75,6 +77,7 @@ describe('apiClient', () => {
 
     mockFetch.mockResolvedValue({
       ok: true,
+      headers: { get: () => null },
       json: async () => ({ status: 'healthy' }),
     })
 
@@ -104,6 +107,7 @@ describe('apiClient', () => {
 
     mockFetch.mockResolvedValue({
       ok: true,
+      headers: { get: () => null },
       json: async () => ({
         passenger_name: 'João',
         monthly_fee: 189.90,
@@ -112,5 +116,18 @@ describe('apiClient', () => {
 
     const result: any = await api.get('/passengers/1')
     expect(result).toEqual({ passengerName: 'João', monthlyFee: 189.90 })
+  })
+
+  it('should resolve undefined on 204 no content', async () => {
+    const { api } = await import('./apiClient')
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 204,
+      headers: { get: () => '0' },
+      json: async () => { throw new Error('should not be called') },
+    })
+
+    await expect(api.delete('/settings/backups/1')).resolves.toBeUndefined()
   })
 })

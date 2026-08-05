@@ -238,8 +238,38 @@ export const realCommunication = {
   create: (data: any) =>
     api.post<any>('/communication', data),
 
+  updateStatus: (id: string, status: string) =>
+    api.put<any>(`/communication/messages/${id}/status`, { status }),
+
+  templates: () =>
+    api.get<any[]>('/communication/templates'),
+
+  createTemplate: (data: any) =>
+    api.post<any>('/communication/templates', data),
+
+  updateTemplate: (id: string, data: any) =>
+    api.put<any>(`/communication/templates/${id}`, data),
+
+  deleteTemplate: (id: string) =>
+    api.delete<void>(`/communication/templates/${id}`),
+
+  schedules: () =>
+    api.get<any[]>('/communication/schedules'),
+
+  schedule: (messageId: string, date: string, time: string) =>
+    api.post<any>('/communication/schedules', { messageId, date, time }),
+
   notifications: () =>
     api.get<any[]>('/communication/notifications'),
+
+  unreadCount: () =>
+    api.get<{ count: number }>('/communication/notifications/unread'),
+
+  updateNotification: (id: string, status: string) =>
+    api.patch<any>(`/communication/notifications/${id}`, { status }),
+
+  markAllNotificationsRead: () =>
+    api.post<any>('/communication/notifications/read-all'),
 
   channels: () =>
     api.get<any[]>('/communication/channels'),
@@ -261,10 +291,31 @@ export const realSettings = {
 
   backup: () =>
     api.post<{ id: string; timestamp: string; size: number }>('/settings/backup'),
+
+  backups: () =>
+    api.get<{ id: string; timestamp: string; size: number; type: string }[]>('/settings/backups'),
+
+  restoreBackup: (id: string) =>
+    api.post<{ success: boolean }>(`/settings/backups/${id}/restore`),
+
+  deleteBackup: (id: string) =>
+    api.delete<void>(`/settings/backups/${id}`),
+
+  logs: (page: number, pageSize: number) =>
+    api.get<{ data: any[]; total: number }>('/settings/logs', { page, pageSize }),
+
+  clearLogs: () =>
+    api.delete<void>('/settings/logs'),
 }
 
 // --- Health ---
 export const realHealth = {
   check: () =>
     api.get<any>('/health', undefined, true),
+}
+
+// --- Reports ---
+export const realReports = {
+  overview: () =>
+    api.get<any>('/reports/overview'),
 }

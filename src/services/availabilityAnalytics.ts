@@ -1,3 +1,5 @@
+import { config } from '../config'
+import { realReports } from './realApi'
 import type { AvailabilityReportData } from '../types/reports'
 import type { Availability } from '../types/availability'
 
@@ -8,6 +10,20 @@ function loadAvailabilities(): Availability[] {
 
 export const availabilityAnalytics = {
   async getReportData(): Promise<AvailabilityReportData> {
+    if (config.realApi) {
+      const overview = await realReports.overview()
+      const a = overview.availability
+      return {
+        active: a.active,
+        scheduled: a.scheduled,
+        finished: a.finished,
+        cancelled: a.cancelled,
+        total: a.total,
+        returningToday: a.returningToday,
+        byMonth: a.byMonth,
+      }
+    }
+
     const items = loadAvailabilities()
 
     const today = new Date()

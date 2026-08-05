@@ -35,6 +35,8 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
   }
 
   db.prepare('UPDATE users SET last_access = datetime(\'now\') WHERE id = ?').run(user.id)
+  db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(uuid(), 'login', 'Login realizado', user.name, user.role, 'login')
 
   const token = signToken({ userId: user.id, role: user.role })
   res.json({
@@ -333,7 +335,10 @@ router.post('/refresh', authMiddleware, (req, res) => {
   res.json({ token, expiresAt: Date.now() + 24 * 60 * 60 * 1000 })
 })
 
-router.post('/logout', authMiddleware, (_req, res) => {
+router.post('/logout', authMiddleware, (req, res) => {
+  const db = getDb()
+  db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(uuid(), 'logout', 'Logout realizado', req.user!.role === 'admin' ? 'Administrador' : 'Passageiro', req.user!.role, 'logout')
   res.json({ success: true })
 })
 

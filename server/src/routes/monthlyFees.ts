@@ -155,6 +155,9 @@ router.post('/:id/pay', (req, res) => {
   const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id) as any
   const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(req.params.id)
 
+  db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(uuid(), 'payment', `Pagamento de R$ ${Number(payAmount).toFixed(2)} registrado`, 'Administrador', 'admin', 'payment')
+
   notifyPaymentReceived(db, fee, payment)
 
   res.json({ ...fee, payment, breakdown })

@@ -18,6 +18,7 @@ import availabilityRoutes from './routes/availability.js'
 import dashboardRoutes from './routes/dashboard.js'
 import communicationRoutes from './routes/communication.js'
 import settingsRoutes from './routes/settings.js'
+import reportsRoutes from './routes/reports.js'
 import clientErrorRoutes from './routes/clientError.js'
 import { paymentsRouter, handleStripeWebhook } from './routes/payments.js'
 import adminRoutes from './routes/admin.js'
@@ -72,6 +73,7 @@ app.use('/api/availability', authMiddleware, availabilityRoutes)
 app.use('/api/dashboard', authMiddleware, dashboardRoutes)
 app.use('/api/communication', authMiddleware, communicationRoutes)
 app.use('/api/settings', authMiddleware, settingsRoutes)
+app.use('/api/reports', authMiddleware, reportsRoutes)
 app.use('/api/payments', authMiddleware, paymentsRouter)
 
 app.use('/api/admin', adminRoutes)

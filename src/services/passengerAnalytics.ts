@@ -1,3 +1,5 @@
+import { config } from '../config'
+import { realReports } from './realApi'
 import type { PassengerReportData } from '../types/reports'
 import type { Passenger } from '../types/passenger'
 
@@ -6,8 +8,32 @@ function loadPassengers(): Passenger[] {
   return stored ? JSON.parse(stored) : []
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  university: 'Universitário', school: 'Escolar', contract: 'Contrato',
+}
+
+function typeLabel(type?: string): string {
+  return TYPE_LABELS[type || ''] || type || 'outros'
+}
+
 export const passengerAnalytics = {
   async getReportData(): Promise<PassengerReportData> {
+    if (config.realApi) {
+      const overview = await realReports.overview()
+      const p = overview.passengers
+      return {
+        ativos: p.ativos,
+        inativos: p.inativos,
+        ferias: p.ferias,
+        bloqueados: p.bloqueados,
+        total: p.total,
+        byCity: p.byCity,
+        byInstitution: p.byInstitution,
+        byCompany: p.byCompany,
+        byTransportType: p.byTransportType,
+      }
+    }
+
     const passengers = loadPassengers()
 
     const ativos = passengers.filter((p) => p.status === 'active').length
@@ -63,6 +89,38 @@ export const passengerAnalytics = {
     chartData: Record<string, unknown>[]
     tableData: Record<string, unknown>[]
   }> {
+    if (config.realApi) {
+      const overview = await realReports.overview()
+      const data = overview.passengers
+      const passengers: any[] = overview.passengers.passengers || []
+
+      if (type === 'active') {
+        const active = passengers.filter((p) => p.status === 'active')
+        return {
+          title: 'Passageiros Ativos',
+          chartData: data.byCity,
+          tableData: active.map((p) => ({
+            nome: p.name, cpf: p.cpf, cidade: p.city || '',
+            tipo: typeLabel(p.transportType),
+            instituicao: p.institution || '-', empresa: p.company || '-',
+          })),
+        }
+      }
+
+      const map: Record<string, { title: string; data: any[] }> = {
+        city: { title: 'Passageiros por Cidade', data: data.byCity },
+        institution: { title: 'Passageiros por Instituição', data: data.byInstitution },
+        company: { title: 'Passageiros por Empresa', data: data.byCompany },
+        transportType: { title: 'Passageiros por Tipo de Transporte', data: data.byTransportType },
+      }
+      const entry = map[type]
+      if (entry) {
+        return { title: entry.title, chartData: entry.data, tableData: entry.data }
+      }
+
+      return { title: 'Relatório de Passageiros', chartData: [], tableData: [] }
+    }
+
     const data = await this.getReportData()
     const passengers = loadPassengers()
 

@@ -1,3 +1,5 @@
+import { config } from '../config'
+import { realReports } from './realApi'
 import type { FinancialSummary } from '../types/reports'
 import type { MonthlyFee } from '../types/monthlyFee'
 
@@ -13,6 +15,26 @@ function loadPayments() {
 
 export const financialAnalytics = {
   async getSummary(): Promise<FinancialSummary> {
+    if (config.realApi) {
+      const overview = await realReports.overview()
+      const f = overview.financial
+      return {
+        totalPrevisto: f.totalPrevisto,
+        totalRecebido: f.totalRecebido,
+        totalPendente: f.totalPendente,
+        totalAtrasado: f.totalAtrasado,
+        inadimplencia: f.inadimplencia,
+        percentualRecebido: f.percentualRecebido,
+        totalPassageiros: f.totalPassageiros,
+        contratosAtivos: f.contratosAtivos,
+        totalMensalidades: f.totalMensalidades,
+        totalPagamentos: f.totalPagamentos,
+        monthlyBreakdown: f.monthlyBreakdown,
+        paymentMethodBreakdown: f.paymentMethodBreakdown,
+        statusBreakdown: f.statusBreakdown,
+      }
+    }
+
     const fees = loadFees()
     const payments = loadPayments()
 
@@ -78,6 +100,36 @@ export const financialAnalytics = {
   async generateReport(
     type: 'monthly' | 'annual' | 'period' | 'flow' | 'paid' | 'pending' | 'overdue' | 'cancelled' | 'exempt'
   ): Promise<{ title: string; chartData: Record<string, unknown>[]; tableData: Record<string, unknown>[] }> {
+    if (config.realApi) {
+      const overview = await realReports.overview()
+      const monthly: Record<string, unknown>[] = overview.financial.monthlyBreakdown
+
+      if (type === 'monthly') {
+        return { title: 'Receita Mensal', chartData: monthly, tableData: monthly }
+      }
+
+      if (type === 'paid' || type === 'pending' || type === 'overdue' || type === 'cancelled' || type === 'exempt') {
+        const statusMap: Record<string, string> = {
+          paid: 'Pago', pending: 'Pendente', overdue: 'Atrasado', cancelled: 'Cancelado', exempt: 'Isento',
+        }
+        const fees: any[] = overview.financial.fees || []
+        const list = fees.filter((f) => f.status === type)
+        return {
+          title: `Mensalidades ${statusMap[type]}`,
+          chartData: monthly.map((m: any) => ({ month: m.month, valor: type === 'paid' ? m.recebido : type === 'pending' ? m.pendente : type === 'overdue' ? m.atrasado : 0 })),
+          tableData: list.map((f) => ({
+            passageiro: f.passengerName,
+            competencia: `${String(f.month).padStart(2, '0')}/${f.year}`,
+            valor: f.amount,
+            vencimento: f.dueDate,
+            observacao: f.notes || '-',
+          })),
+        }
+      }
+
+      return { title: 'Fluxo de Recebimentos', chartData: monthly, tableData: monthly }
+    }
+
     const summary = await this.getSummary()
 
     if (type === 'monthly') {
