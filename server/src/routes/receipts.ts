@@ -165,6 +165,13 @@ router.put('/:id/replace', upload.single('file'), (req, res) => {
   const existing = db.prepare('SELECT * FROM receipts WHERE id = ?').get(req.params.id) as any
   if (!existing) { res.status(404).json({ error: 'Comprovante não encontrado' }); return }
 
+  const isAdmin = req.user.role === 'admin'
+  const isOwner = req.user.userId === existing.passenger_id
+  if (!isAdmin && !isOwner) {
+    res.status(403).json({ error: 'Acesso negado' })
+    return
+  }
+
   if (file) {
     // Remove old file from disk
     if (existing.file_path && fs.existsSync(existing.file_path)) {

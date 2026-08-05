@@ -127,6 +127,7 @@ export const availabilityService = {
   },
 
   async getByPassengerId(passengerId: string): Promise<Availability[]> {
+    if (config.realApi) return realAvailability.my()
     const data = loadAvailabilities()
     return data
       .filter((a) => a.passengerId === passengerId)

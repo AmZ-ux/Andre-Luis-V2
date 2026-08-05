@@ -37,9 +37,14 @@ router.get('/my', (req, res) => {
   res.json(db.prepare('SELECT * FROM availabilities WHERE passenger_id = ? ORDER BY start_date DESC').all(req.user.userId))
 })
 
-router.get('/active', (_req, res) => {
+router.get('/active', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
   const db = getDb()
-  res.json(db.prepare("SELECT * FROM availabilities WHERE status IN ('scheduled', 'active')").all())
+  if (req.user.role === 'admin') {
+    res.json(db.prepare("SELECT * FROM availabilities WHERE status IN ('scheduled', 'active')").all())
+    return
+  }
+  res.json(db.prepare("SELECT * FROM availabilities WHERE passenger_id = ? AND status IN ('scheduled', 'active')").all(req.user.userId))
 })
 
 router.get('/summary', requireAdmin, (_req, res) => {

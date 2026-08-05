@@ -196,4 +196,39 @@ describe('Autorização — passageiro não acessa áreas administrativas', () =
     const res = await request(app).get(`/api/monthly-fees/${feeId}`).set('Authorization', `Bearer ${passengerToken}`)
     expect(res.status).toBe(403)
   })
+
+  it('availabilities: passageiro só vê as próprias férias em /active (sem CPF de outros)', async () => {
+    const db = getDb()
+    const otherId = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(otherId, 'Outro', '222.222.222-22', '2000-01-01')
+    db.prepare(`
+      INSERT INTO availabilities (id, passenger_id, passenger_name, cpf, transport_type, type, start_date, end_date, status)
+      VALUES (?, ?, ?, ?, 'university', 'vacation', '01/07/2026', '15/07/2026', 'scheduled')
+    `).run(uuid(), otherId, 'Outro', '222.222.222-22')
+    db.prepare(`
+      INSERT INTO availabilities (id, passenger_id, passenger_name, cpf, transport_type, type, start_date, end_date, status)
+      VALUES (?, ?, ?, ?, 'university', 'vacation', '01/08/2026', '15/08/2026', 'scheduled')
+    `).run(uuid(), passengerId, 'Passageiro', '111.111.111-11')
+
+    const res = await request(app).get('/api/availabilities/active').set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].passenger_id).toBe(passengerId)
+  })
+
+  it('receipts: passageiro não substitui comprovante de outro (403)', async () => {
+    const db = getDb()
+    const otherId = uuid()
+    const rid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(otherId, 'Outro', '222.222.222-22', '2000-01-01')
+    db.prepare(`
+      INSERT INTO receipts (id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, file_name, file_type, file_size, file_path, status)
+      VALUES (?, ?, ?, ?, ?, 'university', 8, 2026, 200, 'recibo.pdf', 'application/pdf', 100, '/tmp/x.pdf', 'awaiting')
+    `).run(rid, uuid(), otherId, 'Outro', '222.222.222-22')
+
+    const res = await request(app).put(`/api/receipts/${rid}/replace`).set('Authorization', `Bearer ${passengerToken}`).send({})
+    expect(res.status).toBe(403)
+  })
 })
