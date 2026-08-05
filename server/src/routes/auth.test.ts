@@ -26,16 +26,21 @@ describe('POST /api/auth/register', () => {
   it('should register a new user', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Teste', email: 'teste@teste.com', cpf: '529.982.247-25', password: 'Test@123', monthlyFee: 189.9 })
+      .send({ name: 'Teste', email: 'teste@teste.com', cpf: '529.982.247-25', password: 'Test@123', birthDate: '2005-08-15' })
     expect(res.status).toBe(201)
     expect(res.body).toHaveProperty('token')
     expect(res.body.user.name).toBe('Teste')
+
+    const db = (await import('../database/connection.js')).getDb()
+    const passenger = db.prepare('SELECT monthly_fee, birth_date FROM passengers WHERE email = ?').get('teste@teste.com') as { monthly_fee: number; birth_date: string }
+    expect(passenger.monthly_fee).toBe(189.9)
+    expect(passenger.birth_date).toBe('2005-08-15')
   })
 
   it('should reject duplicate email', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Teste 2', email: 'teste@teste.com', cpf: '123.456.789-09', password: 'Test@123', monthlyFee: 189.9 })
+      .send({ name: 'Teste 2', email: 'teste@teste.com', cpf: '123.456.789-09', password: 'Test@123' })
     expect(res.status).toBe(409)
     expect(res.body.error).toBe('Usuário já existe')
   })
@@ -43,7 +48,7 @@ describe('POST /api/auth/register', () => {
   it('should reject duplicate CPF', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Teste 3', email: 'outro@teste.com', cpf: '529.982.247-25', password: 'Test@123', monthlyFee: 189.9 })
+      .send({ name: 'Teste 3', email: 'outro@teste.com', cpf: '529.982.247-25', password: 'Test@123' })
     expect(res.status).toBe(409)
     expect(res.body.error).toBe('Usuário já existe')
   })
@@ -55,41 +60,51 @@ describe('POST /api/auth/register', () => {
     expect(res.status).toBe(400)
   })
 
-  it('should reject register without monthly fee value', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'Sem Valor', email: 'semvalor@teste.com', cpf: '111.444.777-35', password: 'Test@123' })
-    expect(res.status).toBe(400)
-    expect(res.body.error).toBe('Informe o valor da mensalidade')
+  it('should reject register when default monthly fee is not configured', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    db.prepare("INSERT OR REPLACE INTO settings (id, category, data) VALUES ('test-financial', 'financial', ?)").run(JSON.stringify({ defaultMonthlyFee: 0 }))
+    try {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ name: 'Sem Valor', email: 'semvalor@teste.com', cpf: '111.444.777-35', password: 'Test@123' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toBe('Mensalidade padrão não configurada. Contate a administração.')
+    } finally {
+      db.prepare('DELETE FROM settings WHERE id = ?').run('test-financial')
+    }
   })
 
   it('should set due day and first fee due on the month after the contract start', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({
-        name: 'Contrato Teste',
-        email: 'contrato@teste.com',
-        cpf: '987.654.321-00',
-        password: 'Test@123',
-        contractStartDate: '2026-09-10',
-        monthlyFee: 249.9,
-      })
-    expect(res.status).toBe(201)
-
     const db = (await import('../database/connection.js')).getDb()
-    const passenger = db.prepare('SELECT id, due_day, monthly_fee FROM passengers WHERE email = ?').get('contrato@teste.com') as { id: string; due_day: number; monthly_fee: number }
-    expect(passenger.due_day).toBe(10)
-    expect(passenger.monthly_fee).toBe(249.9)
+    db.prepare("INSERT OR REPLACE INTO settings (id, category, data) VALUES ('test-financial', 'financial', ?)").run(JSON.stringify({ defaultMonthlyFee: 249.9 }))
+    try {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Contrato Teste',
+          email: 'contrato@teste.com',
+          cpf: '987.654.321-00',
+          password: 'Test@123',
+          contractStartDate: '2026-09-10',
+        })
+      expect(res.status).toBe(201)
 
-    // Contrato inicia 10/09/2026 => primeira competencia 10/2026, vencimento 10/10/2026
-    const fee = db.prepare(
-      'SELECT amount, due_day, due_date, status, month, year FROM monthly_fees WHERE passenger_id = ? AND month = 10 AND year = 2026'
-    ).get(passenger.id) as { amount: number; due_day: number; due_date: string; status: string; month: number; year: number } | undefined
-    expect(fee).toBeDefined()
-    expect(fee?.amount).toBe(249.9)
-    expect(fee?.due_day).toBe(10)
-    expect(fee?.due_date).toBe('10/10/2026')
-    expect(fee?.status).toBe('pending')
+      const passenger = db.prepare('SELECT id, due_day, monthly_fee FROM passengers WHERE email = ?').get('contrato@teste.com') as { id: string; due_day: number; monthly_fee: number }
+      expect(passenger.due_day).toBe(10)
+      expect(passenger.monthly_fee).toBe(249.9)
+
+      // Contrato inicia 10/09/2026 => primeira competencia 10/2026, vencimento 10/10/2026
+      const fee = db.prepare(
+        'SELECT amount, due_day, due_date, status, month, year FROM monthly_fees WHERE passenger_id = ? AND month = 10 AND year = 2026'
+      ).get(passenger.id) as { amount: number; due_day: number; due_date: string; status: string; month: number; year: number } | undefined
+      expect(fee).toBeDefined()
+      expect(fee?.amount).toBe(249.9)
+      expect(fee?.due_day).toBe(10)
+      expect(fee?.due_date).toBe('10/10/2026')
+      expect(fee?.status).toBe('pending')
+    } finally {
+      db.prepare('DELETE FROM settings WHERE id = ?').run('test-financial')
+    }
   })
 
   it('should fall back to day 5 when contract start date is invalid', async () => {
@@ -101,7 +116,6 @@ describe('POST /api/auth/register', () => {
         cpf: '543.210.987-00',
         password: 'Test@123',
         contractStartDate: 'data-invalida',
-        monthlyFee: 189.9,
       })
     expect(res.status).toBe(201)
 
@@ -113,7 +127,7 @@ describe('POST /api/auth/register', () => {
   it('should register new users with unverified email', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Verif Teste', email: 'verif@teste.com', cpf: '135.790.246-00', password: 'Test@123', monthlyFee: 189.9 })
+      .send({ name: 'Verif Teste', email: 'verif@teste.com', cpf: '135.790.246-00', password: 'Test@123' })
     expect(res.status).toBe(201)
     expect(res.body.user.emailVerified).toBe(false)
   })
@@ -126,7 +140,7 @@ describe('Email verification flow', () => {
     resetDb()
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Verif Flow', email: 'flow@teste.com', cpf: '246.135.790-00', password: 'Test@123', monthlyFee: 189.9 })
+      .send({ name: 'Verif Flow', email: 'flow@teste.com', cpf: '246.135.790-00', password: 'Test@123' })
     token = res.body.token
   })
 
@@ -189,7 +203,7 @@ describe('PUT /api/auth/profile', () => {
     resetDb()
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Profile Teste', email: 'profile@teste.com', cpf: '321.654.987-00', password: 'Test@123', monthlyFee: 189.9 })
+      .send({ name: 'Profile Teste', email: 'profile@teste.com', cpf: '321.654.987-00', password: 'Test@123' })
     token = res.body.token
     userId = res.body.user.id
   })
@@ -221,7 +235,7 @@ describe('PUT /api/auth/profile', () => {
   it('should reject a duplicate email', async () => {
     await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Outro User', email: 'outro@teste.com', cpf: '789.123.456-00', password: 'Test@123', monthlyFee: 189.9 })
+      .send({ name: 'Outro User', email: 'outro@teste.com', cpf: '789.123.456-00', password: 'Test@123' })
 
     const res = await request(app)
       .put('/api/auth/profile')
@@ -243,7 +257,7 @@ describe('POST /api/auth/login', () => {
     resetDb()
     await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Login Test', email: 'login@teste.com', cpf: '111.222.333-44', password: 'Senha@123', monthlyFee: 189.9 })
+      .send({ name: 'Login Test', email: 'login@teste.com', cpf: '111.222.333-44', password: 'Senha@123' })
   })
 
   it('should block unverified passenger login with EMAIL_NOT_VERIFIED', async () => {

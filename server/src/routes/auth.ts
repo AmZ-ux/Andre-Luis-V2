@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { v4 as uuid } from 'uuid'
 import rateLimit from 'express-rate-limit'
 import { getDb } from '../database/connection.js'
+import { loadSettings } from '../services/settingsService.js'
 import { signToken, authMiddleware } from '../middleware/auth.js'
 import { validateBody } from '../middleware/validation.js'
 import { logger } from '../utils/logger.js'
@@ -56,14 +57,8 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
 })
 
 router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req, res) => {
-  const { name, email, cpf, password, phone, transportType, pickupPoint, destination, contractStartDate, monthlyFee } = req.body
+  const { name, email, cpf, password, phone, transportType, pickupPoint, destination, contractStartDate, birthDate } = req.body
   const db = getDb()
-
-  const feeValue = Number(monthlyFee)
-  if (!Number.isFinite(feeValue) || feeValue <= 0) {
-    res.status(400).json({ error: 'Informe o valor da mensalidade' })
-    return
-  }
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ? OR cpf = ?').get(email, cpf)
   if (existing) {
@@ -82,6 +77,15 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
   const validTypes = ['university', 'school', 'contract']
   const type = validTypes.includes(transportType) ? transportType : 'university'
 
+  // Valor da mensalidade vem da configuração da empresa, nunca do passageiro
+  const settings = loadSettings(db)
+  const feeValue = Number(settings.financial.defaultMonthlyFee) || 0
+  if (feeValue <= 0) {
+    db.prepare('DELETE FROM users WHERE id = ?').run(id)
+    res.status(400).json({ error: 'Mensalidade padrão não configurada. Contate a administração.' })
+    return
+  }
+
   let dueDay = 5
   if (contractStartDate && /^\d{4}-\d{2}-\d{2}$/.test(contractStartDate)) {
     dueDay = Number(contractStartDate.slice(8, 10))
@@ -96,7 +100,9 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
   `).run(
-    id, name, cpf, '2000-01-01', phone || '', email, type,
+    id, name, cpf,
+    (birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate)) ? birthDate : '2000-01-01',
+    phone || '', email, type,
     pickupPoint || '', destination || '', contractStartDate || '', dueDay, feeValue
   )
 

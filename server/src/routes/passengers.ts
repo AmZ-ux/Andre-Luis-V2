@@ -56,14 +56,17 @@ router.post('/', (req, res) => {
 
   // Create both user and passenger accounts
   const id = uuid()
-  const userExists = db.prepare('SELECT id FROM users WHERE cpf = ?').get(cpf)
+  let temporaryPassword = ''
+  const userExists = db.prepare('SELECT id FROM users WHERE cpf = ?').get(cpf) as { id: string } | undefined
   if (!userExists) {
+    temporaryPassword = Math.random().toString(36).slice(2, 8) + 'A1!'
     db.prepare(`INSERT INTO users (id, name, email, cpf, phone, role, password_hash)
       VALUES (?, ?, ?, ?, ?, 'passenger', ?)`)
-      .run(id, sanitizeInput(name), sanitizeInput(email), cpf, sanitizeInput(phone || ''), bcrypt.hashSync('passagem123', 10))
+      .run(id, sanitizeInput(name), sanitizeInput(email), cpf, sanitizeInput(phone || ''), bcrypt.hashSync(temporaryPassword, 10))
   }
 
-  const passengerId = userExists ? uuid() : id
+  // Passageiro usa o mesmo id do usuário para manter o vínculo do login
+  const passengerId = userExists ? userExists.id : id
   db.prepare(`
     INSERT INTO passengers (id, name, cpf, rg, birth_date, phone, whatsapp, email,
       zip_code, street, number, complement, neighborhood, city, state,
@@ -80,7 +83,7 @@ router.post('/', (req, res) => {
   )
 
   const created = db.prepare('SELECT * FROM passengers WHERE id = ?').get(passengerId)
-  res.status(201).json(created)
+  res.status(201).json({ ...created, temporaryPassword })
 })
 
 router.put('/:id', (req, res) => {
