@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Card } from '../ui/Card'
 import { Select } from '../ui/Select'
 import { Button } from '../ui/Button'
 import { Trash2, Search } from 'lucide-react'

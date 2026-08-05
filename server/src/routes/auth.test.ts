@@ -197,7 +197,6 @@ describe('Email verification flow', () => {
 
 describe('PUT /api/auth/profile', () => {
   let token = ''
-  let userId = ''
 
   beforeAll(async () => {
     resetDb()
@@ -205,7 +204,6 @@ describe('PUT /api/auth/profile', () => {
       .post('/api/auth/register')
       .send({ name: 'Profile Teste', email: 'profile@teste.com', cpf: '321.654.987-00', password: 'Test@123' })
     token = res.body.token
-    userId = res.body.user.id
   })
 
   it('should update name, phone and email', async () => {

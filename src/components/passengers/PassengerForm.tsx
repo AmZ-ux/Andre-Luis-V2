@@ -5,7 +5,6 @@ import { Select } from '../ui/Select'
 import { Textarea } from '../ui/Textarea'
 import { Button } from '../ui/Button'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { cn } from '../../utils/cn'
 import {
   formatCPF,
   formatPhone,

@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from 'framer-motion'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { AlertTriangle, Info } from 'lucide-react'

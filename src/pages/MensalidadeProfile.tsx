@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { monthlyFeeService } from '../services/monthlyFeeService'
-import { monthlyRules } from '../services/monthlyRules'
 import { MonthlyFeeStatus } from '../components/monthlyFees/MonthlyFeeStatus'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -50,8 +49,6 @@ export function MensalidadeProfile() {
       </div>
     )
   }
-
-  const canEdit = monthlyRules.canEdit(fee)
 
   const infoItems = [
     { icon: User, label: 'Passageiro', value: fee.passengerName },

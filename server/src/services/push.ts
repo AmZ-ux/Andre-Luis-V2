@@ -83,7 +83,6 @@ export const pushService = {
     let sent = 0
 
     for (const row of rows) {
-      const userId = row.category.replace('push_sub_', '')
       try {
         const subscription: PushSubscription = JSON.parse(row.data)
         if (webPushAvailable) {

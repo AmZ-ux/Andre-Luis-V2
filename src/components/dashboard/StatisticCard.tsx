@@ -3,7 +3,6 @@ import { TrendingUp, TrendingDown } from 'lucide-react'
 import * as Icons from 'lucide-react'
 import { cn } from '../../utils/cn'
 import type { Statistic } from '../../types/dashboard'
-import type { ReactNode } from 'react'
 
 interface StatisticCardProps {
   data: Statistic

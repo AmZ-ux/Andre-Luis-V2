@@ -1,11 +1,9 @@
 #!/usr/bin/env node
-import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const DATA_DIR = path.resolve(__dirname, '../data')
 const BACKUP_DIR = path.resolve(__dirname, '../backups')
 const DB_FILE = path.resolve(__dirname, '..', process.env.DATABASE_PATH || 'data/database.sqlite')
 const MAX_BACKUPS = parseInt(process.env.MAX_BACKUPS || '30', 10)

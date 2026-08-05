@@ -20,10 +20,6 @@ const paymentLabel: Record<string, string> = {
   pix: 'PIX', cash: 'Dinheiro', transfer: 'Transferência', card: 'Cartão',
 }
 
-const statusLabel: Record<string, string> = {
-  active: 'Ativo', inactive: 'Inativo', vacation: 'Férias', blocked: 'Bloqueado',
-}
-
 export function PassageiroProfile() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()

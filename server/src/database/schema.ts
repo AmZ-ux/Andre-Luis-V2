@@ -212,6 +212,37 @@ CREATE TABLE IF NOT EXISTS pix_charges (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS message_templates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'custom',
+  subject TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL,
+  variables TEXT NOT NULL DEFAULT '[]',
+  channel TEXT NOT NULL DEFAULT 'app',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS message_history (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL REFERENCES messages(id),
+  action TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  performed_by TEXT NOT NULL DEFAULT 'admin',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS app_logs (
+  id TEXT PRIMARY KEY,
+  action TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  user_name TEXT NOT NULL DEFAULT '',
+  user_role TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT 'general',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `
 
 export async function runMigrations(): Promise<void> {

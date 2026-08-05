@@ -41,7 +41,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
           }
         />
         <div className="space-y-1">
-          {activities.map((activity, i) => {
+          {activities.map((activity) => {
             const Icon = activityIcon[activity.type]
             return (
               <div

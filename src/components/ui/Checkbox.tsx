@@ -7,7 +7,7 @@ interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'typ
   error?: string
 }
 
-export function Checkbox({ label, error, className, id, checked, onChange, disabled, ...props }: CheckboxProps) {
+export function Checkbox({ label, error, className: _className, id, checked, onChange, disabled, ...props }: CheckboxProps) {
   const checkboxId = id || label?.toLowerCase().replace(/\s+/g, '-')
 
   return (

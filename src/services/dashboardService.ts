@@ -57,10 +57,6 @@ const baseChartData: Record<ChartPeriod, ChartDataPoint[]> = {
   ],
 }
 
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 9)
-}
-
 function getDashboardData(): DashboardData {
   const month = monthNames[now.getMonth()]
   const expectedRevenue = 48200

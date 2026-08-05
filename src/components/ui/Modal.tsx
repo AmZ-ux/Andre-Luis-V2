@@ -13,7 +13,9 @@ interface ModalProps {
   className?: string
 }
 
-function ModalDesktop({ isOpen, onClose, title, children, className, containerRef }: ModalProps & { containerRef: React.RefObject<HTMLDivElement | null> }) {
+type ModalPartProps = Omit<ModalProps, 'isOpen'>
+
+function ModalDesktop({ onClose, title, children, className, containerRef }: ModalPartProps & { containerRef: React.RefObject<HTMLDivElement | null> }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <motion.div
@@ -57,7 +59,7 @@ function ModalDesktop({ isOpen, onClose, title, children, className, containerRe
   )
 }
 
-function ModalMobile({ isOpen, onClose, title, children }: ModalProps) {
+function ModalMobile({ onClose, title, children }: ModalPartProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <motion.div
@@ -107,9 +109,9 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
   return (
     <AnimatePresence>
       {isOpen && (isMobile ? (
-        <ModalMobile isOpen={isOpen} onClose={onClose} title={title} children={children} />
+        <ModalMobile onClose={onClose} title={title}>{children}</ModalMobile>
       ) : (
-        <ModalDesktop isOpen={isOpen} onClose={onClose} title={title} children={children} className={className} containerRef={containerRef} />
+        <ModalDesktop onClose={onClose} title={title} className={className} containerRef={containerRef}>{children}</ModalDesktop>
       ))}
     </AnimatePresence>
   )

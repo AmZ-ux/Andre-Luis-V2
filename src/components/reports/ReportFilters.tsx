@@ -2,7 +2,7 @@ import { Select } from '../ui/Select'
 import { Button } from '../ui/Button'
 import { Filter, RotateCcw } from 'lucide-react'
 import type { ReportFilters as ReportFiltersType } from '../../types/reports'
-import type { TransportType, PaymentMethod } from '../../types/passenger'
+import type { TransportType } from '../../types/passenger'
 
 interface ReportFiltersComponentProps {
   filters: ReportFiltersType

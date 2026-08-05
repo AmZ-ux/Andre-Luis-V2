@@ -20,7 +20,7 @@ interface RecipientSelectorProps {
   type: MessageType
 }
 
-export function RecipientSelector({ selected, onChange, type }: RecipientSelectorProps) {
+export function RecipientSelector({ selected, onChange, type: _type }: RecipientSelectorProps) {
   const [filterType, setFilterType] = useState<RecipientFilter>('individual')
   const [value, setValue] = useState('')
   const [label, setLabel] = useState('')

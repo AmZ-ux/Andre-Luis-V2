@@ -29,6 +29,7 @@ export function MonthlyFeeStatus({ status, className }: MonthlyFeeStatusProps) {
   )
 }
 
+// oxlint-disable-next-line react/only-export-components
 export const statusOptions: { value: Status | ''; label: string }[] = [
   { value: '', label: 'Todos os status' },
   { value: 'pending', label: 'Pendente' },

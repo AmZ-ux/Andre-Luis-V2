@@ -2,7 +2,7 @@
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
-import { generateMonthlyFees, ensureContractFees } from '../services/monthlyFeeGenerator.js'
+import { ensureContractFees } from '../services/monthlyFeeGenerator.js'
 import { calculateDueFromFee } from '../services/billingRules.js'
 import { notifyPaymentReceived } from '../services/feeAutomation.js'
 import { requireAdmin as requireAdminRole } from '../middleware/roles.js'

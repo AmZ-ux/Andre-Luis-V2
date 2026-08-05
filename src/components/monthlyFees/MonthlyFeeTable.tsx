@@ -73,7 +73,6 @@ export function MonthlyFeeTable({
     return (
       <div className="space-y-3">
         {fees.map((fee, i) => {
-          const canPay = fee.status === 'pending' || fee.status === 'overdue'
           const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
           const canExempt = fee.status !== 'paid' && fee.status !== 'exempt'
 
@@ -186,7 +185,6 @@ export function MonthlyFeeTable({
         </thead>
         <tbody>
           {fees.map((fee) => {
-            const canPay = fee.status === 'pending' || fee.status === 'overdue'
             const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
             const canExempt = fee.status !== 'paid' && fee.status !== 'exempt'
 

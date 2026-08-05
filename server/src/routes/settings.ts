@@ -16,8 +16,30 @@ router.put('/:category', requireAdmin, (req, res) => {
   const { category } = req.params
   const data = req.body
 
-  const existing = db.prepare('SELECT id FROM settings WHERE category = ?').get(category)
+  const existing = db.prepare('SELECT id, data FROM settings WHERE category = ?').get(category)
+
   if (existing) {
+    const parsedExisting = JSON.parse(existing.data)
+    const parsedIncoming = data
+
+    // Registrar alterações no audit_logs
+    for (const [key, newVal] of Object.entries(parsedIncoming)) {
+      const oldVal = parsedExisting[key]
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        db.prepare(`
+          INSERT INTO audit_logs (id, user_id, user_name, action, category, details)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(
+          uuid(),
+          req.user!.userId,
+          req.user!.role === 'admin' ? 'Administrador' : 'Passageiro',
+          'settings_update',
+          category,
+          JSON.stringify({ field: key, previousValue: oldVal, newValue: newVal })
+        )
+      }
+    }
+
     db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE category = ?').run(JSON.stringify(data), category)
   } else {
     db.prepare('INSERT INTO settings (id, category, data) VALUES (?, ?, ?)').run(uuid(), category, JSON.stringify(data))

@@ -27,7 +27,6 @@ export function CardCheckout({ fee, clientSecret, onPaid, onBack, onError }: Car
 
   useEffect(() => {
     mountedRef.current = true
-    let unmounted = false
 
     const init = async () => {
       try {
@@ -48,7 +47,6 @@ export function CardCheckout({ fee, clientSecret, onPaid, onBack, onError }: Car
 
     return () => {
       mountedRef.current = false
-      unmounted = true
       if (pollTimer.current) window.clearTimeout(pollTimer.current)
       try { elementsRef.current?._paymentElement?.unmount() } catch {}
       try { elementsRef.current?.unmount() } catch {}

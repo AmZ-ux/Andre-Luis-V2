@@ -5,7 +5,7 @@ interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'
   label?: string
 }
 
-export function Switch({ label, className, id, checked, onChange, disabled, ...props }: SwitchProps) {
+export function Switch({ label, className: _className, id, checked, onChange, disabled, ...props }: SwitchProps) {
   const switchId = id || label?.toLowerCase().replace(/\s+/g, '-')
 
   return (

@@ -13,7 +13,7 @@ export function useSettings() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [backups, setBackups] = useState<BackupEntry[]>([])
   const [activeCategory, setActiveCategory] = useState<SettingsCategory | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading] = useState(false)
   const [saved, setSaved] = useState(false)
 
   const reload = useCallback(() => {

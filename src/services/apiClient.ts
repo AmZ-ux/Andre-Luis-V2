@@ -2,8 +2,6 @@ import { config } from '../config'
 import { transformKeys } from '../utils/transformKeys'
 import { sessionManager } from '../auth/sessionManager'
 
-const MAX_RETRIES = 2
-
 interface ApiError {
   status: number
   message: string

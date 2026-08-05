@@ -15,10 +15,10 @@ router.get('/', (_req, res) => {
 
   const totalPassengers = (db.prepare('SELECT COUNT(*) as c FROM passengers').get() as any).c
   const activePassengers = (db.prepare("SELECT COUNT(*) as c FROM passengers WHERE status = 'active'").get() as any).c
-  const totalFees = (db.prepare('SELECT COUNT(*) as c FROM monthly_fees').get() as any).c
   const pendingFees = (db.prepare("SELECT COUNT(*) as c FROM monthly_fees WHERE status IN ('pending', 'overdue')").get() as any).c
   const overdueFees = (db.prepare("SELECT COUNT(*) as c FROM monthly_fees WHERE status = 'overdue'").get() as any).c
-  const paidThisMonth = (db.prepare("SELECT COUNT(*) as c FROM monthly_fees WHERE status = 'paid' AND month = ? AND year = ?").get(new Date().getMonth() + 1, new Date().getFullYear()) as any).c
+  const paidThisMonthCount = (db.prepare("SELECT COUNT(*) as c FROM monthly_fees WHERE status = 'paid' AND month = ? AND year = ?").get(new Date().getMonth() + 1, new Date().getFullYear()) as any).c
+  const paidThisMonth = (db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM monthly_fees WHERE status = 'paid' AND month = ? AND year = ?").get(new Date().getMonth() + 1, new Date().getFullYear()) as any).total
   const totalRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM monthly_fees WHERE status = 'paid'").get() as any).total
   const expectedRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM monthly_fees").get() as any).total
   const pendingRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM monthly_fees WHERE status IN ('pending', 'overdue')").get() as any).total
@@ -121,7 +121,7 @@ router.get('/', (_req, res) => {
     statistics: [
       { id: '1', title: 'Passageiros Ativos', value: String(activePassengers), description: `de ${totalPassengers} total`, icon: 'Users', change: 0, changeType: 'increase', color: 'primary' },
       { id: '2', title: 'Mensalidades Pendentes', value: String(pendingFees), description: `${overdueFees} vencidas`, icon: 'DollarSign', change: 0, changeType: 'decrease', color: 'warning' },
-      { id: '3', title: 'Receita do Mês', value: String(paidThisMonth), description: `de ${totalFees} mensalidades`, icon: 'TrendingUp', change: 0, changeType: 'increase', color: 'success' },
+      { id: '3', title: 'Receita do Mês', value: `R$ ${Number(paidThisMonth).toFixed(2)}`, description: `${paidThisMonthCount} mensalidades pagas`, icon: 'TrendingUp', change: 0, changeType: 'increase', color: 'success' },
       { id: '4', title: 'Comprovantes Pendentes', value: String(awaitingReceipts), description: 'aguardando revisão', icon: 'FileText', change: 0, changeType: 'increase', color: 'error' },
       { id: '5', title: 'Em Férias', value: String(av.c), description: 'atualmente', icon: 'Plane', change: 0, changeType: 'increase', color: 'info' },
       { id: '6', title: 'Taxa de Adimplência', value: `${receivedPercentage}%`, description: 'geral', icon: 'CheckCircle', change: 0, changeType: 'increase', color: 'success' },

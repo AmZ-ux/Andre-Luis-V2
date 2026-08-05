@@ -39,13 +39,13 @@ export function CommunicationCenter({ embedded = false }: { embedded?: boolean }
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
 
   const {
-    messages, templates, channels, notifications, scheduled, history,
+    messages, templates, channels, notifications, scheduled,
     summary, preferences, unreadCount, loading,
     sendMessage, createTemplate, updateTemplate, deleteTemplate,
-    scheduleMessage, cancelScheduling,
+    cancelScheduling,
     markNotifRead, markNotifFavorite, archiveNotif, markAllNotifsRead,
     updatePreferences, toggleChannel,
-    filters, setFilters, reload,
+    filters, setFilters,
   } = useCommunication()
 
   const handleSend = (data: Parameters<typeof sendMessage>[0]) => {

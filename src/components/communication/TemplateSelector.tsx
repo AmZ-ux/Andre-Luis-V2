@@ -8,7 +8,7 @@ interface TemplateSelectorProps {
   onClose: () => void
 }
 
-export function TemplateSelector({ onSelect, onClose }: TemplateSelectorProps) {
+export function TemplateSelector({ onSelect, onClose: _onClose }: TemplateSelectorProps) {
   const [search, setSearch] = useState('')
   const templates = templateService.list()
 

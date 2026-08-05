@@ -1,6 +1,5 @@
 import { X } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { ReceiptPreview } from './ReceiptPreview'
 import type { Receipt } from '../../types/receipt'
 
 interface ReceiptViewerProps {

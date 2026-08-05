@@ -28,6 +28,7 @@ export function AvailabilityStatusBadge({ status, className }: AvailabilityStatu
   )
 }
 
+// oxlint-disable-next-line react/only-export-components
 export const availabilityStatusOptions: { value: AvailabilityStatus | ''; label: string }[] = [
   { value: '', label: 'Todos os status' },
   { value: 'scheduled', label: 'Agendado' },

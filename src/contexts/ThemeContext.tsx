@@ -35,6 +35,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// oxlint-disable-next-line react/only-export-components
 export function useTheme() {
   const context = useContext(ThemeContext)
   if (!context) {

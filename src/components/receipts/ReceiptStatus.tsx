@@ -28,6 +28,7 @@ export function ReceiptStatus({ status, className }: ReceiptStatusProps) {
   )
 }
 
+// oxlint-disable-next-line react/only-export-components
 export const receiptStatusOptions: { value: Status | ''; label: string }[] = [
   { value: '', label: 'Todos os status' },
   { value: 'awaiting', label: 'Aguardando' },

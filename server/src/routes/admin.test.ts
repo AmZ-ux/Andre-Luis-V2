@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
 import express from 'express'
 import request from 'supertest'
-import jwt from 'jsonwebtoken'
 import { runMigrations } from '../database/schema.js'
 import { sanitizeBody } from '../middleware/validation.js'
 import { resetDb, getDb } from '../database/connection.js'
