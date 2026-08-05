@@ -177,12 +177,12 @@ describe('POST /api/availabilities', () => {
     expect(history[0].action).toBe('created')
   })
 
-  it('should return 500 when required fields are missing', async () => {
+  it('should return 400 when required fields are missing', async () => {
     const res = await request(app)
       .post('/api/availabilities')
       .set('Authorization', `Bearer ${token}`)
       .send({})
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(400)
   })
 })
 

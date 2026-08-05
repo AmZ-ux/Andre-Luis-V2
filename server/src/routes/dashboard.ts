@@ -1,7 +1,10 @@
 ﻿import { Router } from 'express'
 import { getDb } from '../database/connection.js'
+import { requireAdmin } from '../middleware/roles.js'
 
 const router = Router()
+
+router.use(requireAdmin)
 
 function initials(name: string): string {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()

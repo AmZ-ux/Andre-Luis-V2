@@ -5,6 +5,7 @@ import { loadSettings } from '../services/settingsService.js'
 import { generateMonthlyFees, ensureContractFees } from '../services/monthlyFeeGenerator.js'
 import { calculateDueFromFee } from '../services/billingRules.js'
 import { notifyPaymentReceived } from '../services/feeAutomation.js'
+import { requireAdmin as requireAdminRole } from '../middleware/roles.js'
 
 const router = Router()
 
@@ -41,7 +42,7 @@ router.post('/ensure-current', (req, res) => {
   })
 })
 
-router.get('/', (req, res) => {
+router.get('/', requireAdminRole, (req, res) => {
   const db = getDb()
   const { search = '', month = '', year = '', status = '', transportType = '', page = '1', pageSize = '15', sortField = 'created_at', sortDirection = 'desc' } = req.query
 

@@ -2,6 +2,7 @@
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
+import { requireAdmin } from '../middleware/roles.js'
 
 const router = Router()
 
@@ -10,7 +11,7 @@ router.get('/', (req, res) => {
   res.json(loadSettings(db))
 })
 
-router.put('/:category', (req, res) => {
+router.put('/:category', requireAdmin, (req, res) => {
   const db = getDb()
   const { category } = req.params
   const data = req.body
@@ -26,7 +27,7 @@ router.put('/:category', (req, res) => {
 })
 
 // Audit logs
-router.get('/audit', (req, res) => {
+router.get('/audit', requireAdmin, (req, res) => {
   const db = getDb()
   const { page = '1', pageSize = '20' } = req.query
   const offset = (Number(page) - 1) * Number(pageSize)
@@ -36,13 +37,13 @@ router.get('/audit', (req, res) => {
 })
 
 // User management
-router.get('/users', (_req, res) => {
+router.get('/users', requireAdmin, (_req, res) => {
   const db = getDb()
   res.json(db.prepare('SELECT id, name, email, cpf, phone, role, created_at, last_access FROM users').all())
 })
 
 // Backup
-router.post('/backup', (_req, res) => {
+router.post('/backup', requireAdmin, (_req, res) => {
   const db = getDb()
   const tables = ['passengers', 'monthly_fees', 'payments', 'receipts', 'receipt_history', 'availabilities', 'availability_history', 'messages', 'notifications', 'settings']
   const backup: any = {}

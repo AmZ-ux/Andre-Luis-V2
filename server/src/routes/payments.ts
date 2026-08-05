@@ -58,6 +58,10 @@ paymentsRouter.post('/create', async (req, res) => {
 
   const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(monthlyFeeId) as any
   if (!fee) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
+  if (req.user?.role !== 'admin' && fee.passenger_id !== req.user?.userId) {
+    res.status(403).json({ error: 'Acesso negado' })
+    return
+  }
   if (fee.status === 'paid') { res.status(400).json({ error: 'Pagamento já registrado para esta mensalidade' }); return }
   if (fee.status === 'cancelled') { res.status(400).json({ error: 'Não é possível cobrar uma mensalidade cancelada' }); return }
   if (fee.status === 'exempt') { res.status(400).json({ error: 'Não é possível cobrar uma mensalidade isenta' }); return }
@@ -111,6 +115,10 @@ paymentsRouter.get('/status', async (req, res) => {
   const db = getDb()
   const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(monthlyFeeId) as any
   if (!fee) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
+  if (req.user?.role !== 'admin' && fee.passenger_id !== req.user?.userId) {
+    res.status(403).json({ error: 'Acesso negado' })
+    return
+  }
 
   if (fee.status === 'paid') { res.json({ status: 'paid' }); return }
 

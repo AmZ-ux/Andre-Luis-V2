@@ -1,10 +1,11 @@
 ﻿import { Router } from 'express'
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
+import { requireAdmin } from '../middleware/roles.js'
 
 const router = Router()
 
-router.get('/', (req, res) => {
+router.get('/', requireAdmin, (req, res) => {
   const db = getDb()
   const { search = '', status = '', type = '', transportType = '', page = '1', pageSize = '15', sortField = 'start_date', sortDirection = 'desc' } = req.query
 
@@ -41,7 +42,7 @@ router.get('/active', (_req, res) => {
   res.json(db.prepare("SELECT * FROM availabilities WHERE status IN ('scheduled', 'active')").all())
 })
 
-router.get('/summary', (_req, res) => {
+router.get('/summary', requireAdmin, (_req, res) => {
   const db = getDb()
   const today = new Date().toISOString().split('T')[0]
   const [d, m, y] = today.split('-')
@@ -56,7 +57,7 @@ router.get('/summary', (_req, res) => {
   })
 })
 
-router.get('/:id', (req, res) => {
+router.get('/:id', requireAdmin, (req, res) => {
   const db = getDb()
   const av = db.prepare('SELECT * FROM availabilities WHERE id = ?').get(req.params.id)
   if (!av) { res.status(404).json({ error: 'Período não encontrado' }); return }
@@ -67,13 +68,33 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
   const db = getDb()
-  const { passengerId, passengerName, cpf, transportType, institution, company, city, type, startDate, endDate, reason, notes, submittedBy, submittedById } = req.body
+  const { passengerName, cpf, transportType, institution, company, city, type, startDate, endDate, reason, notes, submittedBy, submittedById } = req.body
+
+  const isAdmin = req.user.role === 'admin'
+  const passengerId = isAdmin && req.body.passengerId ? req.body.passengerId : req.user.userId
+
+  // Validação básica
+  if (!startDate || !endDate) {
+    res.status(400).json({ error: 'Data de início e fim são obrigatórias' })
+    return
+  }
+
+  // Para passageiro, os dados vêm do próprio cadastro (não confia no body)
+  let finalName = passengerName
+  let finalCpf = cpf
+  let finalTransportType = transportType
+  if (!isAdmin) {
+    const p = db.prepare('SELECT name, cpf, transport_type, institution, company, city FROM passengers WHERE id = ?').get(passengerId) as any
+    finalName = p?.name || req.user.userId
+    finalCpf = p?.cpf || ''
+    finalTransportType = p?.transport_type || 'university'
+  }
 
   const id = uuid()
   db.prepare(`
     INSERT INTO availabilities (id, passenger_id, passenger_name, cpf, transport_type, institution, company, city, type, start_date, end_date, reason, notes, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled')
-  `).run(id, passengerId, passengerName, cpf, transportType, institution || '', company || '', city || '', type || 'vacation', startDate, endDate, reason, notes || '')
+  `).run(id, passengerId, finalName, finalCpf, finalTransportType, institution || '', company || '', city || '', type || 'vacation', startDate, endDate, reason || '', notes || '')
 
   db.prepare('INSERT INTO availability_history (id, availability_id, action, performed_by, performed_by_id) VALUES (?, ?, \'created\', ?, ?)')
     .run(uuid(), id, submittedBy || req.user.userId, submittedById || req.user.userId)
@@ -85,8 +106,14 @@ router.put('/:id/cancel', (req, res) => {
   if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
   const db = getDb()
   const { reason, cancelledBy, cancelledById } = req.body
-  const existing = db.prepare('SELECT id FROM availabilities WHERE id = ?').get(req.params.id)
+  const existing = db.prepare('SELECT * FROM availabilities WHERE id = ?').get(req.params.id) as any
   if (!existing) { res.status(404).json({ error: 'Período não encontrado' }); return }
+
+  const isAdmin = req.user.role === 'admin'
+  if (!isAdmin && existing.passenger_id !== req.user.userId) {
+    res.status(403).json({ error: 'Acesso negado' })
+    return
+  }
 
   db.prepare("UPDATE availabilities SET status = 'cancelled', cancelled_at = datetime('now'), cancellation_reason = ? WHERE id = ?").run(reason || '', req.params.id)
   db.prepare('INSERT INTO availability_history (id, availability_id, action, performed_by, performed_by_id, notes) VALUES (?, ?, \'cancelled\', ?, ?, ?)')

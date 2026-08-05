@@ -4,10 +4,11 @@ import fs from 'fs'
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { upload, getUploadsDir } from '../middleware/upload.js'
+import { requireAdmin } from '../middleware/roles.js'
 
 const router = Router()
 
-router.get('/', (req, res) => {
+router.get('/', requireAdmin, (req, res) => {
   const db = getDb()
   const { search = '', status = '', month = '', year = '', transportType = '', page = '1', pageSize = '15', sortField = 'created_at', sortDirection = 'desc' } = req.query
 
@@ -33,7 +34,7 @@ router.get('/', (req, res) => {
   res.json({ data: db.prepare(sql).all(...params), total })
 })
 
-router.get('/summary', (_req, res) => {
+router.get('/summary', requireAdmin, (_req, res) => {
   const db = getDb()
   const rows = db.prepare("SELECT status, COUNT(*) as count FROM receipts GROUP BY status").all() as any[]
   const summary = { awaiting: 0, approved: 0, rejected: 0, cancelled: 0, total: 0 }
@@ -48,10 +49,17 @@ router.get('/passenger/:passengerId', (req, res) => {
   res.json(db.prepare("SELECT id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, file_name, file_type, file_size, status, reviewed_by, review_date, review_notes, created_at, updated_at FROM receipts WHERE passenger_id = ? ORDER BY created_at DESC").all(passengerId))
 })
 
-router.get('/download/:id', (_req, res) => {
+router.get('/download/:id', (req, res) => {
   const db = getDb()
-  const receipt = db.prepare("SELECT id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, file_name, file_type, file_size, file_path, status, reviewed_by, review_date, review_notes, created_at, updated_at FROM receipts WHERE id = ?").get(_req.params.id) as any
+  const receipt = db.prepare("SELECT id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, file_name, file_type, file_size, file_path, status, reviewed_by, review_date, review_notes, created_at, updated_at FROM receipts WHERE id = ?").get(req.params.id) as any
   if (!receipt) { res.status(404).json({ error: 'Comprovante não encontrado' }); return }
+
+  const isAdmin = req.user?.role === 'admin'
+  const isOwner = req.user?.userId === receipt.passenger_id
+  if (!req.user || (!isAdmin && !isOwner)) {
+    res.status(403).json({ error: 'Acesso negado' })
+    return
+  }
 
   if (receipt.file_path) {
     const filePath = path.join(getUploadsDir(), path.basename(receipt.file_path))
@@ -65,7 +73,7 @@ router.get('/download/:id', (_req, res) => {
   res.status(404).json({ error: 'Arquivo não encontrado' })
 })
 
-router.get('/:id', (req, res) => {
+router.get('/:id', requireAdmin, (req, res) => {
   const db = getDb()
   const receipt = db.prepare("SELECT id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, file_name, file_type, file_size, status, reviewed_by, review_date, review_notes, created_at, updated_at FROM receipts WHERE id = ?").get(req.params.id)
   if (!receipt) { res.status(404).json({ error: 'Comprovante não encontrado' }); return }
@@ -103,7 +111,7 @@ router.post('/', upload.single('file'), (req, res) => {
   res.status(201).json(created)
 })
 
-router.put('/:id/approve', (req, res) => {
+router.put('/:id/approve', requireAdmin, (req, res) => {
   const db = getDb()
   const { notes } = req.body
   const existing = db.prepare('SELECT * FROM receipts WHERE id = ?').get(req.params.id) as any
@@ -120,7 +128,7 @@ router.put('/:id/approve', (req, res) => {
   res.json(db.prepare("SELECT id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, file_name, file_type, file_size, status, reviewed_by, review_date, review_notes, created_at, updated_at FROM receipts WHERE id = ?").get(req.params.id))
 })
 
-router.put('/:id/reject', (req, res) => {
+router.put('/:id/reject', requireAdmin, (req, res) => {
   const db = getDb()
   const { reason } = req.body
   const existing = db.prepare('SELECT id FROM receipts WHERE id = ?').get(req.params.id)
@@ -135,7 +143,7 @@ router.put('/:id/reject', (req, res) => {
   res.json(db.prepare("SELECT id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, file_name, file_type, file_size, status, reviewed_by, review_date, review_notes, created_at, updated_at FROM receipts WHERE id = ?").get(req.params.id))
 })
 
-router.put('/:id/cancel', (req, res) => {
+router.put('/:id/cancel', requireAdmin, (req, res) => {
   const db = getDb()
   const { reason } = req.body
   const existing = db.prepare('SELECT id FROM receipts WHERE id = ?').get(req.params.id)

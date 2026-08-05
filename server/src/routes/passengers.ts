@@ -3,8 +3,11 @@ import bcrypt from 'bcryptjs'
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { sanitizeInput } from '../middleware/validation.js'
+import { requireAdmin } from '../middleware/roles.js'
 
 const router = Router()
+
+router.use(requireAdmin)
 
 router.get('/', (req, res) => {
   const db = getDb()

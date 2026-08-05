@@ -3,16 +3,20 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { whatsappService } from '../services/whatsapp.js'
 import { pushService } from '../services/push.js'
+import { requireAdmin } from '../middleware/roles.js'
 
 const router = Router()
 
-router.get('/', (_req, res) => {
+// Rotas de envio (mensagens, WhatsApp, push para todos) — somente administradores.
+// Notificações do próprio usuário permanecem acessíveis a qualquer autenticado.
+
+router.get('/', requireAdmin, (_req, res) => {
   const db = getDb()
   const messages = db.prepare('SELECT * FROM messages ORDER BY created_at DESC').all()
   res.json(messages)
 })
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const db = getDb()
   const { title, subject, body, type, channel, recipients, recipientPhones, scheduledAt, templateId, priority } = req.body
   const id = uuid()
@@ -54,7 +58,7 @@ router.post('/', async (req, res) => {
 })
 
 // Send WhatsApp message
-router.post('/whatsapp/send', async (req, res) => {
+router.post('/whatsapp/send', requireAdmin, async (req, res) => {
   const { to, message } = req.body
   if (!to || !message) {
     res.status(400).json({ error: 'Campos obrigatórios: to, message' })
@@ -69,7 +73,7 @@ router.post('/whatsapp/send', async (req, res) => {
 })
 
 // Bulk WhatsApp
-router.post('/whatsapp/bulk', async (req, res) => {
+router.post('/whatsapp/bulk', requireAdmin, async (req, res) => {
   const { recipients, messageTemplate } = req.body
   if (!recipients?.length || !messageTemplate) {
     res.status(400).json({ error: 'Campos obrigatórios: recipients, messageTemplate' })
@@ -99,7 +103,7 @@ router.get('/push/key', (_req, res) => {
 })
 
 // Send push notification
-router.post('/push/send', async (req, res) => {
+router.post('/push/send', requireAdmin, async (req, res) => {
   const { userIds, title, body, data } = req.body
   if (!userIds?.length || !title || !body) {
     res.status(400).json({ error: 'Campos obrigatórios: userIds, title, body' })
@@ -112,7 +116,7 @@ router.post('/push/send', async (req, res) => {
   res.json({ sent, total: userIds.length })
 })
 
-router.post('/push/send-all', async (req, res) => {
+router.post('/push/send-all', requireAdmin, async (req, res) => {
   const { title, body, data } = req.body
   if (!title || !body) {
     res.status(400).json({ error: 'Campos obrigatórios: title, body' })
