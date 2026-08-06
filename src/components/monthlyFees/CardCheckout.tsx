@@ -1,116 +1,68 @@
 import { useEffect, useRef, useState } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
 import { Button } from '../ui/Button'
-import { config } from '../../config'
 import { realPayments } from '../../services/realApi'
 import type { MonthlyFee } from '../../types/monthlyFee'
 
 interface CardCheckoutProps {
   fee: MonthlyFee
-  clientSecret: string
+  paymentUrl: string
   onPaid: () => void
   onBack: () => void
   onError: (message: string) => void
 }
 
 const POLL_INTERVAL_MS = 3000
-const POLL_TIMEOUT_MS = 10 * 60 * 1000
+const POLL_TIMEOUT_MS = 15 * 60 * 1000
 
-export function CardCheckout({ fee, clientSecret, onPaid, onBack, onError }: CardCheckoutProps) {
-  const elementRef = useRef<HTMLDivElement>(null)
-  const [processing, setProcessing] = useState(false)
+export function CardCheckout({ fee, paymentUrl, onPaid, onBack, onError }: CardCheckoutProps) {
   const [waitingConfirmation, setWaitingConfirmation] = useState(false)
   const [expired, setExpired] = useState(false)
-  const elementsRef = useRef<any>(null)
   const pollTimer = useRef<number | null>(null)
   const mountedRef = useRef(true)
 
   useEffect(() => {
     mountedRef.current = true
 
-    const init = async () => {
-      try {
-        const stripe: any = await loadStripe(config.stripePublishableKey)
-        if (!stripe) throw new Error('Não foi possível carregar o Stripe. Verifique a chave pública (VITE_STRIPE_PUBLISHABLE_KEY).')
-
-        const elements = stripe.elements({ clientSecret })
-        elementsRef.current = elements
-        const paymentElement = elements.create('payment', { layout: 'tabs' })
-        if (elementRef.current) paymentElement.mount(elementRef.current)
-        elementsRef.current._paymentElement = paymentElement
-      } catch (err: any) {
-        if (mountedRef.current) onError(err?.message || 'Falha ao carregar o formulário de cartão')
-      }
+    const startPolling = () => {
+      const startedAt = Date.now()
+      pollTimer.current = window.setTimeout(async function tick() {
+        if (!mountedRef.current) return
+        try {
+          const status = await realPayments.status(fee.id)
+          if (status.status === 'paid') {
+            onPaid()
+            return
+          }
+          const elapsed = Date.now() - startedAt
+          if (elapsed >= POLL_TIMEOUT_MS) {
+            setExpired(true)
+            return
+          }
+          pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS)
+        } catch {
+          pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS)
+        }
+      }, POLL_INTERVAL_MS)
     }
 
-    init()
+    const handleOpen = () => {
+      setWaitingConfirmation(true)
+      window.open(paymentUrl, '_blank', 'noopener,noreferrer')
+      startPolling()
+    }
+
+    if (!paymentUrl) {
+      onError('Não foi possível gerar o link de pagamento')
+      return
+    }
+    handleOpen()
 
     return () => {
       mountedRef.current = false
       if (pollTimer.current) window.clearTimeout(pollTimer.current)
-      try { elementsRef.current?._paymentElement?.unmount() } catch {}
-      try { elementsRef.current?.unmount() } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientSecret])
-
-  const startPolling = () => {
-    pollTimer.current = window.setTimeout(async function tick() {
-      if (!mountedRef.current) return
-      const startedAt = Date.now()
-      try {
-        const status = await realPayments.status(fee.id)
-        if (status.status === 'paid') {
-          onPaid()
-          return
-        }
-        const elapsed = Date.now() - startedAt
-        if (elapsed >= POLL_TIMEOUT_MS) {
-          setExpired(true)
-          return
-        }
-        pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS)
-      } catch {
-        pollTimer.current = window.setTimeout(tick, POLL_INTERVAL_MS)
-      }
-    }, POLL_INTERVAL_MS)
-  }
-
-  const handlePay = async () => {
-    setProcessing(true)
-    try {
-      const stripe: any = await loadStripe(config.stripePublishableKey)
-      if (!stripe) throw new Error('Não foi possível carregar o Stripe.')
-
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements: elementsRef.current,
-        confirmParams: {
-          return_url: `${window.location.origin}/minhas-mensalidades`,
-          payment_method_data: { billing_details: { name: fee.passengerName } },
-        },
-        redirect: 'if_required',
-      })
-
-      if (error) {
-        if (mountedRef.current) onError(error.message)
-        return
-      }
-      if (paymentIntent?.status === 'succeeded') {
-        onPaid()
-        return
-      }
-      if (paymentIntent?.status === 'requires_action' || paymentIntent?.status === 'processing') {
-        setWaitingConfirmation(true)
-        startPolling()
-        return
-      }
-      if (mountedRef.current) onError('Não foi possível concluir o pagamento')
-    } catch (err: any) {
-      if (mountedRef.current) onError(err?.message || 'Falha ao processar o pagamento')
-    } finally {
-      if (mountedRef.current) setProcessing(false)
-    }
-  }
+  }, [paymentUrl, fee.id])
 
   return (
     <div className="space-y-4">
@@ -122,14 +74,13 @@ export function CardCheckout({ fee, clientSecret, onPaid, onBack, onError }: Car
         </p>
       </div>
 
-      <div
-        ref={elementRef}
-        className="bg-white rounded-xl border border-gray-200 dark:border-gray-700 p-4 min-h-[140px]"
-      />
+      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+        Abrimos o pagamento do cartão em uma nova aba. Se ela não abriu, use o botão abaixo.
+      </div>
 
       {waitingConfirmation && !expired && (
         <p className="text-sm text-center text-gray-500">
-          Aguardando confirmação do banco emissor do cartão...
+          Aguardando confirmação do pagamento do cartão...
         </p>
       )}
       {expired && (
@@ -141,11 +92,9 @@ export function CardCheckout({ fee, clientSecret, onPaid, onBack, onError }: Car
       <div className="flex gap-3 pt-2">
         <Button
           fullWidth
-          loading={processing}
-          disabled={waitingConfirmation}
-          onClick={handlePay}
+          onClick={() => window.open(paymentUrl, '_blank', 'noopener,noreferrer')}
         >
-          Pagar com cartão
+          Abrir página de pagamento
         </Button>
       </div>
       <div className="flex gap-3">

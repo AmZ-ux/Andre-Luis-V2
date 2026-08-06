@@ -21,7 +21,7 @@ import communicationRoutes from './routes/communication.js'
 import settingsRoutes from './routes/settings.js'
 import reportsRoutes from './routes/reports.js'
 import clientErrorRoutes from './routes/clientError.js'
-import { paymentsRouter, handleStripeWebhook } from './routes/payments.js'
+import { paymentsRouter, handleAsaasWebhook } from './routes/payments.js'
 import adminRoutes from './routes/admin.js'
 import { startScheduler } from './services/scheduler.js'
 
@@ -40,9 +40,9 @@ app.use(helmet({
   contentSecurityPolicy: isProduction ? {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", 'https://js.stripe.com'],
-      frameSrc: ['https://js.stripe.com'],
-      connectSrc: ["'self'", 'https://api.stripe.com'],
+      scriptSrc: ["'self'"],
+      frameSrc: ["'self'"],
+      connectSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'blob:'],
       fontSrc: ["'self'", 'data:'],
@@ -69,14 +69,13 @@ const globalLimiter = rateLimit({
 })
 app.use('/api', globalLimiter)
 
-// Stripe webhook (precisa do body raw, antes do express.json)
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook)
-app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook)
-
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 app.use(sanitizeBody)
+
+// Webhook do Asaas (JSON normal; eventos PAYMENT_CONFIRMED / PAYMENT_RECEIVED confirmam o pagamento)
+app.post('/api/asaas/webhook', handleAsaasWebhook)
 
 // Migrations
 await runMigrations()

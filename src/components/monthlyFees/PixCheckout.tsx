@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
 import { Button } from '../ui/Button'
-import { config } from '../../config'
 import { realPayments } from '../../services/realApi'
 import type { MonthlyFee } from '../../types/monthlyFee'
 
@@ -16,8 +14,8 @@ const POLL_INTERVAL_MS = 3000
 const POLL_TIMEOUT_MS = 10 * 60 * 1000
 
 export function PixCheckout({ fee, onPaid, onBack, onError }: PixCheckoutProps) {
-  const qrRef = useRef<HTMLDivElement>(null)
   const [pixCode, setPixCode] = useState('')
+  const [qrImage, setQrImage] = useState('')
   const [copied, setCopied] = useState(false)
   const [waitingPayment, setWaitingPayment] = useState(false)
   const [expired, setExpired] = useState(false)
@@ -26,35 +24,7 @@ export function PixCheckout({ fee, onPaid, onBack, onError }: PixCheckoutProps) 
 
   useEffect(() => {
     mountedRef.current = true
-    let pixClient: any = null
-
-    const init = async () => {
-      try {
-        const res = await realPayments.create(fee.id, 'pix')
-        if (!res.clientSecret) throw new Error('Sem clientSecret na resposta do servidor')
-
-        const stripe: any = await loadStripe(config.stripePublishableKey)
-        if (!stripe) throw new Error('Não foi possível carregar o Stripe. Verifique a chave pública (VITE_STRIPE_PUBLISHABLE_KEY).')
-
-        pixClient = stripe.initPixClient()
-        const { paymentIntent } = await stripe.confirmPixPayment(pixClient, {
-          clientSecret: res.clientSecret,
-        })
-        if (paymentIntent?.status === 'processing' || paymentIntent?.status === 'requires_action') {
-          setWaitingPayment(true)
-          if (qrRef.current) pixClient.mountQrCode(qrRef.current)
-          const code = pixClient.getPixCode()
-          setPixCode(typeof code === 'string' ? code : '')
-          startPolling()
-        } else if (paymentIntent?.status === 'succeeded') {
-          onPaid()
-        } else {
-          throw new Error('Não foi possível iniciar o pagamento PIX')
-        }
-      } catch (err: any) {
-        if (mountedRef.current) onError(err?.message || 'Falha ao gerar o PIX')
-      }
-    }
+    const startedAt = Date.now()
 
     const startPolling = () => {
       pollTimer.current = window.setTimeout(async function tick() {
@@ -76,14 +46,25 @@ export function PixCheckout({ fee, onPaid, onBack, onError }: PixCheckoutProps) 
         }
       }, POLL_INTERVAL_MS)
     }
-    const startedAt = Date.now()
+
+    const init = async () => {
+      try {
+        const res = await realPayments.create(fee.id, 'pix')
+        if (!res.pixCode || !res.qrImage) throw new Error('Sem dados do PIX na resposta do servidor')
+        setPixCode(res.pixCode)
+        setQrImage(res.qrImage)
+        setWaitingPayment(true)
+        startPolling()
+      } catch (err: any) {
+        if (mountedRef.current) onError(err?.message || 'Falha ao gerar o PIX')
+      }
+    }
 
     init()
 
     return () => {
       mountedRef.current = false
       if (pollTimer.current) window.clearTimeout(pollTimer.current)
-      try { pixClient?.unmount() } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fee.id])
@@ -107,11 +88,16 @@ export function PixCheckout({ fee, onPaid, onBack, onError }: PixCheckoutProps) 
       </div>
 
       <div className="flex justify-center">
-        <div
-          ref={qrRef}
-          className="w-56 h-56 bg-white rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center"
-        >
-          {!waitingPayment && <span className="text-sm text-gray-400">Gerando QR Code...</span>}
+        <div className="w-56 h-56 bg-white rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+          {qrImage ? (
+            <img
+              src={qrImage}
+              alt="QR Code PIX"
+              className="w-full h-full object-contain rounded-xl"
+            />
+          ) : (
+            <span className="text-sm text-gray-400">Gerando QR Code...</span>
+          )}
         </div>
       </div>
 

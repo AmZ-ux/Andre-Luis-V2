@@ -31,7 +31,6 @@ interface AppConfig {
     retentionDays: number
     maxBackups: number
   }
-  stripePublishableKey: string
 }
 
 export function getConfig(): AppConfig {
@@ -70,7 +69,6 @@ export function getConfig(): AppConfig {
       retentionDays: Number(import.meta.env.VITE_BACKUP_RETENTION_DAYS) || 30,
       maxBackups: Number(import.meta.env.VITE_MAX_BACKUPS) || 10,
     },
-    stripePublishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
   }
 }
 

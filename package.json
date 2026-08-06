@@ -27,7 +27,6 @@
     "docker:down": "docker-compose down"
   },
   "dependencies": {
-    "@stripe/stripe-js": "^9.12.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.26.0",

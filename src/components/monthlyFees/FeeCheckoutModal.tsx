@@ -22,13 +22,13 @@ type CheckoutMethod = 'pix' | 'card' | null
 
 export function FeeCheckoutModal({ fee, onClose, onPaid }: FeeCheckoutModalProps) {
   const [method, setMethod] = useState<CheckoutMethod>(null)
-  const [cardClientSecret, setCardClientSecret] = useState('')
+  const [cardPaymentUrl, setCardPaymentUrl] = useState('')
   const [preparingCard, setPreparingCard] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
 
   const close = () => {
     setMethod(null)
-    setCardClientSecret('')
+    setCardPaymentUrl('')
     setPaymentError(null)
     onClose()
   }
@@ -37,11 +37,11 @@ export function FeeCheckoutModal({ fee, onClose, onPaid }: FeeCheckoutModalProps
     if (!fee) return
     setPaymentError(null)
     setMethod(nextMethod)
-    setCardClientSecret('')
+    setCardPaymentUrl('')
     if (nextMethod === 'card') {
       setPreparingCard(true)
       realPayments.create(fee.id, 'card')
-        .then((res) => setCardClientSecret(res.clientSecret))
+        .then((res) => setCardPaymentUrl(res.paymentUrl || ''))
         .catch((err: any) => setPaymentError(err?.message || 'Falha ao preparar o pagamento'))
         .finally(() => setPreparingCard(false))
     }
@@ -95,10 +95,10 @@ export function FeeCheckoutModal({ fee, onClose, onPaid }: FeeCheckoutModalProps
 
           {method === 'card' && (preparingCard ? (
             <p className="text-sm text-center text-gray-500 py-8">Preparando pagamento...</p>
-          ) : cardClientSecret ? (
+          ) : cardPaymentUrl ? (
             <CardCheckout
               fee={fee}
-              clientSecret={cardClientSecret}
+              paymentUrl={cardPaymentUrl}
               onPaid={onPaid}
               onBack={() => { setMethod(null); setPaymentError(null) }}
               onError={(message) => setPaymentError(message)}

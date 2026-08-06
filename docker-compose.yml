@@ -7,7 +7,6 @@ services:
         - VITE_REAL_API=true
         - VITE_API_URL=/api
         - VITE_APP_ENV=production
-        - VITE_STRIPE_PUBLISHABLE_KEY=${VITE_STRIPE_PUBLISHABLE_KEY:-}
     container_name: transporte-andre-luis-server
     ports:
       - "${SERVER_PORT:-3001}:3001"
@@ -20,8 +19,8 @@ services:
       - DATABASE_PATH=/app/data/database.sqlite
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@transporte.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD is required}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - ASAAS_API_KEY=${ASAAS_API_KEY:-}
+      - ASAAS_API_URL=${ASAAS_API_URL:-}
     volumes:
       - server-data:/app/data
     restart: unless-stopped

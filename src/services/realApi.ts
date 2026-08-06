@@ -221,10 +221,20 @@ export const realDashboard = {
     api.get<DashboardData>('/dashboard'),
 }
 
-// --- Pagamentos (Stripe: PIX e cartão) ---
+// --- Pagamentos (Asaas: PIX e cartão via link) ---
 export const realPayments = {
   create: (monthlyFeeId: string, method: 'pix' | 'card' = 'pix') =>
-    api.post<{ clientSecret: string; amount: number; currency: string; breakdown: any; paymentIntentId: string; method: 'pix' | 'card' }>('/payments/create', { monthlyFeeId, method }),
+    api.post<{
+      paymentId: string
+      amount: number
+      currency: string
+      breakdown: any
+      method: 'pix' | 'card'
+      pixCode?: string
+      qrImage?: string
+      expirationDate?: string
+      paymentUrl?: string
+    }>('/payments/create', { monthlyFeeId, method }),
 
   status: (monthlyFeeId: string) =>
     api.get<{ status: string }>('/payments/status', { monthlyFeeId }),
