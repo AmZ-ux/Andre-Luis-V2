@@ -107,4 +107,20 @@ describe('POST /api/asaas/webhook', () => {
     expect(res.status).toBe(200)
     expect(res.body.received).toBe(true)
   })
+
+  it('should reject webhooks with invalid token when ASAAS_WEBHOOK_TOKEN is set', async () => {
+    process.env.ASAAS_WEBHOOK_TOKEN = 'token-secreto'
+    const res = await request(app).post('/api/asaas/webhook').send({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay_1', value: 189.9 } })
+    expect(res.status).toBe(401)
+  })
+
+  it('should accept webhooks with valid token', async () => {
+    process.env.ASAAS_WEBHOOK_TOKEN = 'token-secreto'
+    const res = await request(app).post('/api/asaas/webhook')
+      .set('asaas-access-token', 'token-secreto')
+      .send({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay_1', value: 189.9 } })
+    expect(res.status).toBe(200)
+    expect(res.body.received).toBe(true)
+    delete process.env.ASAAS_WEBHOOK_TOKEN
+  })
 })

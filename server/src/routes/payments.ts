@@ -202,6 +202,13 @@ paymentsRouter.get('/status', async (req, res) => {
 })
 
 export function handleAsaasWebhook(req: Request, res: Response): void {
+  const expectedToken = process.env.ASAAS_WEBHOOK_TOKEN
+  if (expectedToken && req.headers['asaas-access-token'] !== expectedToken) {
+    logger.warn({ event: req.body?.event }, 'Token de autenticação do webhook Asaas inválido')
+    res.status(401).json({ error: 'Token de autenticação inválido' })
+    return
+  }
+
   const event = req.body?.event
   const payment = req.body?.payment
   const db = getDb()
