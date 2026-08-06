@@ -1,6 +1,4 @@
 ﻿import { Router } from 'express'
-import bcrypt from 'bcryptjs'
-import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { sanitizeInput } from '../middleware/validation.js'
 import { requireAdmin } from '../middleware/roles.js'
@@ -45,45 +43,13 @@ router.get('/:id', (req, res) => {
   res.json(passenger)
 })
 
-router.post('/', (req, res) => {
-  const db = getDb()
-  const {
-    name, cpf, rg, birthDate, phone, whatsapp, email,
-    zipCode, street, number, complement, neighborhood, city, state,
-    transportType, institution, course, class: clazz, company, school, workplace,
-    monthlyFee, dueDay, paymentMethod, status, notes,
-  } = req.body
-
-  // Create both user and passenger accounts
-  const id = uuid()
-  let temporaryPassword = ''
-  const userExists = db.prepare('SELECT id FROM users WHERE cpf = ?').get(cpf) as { id: string } | undefined
-  if (!userExists) {
-    temporaryPassword = Math.random().toString(36).slice(2, 8) + 'A1!'
-    db.prepare(`INSERT INTO users (id, name, email, cpf, phone, role, password_hash)
-      VALUES (?, ?, ?, ?, ?, 'passenger', ?)`)
-      .run(id, sanitizeInput(name), sanitizeInput(email), cpf, sanitizeInput(phone || ''), bcrypt.hashSync(temporaryPassword, 10))
-  }
-
-  // Passageiro usa o mesmo id do usuário para manter o vínculo do login
-  const passengerId = userExists ? userExists.id : id
-  db.prepare(`
-    INSERT INTO passengers (id, name, cpf, rg, birth_date, phone, whatsapp, email,
-      zip_code, street, number, complement, neighborhood, city, state,
-      transport_type, institution, course, class, company, school, workplace,
-      monthly_fee, due_day, payment_method, status, notes)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `).run(
-    passengerId, sanitizeInput(name), cpf, rg || '', birthDate, sanitizeInput(phone || ''), whatsapp || '',
-    sanitizeInput(email || ''), zipCode || '', sanitizeInput(street || ''), number || '', complement || '',
-    neighborhood || '', sanitizeInput(city || ''), state || '',
-    transportType || 'university', sanitizeInput(institution || ''), course || '', clazz || '',
-    sanitizeInput(company || ''), school || '', workplace || '',
-    Number(monthlyFee) || 0, Number(dueDay) || 5, paymentMethod || 'pix', status || 'active', notes || ''
-  )
-
-  const created = db.prepare('SELECT * FROM passengers WHERE id = ?').get(passengerId)
-  res.status(201).json({ ...created, temporaryPassword })
+// O cadastro de passageiros é feito exclusivamente pelo próprio passageiro no app
+// (POST /api/auth/register), que gera a mensalidade do mês atual automaticamente.
+// O administrador não cria passageiros — apenas gerencia os já cadastrados.
+router.post('/', (_req, res) => {
+  res.status(403).json({
+    error: 'O cadastro de passageiro é feito pelo próprio passageiro no app. O administrador não cria passageiros.',
+  })
 })
 
 router.put('/:id', (req, res) => {

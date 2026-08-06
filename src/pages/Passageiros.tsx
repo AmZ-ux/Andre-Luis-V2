@@ -11,11 +11,10 @@ import { EmptyPassengers } from '../components/passengers/EmptyPassengers'
 import { ViewToggle } from '../components/passengers/ViewToggle'
 import { DisponibilidadeSection } from './CentralDisponibilidade'
 import { PageTabs } from '../components/ui/PageTabs'
-import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useToast } from '../contexts/ToastContext'
 import { passengerService } from '../services/passengerService'
-import { Plus, ChevronLeft, ChevronRight, Users, CalendarOff } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Users, CalendarOff } from 'lucide-react'
 import { cn } from '../utils/cn'
 import type { Passenger, ViewMode } from '../types/passenger'
 
@@ -32,7 +31,6 @@ export function Passageiros() {
   } = usePassengers()
   const { addToast } = useToast()
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [formOpen, setFormOpen] = useState(false)
   const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(null)
   const [deletingPassenger, setDeletingPassenger] = useState<Passenger | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -43,24 +41,14 @@ export function Passageiros() {
     setSearchParams(key === 'passageiros' ? {} : { tab: key }, { replace: true })
   }
 
-  const handleNew = () => {
-    setEditingPassenger(null)
-    setFormOpen(true)
-  }
-
   const handleEdit = (p: Passenger) => {
     setEditingPassenger(p)
-    setFormOpen(true)
   }
 
   const handleSave = async (data: Omit<Passenger, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (editingPassenger) {
-      await passengerService.update(editingPassenger.id, data as unknown as Partial<Passenger>)
-      addToast('success', 'Passageiro atualizado com sucesso!')
-    } else {
-      await passengerService.create(data)
-      addToast('success', 'Passageiro cadastrado com sucesso!')
-    }
+    if (!editingPassenger) return
+    await passengerService.update(editingPassenger.id, data as unknown as Partial<Passenger>)
+    addToast('success', 'Passageiro atualizado com sucesso!')
     reload()
   }
 
@@ -129,12 +117,6 @@ export function Passageiros() {
         <DisponibilidadeSection embedded />
       ) : (
         <>
-      <div className="flex justify-end">
-        <Button onClick={handleNew} icon={<Plus className="h-4 w-4" />}>
-          Novo Passageiro
-        </Button>
-      </div>
-
       <div className="flex flex-col sm:flex-row gap-4">
         <SearchInput
           value={filters.search}
@@ -151,8 +133,8 @@ export function Passageiros() {
         <Card>
           <EmptyPassengers
             type={filters.search || Object.values(filters).some((v) => v !== '') ? 'not-found' : 'empty'}
-            onAction={filters.search ? resetFilters : handleNew}
-            actionLabel={filters.search ? 'Limpar pesquisa' : 'Novo Passageiro'}
+            onAction={filters.search ? resetFilters : reload}
+            actionLabel={filters.search ? 'Limpar pesquisa' : 'Atualizar'}
           />
         </Card>
       ) : viewMode === 'list' ? (
@@ -212,8 +194,8 @@ export function Passageiros() {
       )}
 
       <PassengerForm
-        isOpen={formOpen}
-        onClose={() => { setFormOpen(false); setEditingPassenger(null) }}
+        isOpen={!!editingPassenger}
+        onClose={() => setEditingPassenger(null)}
         onSave={handleSave}
         editPassenger={editingPassenger}
       />

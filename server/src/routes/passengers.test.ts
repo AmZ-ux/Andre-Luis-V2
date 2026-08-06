@@ -89,7 +89,7 @@ describe('GET /api/passengers/:id', () => {
 })
 
 describe('POST /api/passengers', () => {
-  it('should create a new passenger', async () => {
+  it('should block admin passenger creation (registration is self-service)', async () => {
     const res = await request(app)
       .post('/api/passengers')
       .set('Authorization', `Bearer ${token}`)
@@ -100,65 +100,15 @@ describe('POST /api/passengers', () => {
         phone: '11999999999',
         email: 'passenger@test.com',
         transportType: 'university',
-        monthlyFee: 189.90,
+        monthlyFee: 189.9,
         dueDay: 5,
       })
-    expect(res.status).toBe(201)
-    expect(res.body).toHaveProperty('id')
-    expect(res.body.name).toBe('New Passenger')
-    expect(res.body.cpf).toBe('444.444.444-44')
-  })
-
-  it('should create a user when passenger CPF is new', async () => {
-    const res = await request(app)
-      .post('/api/passengers')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'User Passenger',
-        cpf: '555.555.555-55',
-        birthDate: '1990-01-01',
-        email: 'userpass@test.com',
-        transportType: 'university',
-        monthlyFee: 150,
-        dueDay: 10,
-      })
-    expect(res.status).toBe(201)
-    expect(res.body.temporaryPassword).toBeTruthy()
+    expect(res.status).toBe(403)
     const db = getDb()
-    const user = db.prepare('SELECT * FROM users WHERE cpf = ?').get('555.555.555-55')
-    expect(user).toBeTruthy()
-    expect(user!.role).toBe('passenger')
-    expect(user!.id).toBe(res.body.id)
-  })
-
-  it('should reuse existing user id when CPF already has an account', async () => {
-    const db = getDb()
-    const userId = uuid()
-    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, 'Existing User', ?, ?, '', 'passenger', ?)")
-      .run(userId, 'existing@test.com', '666.666.666-66', '$2a$10$invalidhash')
-    const res = await request(app)
-      .post('/api/passengers')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'Existing Passenger',
-        cpf: '666.666.666-66',
-        birthDate: '1992-02-02',
-        transportType: 'university',
-        monthlyFee: 150,
-        dueDay: 5,
-      })
-    expect(res.status).toBe(201)
-    expect(res.body.id).toBe(userId)
-    const linked = db.prepare('SELECT id FROM passengers WHERE id = ?').get(userId)
-    expect(linked).toBeTruthy()
-  })
-
-  it('should return 500 when required fields are missing', async () => {
-    const res = await request(app)
-      .post('/api/passengers')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'Incomplete' })
-    expect(res.status).toBe(500)
+    const passenger = db.prepare('SELECT id FROM passengers WHERE cpf = ?').get('444.444.444-44')
+    expect(passenger).toBeUndefined()
+    const user = db.prepare('SELECT id FROM users WHERE cpf = ?').get('444.444.444-44')
+    expect(user).toBeUndefined()
   })
 })
 

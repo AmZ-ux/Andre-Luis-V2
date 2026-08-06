@@ -173,16 +173,10 @@ export const authService = {
       { id }
     )
 
-    // Primeira mensalidade: competencia do mes seguinte ao inicio do contrato
+    // Primeira mensalidade: competencia do mes atual (mes do cadastro)
     const now = new Date()
-    const startMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(credentials.contractStartDate)
-    let feeMonth = now.getMonth() + 1
-    let feeYear = now.getFullYear()
-    if (startMatch) {
-      feeMonth = Number(startMatch[2]) + 1
-      feeYear = Number(startMatch[1])
-      if (feeMonth > 12) { feeMonth = 1; feeYear++ }
-    }
+    const feeMonth = now.getMonth() + 1
+    const feeYear = now.getFullYear()
     await monthlyFeeService.create({
       passengerId: user.id,
       passengerName: user.name,
