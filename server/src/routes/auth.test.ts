@@ -258,12 +258,13 @@ describe('POST /api/auth/login', () => {
       .send({ name: 'Login Test', email: 'login@teste.com', cpf: '111.222.333-44', password: 'Senha@123' })
   })
 
-  it('should block unverified passenger login with EMAIL_NOT_VERIFIED', async () => {
+  it('should allow unverified passenger login (email verification is optional)', async () => {
     const res = await request(app)
       .post('/api/auth/login')
       .send({ login: 'login@teste.com', password: 'Senha@123' })
-    expect(res.status).toBe(403)
-    expect(res.body.code).toBe('EMAIL_NOT_VERIFIED')
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty('token')
+    expect(res.body.user.emailVerified).toBe(false)
   })
 
   it('should verify email through the public flow and then login', async () => {
@@ -288,8 +289,28 @@ describe('POST /api/auth/login', () => {
     expect(res.body.user.emailVerified).toBe(true)
   })
 
-  it('should login with CPF', async () => {
-    const res = await request(app)
+  it('should return demoCode in production when EMAIL_DISABLED is set', async () => {
+    const prevEnv = process.env.NODE_ENV
+    const prevEmail = process.env.EMAIL_DISABLED
+    try {
+      await request(app)
+        .post('/api/auth/register')
+        .send({ name: 'Demo Email', email: 'demoemail@teste.com', cpf: '555.666.777-88', password: 'Senha@123' })
+      process.env.NODE_ENV = 'production'
+      process.env.EMAIL_DISABLED = 'true'
+      const sendRes = await request(app)
+        .post('/api/auth/verify-email/send-public')
+        .send({ email: 'demoemail@teste.com' })
+      expect(sendRes.status).toBe(200)
+      expect(sendRes.body.demoCode).toMatch(/^\d{6}$/)
+    } finally {
+      process.env.NODE_ENV = prevEnv
+      if (prevEmail === undefined) delete process.env.EMAIL_DISABLED
+      else process.env.EMAIL_DISABLED = prevEmail
+    }
+  })
+
+  it('should login with CPF', async () => {    const res = await request(app)
       .post('/api/auth/login')
       .send({ login: '111.222.333-44', password: 'Senha@123' })
     expect(res.status).toBe(200)

@@ -88,14 +88,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await authService.register(credentials)
-      if (config.realApi && response.user.role === 'passenger' && !response.user.emailVerified) {
-        sessionManager.destroy()
-        setState({ user: null, isAuthenticated: false, isLoading: false, error: null })
-        const err: any = new Error('Verifique seu email para entrar.')
-        err.code = 'EMAIL_NOT_VERIFIED'
-        err.email = response.user.email
-        throw err
-      }
       sessionManager.save(
         { user: response.user, token: response.token, expiresAt: response.expiresAt },
         false

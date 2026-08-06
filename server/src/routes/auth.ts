@@ -28,12 +28,6 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
     return
   }
 
-  // Produção real: todo usuário (exceto o super admin) precisa verificar o email antes de entrar.
-  if (!user.super_admin && !user.email_verified) {
-    res.status(403).json({ code: 'EMAIL_NOT_VERIFIED', error: 'Verifique seu email para acessar o sistema.' })
-    return
-  }
-
   db.prepare('UPDATE users SET last_access = datetime(\'now\') WHERE id = ?').run(user.id)
   db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
     .run(uuid(), 'login', 'Login realizado', user.name, user.role, 'login')
@@ -184,7 +178,15 @@ router.put('/profile', authMiddleware, (req, res) => {
   res.json({ success: true })
 })
 
+function emailDisabled(): boolean {
+  return process.env.EMAIL_DISABLED === 'true'
+}
+
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+  if (emailDisabled()) {
+    logger.info({ to, subject }, 'EMAIL_DISABLED — email would be sent (demo mode)')
+    return
+  }
   if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
     throw new Error('Envio de email não configurado (RESEND_API_KEY ausente)')
   }
@@ -236,7 +238,7 @@ router.post('/verify-email/send', authMiddleware, (req, res) => {
   db.prepare('UPDATE users SET verify_token = ?, verify_token_expires = ? WHERE id = ?').run(code, expiresAt, user.id)
 
   const isProd = process.env.NODE_ENV === 'production'
-  if (!process.env.RESEND_API_KEY && isProd) {
+  if (!process.env.RESEND_API_KEY && isProd && !emailDisabled()) {
     res.status(503).json({ error: 'Envio de email indisponível no momento. Contate o suporte.' })
     return
   }
@@ -246,7 +248,7 @@ router.post('/verify-email/send', authMiddleware, (req, res) => {
 
   res.json({
     success: true,
-    demoCode: isProd ? undefined : code,
+    demoCode: emailDisabled() || !isProd ? code : undefined,
   })
 })
 
@@ -266,7 +268,7 @@ router.post('/verify-email/send-public', verifyLimiter, validateBody('email'), (
   db.prepare('UPDATE users SET verify_token = ?, verify_token_expires = ? WHERE id = ?').run(code, expiresAt, user.id)
 
   const isProd = process.env.NODE_ENV === 'production'
-  if (!process.env.RESEND_API_KEY && isProd) {
+  if (!process.env.RESEND_API_KEY && isProd && !emailDisabled()) {
     res.status(503).json({ error: 'Envio de email indisponível no momento. Contate o suporte.' })
     return
   }
@@ -274,7 +276,7 @@ router.post('/verify-email/send-public', verifyLimiter, validateBody('email'), (
     logger.error({ err: String(err) }, 'Verification email failed')
   })
 
-  res.json({ success: true, demoCode: isProd ? undefined : code })
+  res.json({ success: true, demoCode: emailDisabled() || !isProd ? code : undefined })
 })
 
 router.post('/verify-email/confirm-public', verifyLimiter, validateBody('email', 'code'), (req, res) => {

@@ -221,9 +221,10 @@ export function ProfilePage() {
               <KeyRound className="h-5 w-5 text-warning" />
             </div>
             <div className="flex-1">
-              <h2 className="text-sm font-bold text-text mb-1">Verificar email</h2>
+              <h2 className="text-sm font-bold text-text mb-1">Verificar email (recomendado)</h2>
               <p className="text-xs text-gray-500 mb-3">
-                Verifique seu email para garantir a segurança da sua conta.
+                Confirmar seu email é opcional, mas ajuda a proteger sua conta e a receber
+                comunicações importantes. Você pode fazer isso a qualquer momento.
               </p>
               {codeSent ? (
                 <div className="space-y-3">

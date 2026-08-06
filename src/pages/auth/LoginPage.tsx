@@ -9,7 +9,6 @@ export function LoginPage() {
   const location = useLocation()
   const requestedPath = (location.state as { from?: { pathname: string } })?.from?.pathname
   const from = requestedPath || '/'
-  const verifyEmail = (location.state as { verifyEmail?: string })?.verifyEmail
 
   if (isLoading) {
     return (
@@ -28,7 +27,7 @@ export function LoginPage() {
       title="Acessar o sistema"
       subtitle="Entre com suas credenciais para continuar"
     >
-      <LoginForm initialVerifyEmail={verifyEmail} />
+      <LoginForm />
     </AuthLayout>
   )
 }

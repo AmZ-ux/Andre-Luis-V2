@@ -110,12 +110,7 @@ export function RegisterPage() {
       await register(form)
       addToast('success', 'Conta criada com sucesso!')
       navigate('/', { replace: true })
-    } catch (err: any) {
-      if (err?.code === 'EMAIL_NOT_VERIFIED') {
-        addToast('success', 'Conta criada!', 'Verifique seu email para acessar o sistema.')
-        navigate('/login', { replace: true, state: { verifyEmail: err.email } })
-        return
-      }
+    } catch {
       addToast('error', 'Não foi possível criar a conta')
     }
   }
