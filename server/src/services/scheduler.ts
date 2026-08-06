@@ -50,7 +50,7 @@ function runDaily(): void {
 }
 
 // Gera as mensalidades de cada passageiro conforme o proprio contrato
-// (primeiro ciclo = mes seguinte ao inicio; demais, um por mes ate o atual).
+// (primeiro ciclo = mes do inicio do contrato; demais, um por mes ate o atual).
 function runContractGeneration(): void {
   const db = getDb()
   if (!claimDaily('contract_generation', todayStr())) return

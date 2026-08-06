@@ -74,7 +74,7 @@ describe('POST /api/auth/register', () => {
     }
   })
 
-  it('should set due day and first fee due on the month after the contract start', async () => {
+  it('should create the current month fee with due day from the contract', async () => {
     const db = (await import('../database/connection.js')).getDb()
     db.prepare("INSERT OR REPLACE INTO settings (id, category, data) VALUES ('test-financial', 'financial', ?)").run(JSON.stringify({ defaultMonthlyFee: 249.9 }))
     try {
@@ -93,14 +93,17 @@ describe('POST /api/auth/register', () => {
       expect(passenger.due_day).toBe(10)
       expect(passenger.monthly_fee).toBe(249.9)
 
-      // Contrato inicia 10/09/2026 => primeira competencia 10/2026, vencimento 10/10/2026
+      // Competencia do mes atual (mes do cadastro), vencendo no dia do contrato
+      const now = new Date()
+      const month = now.getMonth() + 1
+      const year = now.getFullYear()
       const fee = db.prepare(
-        'SELECT amount, due_day, due_date, status, month, year FROM monthly_fees WHERE passenger_id = ? AND month = 10 AND year = 2026'
-      ).get(passenger.id) as { amount: number; due_day: number; due_date: string; status: string; month: number; year: number } | undefined
+        'SELECT amount, due_day, due_date, status, month, year FROM monthly_fees WHERE passenger_id = ? AND month = ? AND year = ?'
+      ).get(passenger.id, month, year) as { amount: number; due_day: number; due_date: string; status: string; month: number; year: number } | undefined
       expect(fee).toBeDefined()
       expect(fee?.amount).toBe(249.9)
       expect(fee?.due_day).toBe(10)
-      expect(fee?.due_date).toBe('10/10/2026')
+      expect(fee?.due_date).toBe(`10/${String(month).padStart(2, '0')}/${year}`)
       expect(fee?.status).toBe('pending')
     } finally {
       db.prepare('DELETE FROM settings WHERE id = ?').run('test-financial')

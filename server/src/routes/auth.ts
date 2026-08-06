@@ -102,17 +102,11 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
     pickupPoint || '', destination || '', contractStartDate || '', dueDay, feeValue
   )
 
-  // First fee: competencia do mes seguinte ao inicio do contrato (1 mes de uso),
+  // Primeira mensalidade: competencia do mes ATUAL (mes do cadastro),
   // vencendo no dia do contrato. Aparece pendente no dashboard logo apos o cadastro.
   const now = new Date()
-  let feeMonth = now.getMonth() + 1
-  let feeYear = now.getFullYear()
-  if (contractStartDate && /^\d{4}-\d{2}-\d{2}$/.test(contractStartDate)) {
-    const [y0, m0] = contractStartDate.split('-').map(Number)
-    feeMonth = m0 + 1
-    feeYear = y0
-    if (feeMonth > 12) { feeMonth = 1; feeYear++ }
-  }
+  const feeMonth = now.getMonth() + 1
+  const feeYear = now.getFullYear()
 
   db.prepare(`
     INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)

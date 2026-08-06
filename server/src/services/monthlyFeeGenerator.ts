@@ -99,8 +99,8 @@ export function generateMonthlyFees(request: GenerationRequest, db: any = getDb(
 const MAX_CONTRACT_CYCLES = 60
 
 // Garante a serie de mensalidades de UM passageiro a partir do seu contrato:
-// a primeira competencia e o mes seguinte ao inicio do contrato (1 mes de uso),
-// e as demais sao criadas um ciclo por mes ate o mes corrente.
+// a primeira competencia e o mes do inicio do contrato (o mes de entrada ja e
+// cobrado), e as demais sao criadas um ciclo por mes ate o mes corrente.
 export function ensureContractFees(passengerId: string, db: any = getDb()): GenerationResult {
   const result: GenerationResult = { created: 0, skippedExisting: 0, skippedInactive: 0, skippedVacation: 0 }
 
@@ -119,9 +119,8 @@ export function ensureContractFees(passengerId: string, db: any = getDb()): Gene
   const start = passenger.contract_start_date
   if (typeof start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(start)) {
     const [y, m] = start.split('-').map(Number)
-    firstMonth = m + 1
+    firstMonth = m
     firstYear = y
-    if (firstMonth > 12) { firstMonth = 1; firstYear++ }
   } else {
     firstYear = nowYear
     firstMonth = nowMonth

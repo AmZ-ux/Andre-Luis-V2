@@ -16,8 +16,8 @@ function requireAdmin(req: any, res: any): boolean {
 }
 
 // Garante a serie de mensalidades do passageiro autenticado a partir do seu
-// contrato (primeira competencia = mes seguinte ao inicio), criando sob demanda
-// os ciclos ja vencidos que ainda nao existem. O admin nao gera mensalidades.
+// contrato (primeira competencia = mes do inicio do contrato), criando sob
+// demanda os ciclos ja vencidos que ainda nao existem. O admin nao gera mensalidades.
 router.post('/ensure-current', (req, res) => {
   if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
   if (req.user.role !== 'passenger') { res.status(403).json({ error: 'Apenas passageiros' }); return }
