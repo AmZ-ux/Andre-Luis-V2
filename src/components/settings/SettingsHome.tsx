@@ -27,7 +27,7 @@ const innerTabs: { key: InnerTab; label: string; icon: typeof FileText }[] = [
 export function SettingsHome() {
   const {
     settings, auditLog, logs, backups, saved,
-    updateCategory, createBackup, restoreBackup, deleteBackup, reload,
+    updateCategory, createBackup, restoreBackup, deleteBackup, downloadBackup, reload,
   } = useSettings()
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory | null>('company')
@@ -80,7 +80,7 @@ export function SettingsHome() {
         case 'security':
           return <SecuritySettingsForm settings={settings.security} onSave={(v) => updateCategory('security', v)} saved={saved} />
         case 'backup':
-          return <BackupCenter backups={backups} onCreateBackup={createBackup} onRestore={restoreBackup} onDelete={deleteBackup} />
+          return <BackupCenter backups={backups} onCreateBackup={createBackup} onRestore={restoreBackup} onDelete={deleteBackup} onDownload={downloadBackup} />
         case 'system':
           return <SystemSettingsForm settings={settings.system} onSave={(v) => updateCategory('system', v)} saved={saved} />
         case 'users':

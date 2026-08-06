@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button } from '../ui/Button'
-import { HardDrive, Upload, Trash2, RotateCcw } from 'lucide-react'
+import { HardDrive, Upload, Trash2, RotateCcw, Download } from 'lucide-react'
 import type { BackupEntry } from '../../types/settings'
 
 interface BackupCenterProps {
@@ -8,13 +8,14 @@ interface BackupCenterProps {
   onCreateBackup: () => void
   onRestore: (id: string) => void
   onDelete: (id: string) => void
+  onDownload: (id: string) => void
 }
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR')
 }
 
-export function BackupCenter({ backups, onCreateBackup, onRestore, onDelete }: BackupCenterProps) {
+export function BackupCenter({ backups, onCreateBackup, onRestore, onDelete, onDownload }: BackupCenterProps) {
   const [restoring, setRestoring] = useState<string | null>(null)
 
   const handleRestore = (id: string) => {
@@ -57,6 +58,13 @@ export function BackupCenter({ backups, onCreateBackup, onRestore, onDelete }: B
                 </p>
               </div>
               <div className="flex gap-1">
+                <button
+                  onClick={() => onDownload(b.id)}
+                  className="h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                  aria-label="Baixar backup"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
                 <button
                   onClick={() => handleRestore(b.id)}
                   disabled={restoring === b.id}

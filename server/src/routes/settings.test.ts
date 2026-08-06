@@ -3,6 +3,7 @@ import express from 'express'
 import request from 'supertest'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
+import fs from 'fs'
 import { v4 as uuid } from 'uuid'
 import { runMigrations } from '../database/schema.js'
 import { sanitizeBody } from '../middleware/validation.js'
@@ -26,6 +27,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   resetDb()
+  fs.rmSync(process.env.BACKUP_DIR!, { recursive: true, force: true })
+  fs.mkdirSync(process.env.BACKUP_DIR!, { recursive: true })
   const db = getDb()
   adminId = uuid()
   db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'admin', ?)")
@@ -179,6 +182,27 @@ describe('Backup endpoints', () => {
     expect(res.status).toBe(204)
     const after = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
     expect(after.body).toHaveLength(0)
+  })
+
+  it('should download a backup file', async () => {
+    const created = await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .get(`/api/settings/backups/${created.body.id}/download`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toContain('application/json')
+    expect(JSON.parse(res.text)._meta).toBeDefined()
+  })
+
+  it('should return 400 for path traversal in backup id', async () => {
+    const res = await request(app)
+      .post('/api/settings/backups/..%2F..%2Fetc%2Fpasswd/restore')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(400)
+    const del = await request(app)
+      .delete('/api/settings/backups/..%2F..%2Fetc%2Fpasswd')
+      .set('Authorization', `Bearer ${token}`)
+    expect(del.status).toBe(400)
   })
 })
 

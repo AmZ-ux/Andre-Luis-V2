@@ -2,6 +2,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import Database from 'better-sqlite3'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BACKUP_DIR = path.resolve(__dirname, '../backups')
@@ -14,6 +15,13 @@ const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
 const backupFile = path.join(BACKUP_DIR, `backup-${timestamp}.sqlite`)
 
 if (fs.existsSync(DB_FILE)) {
+  // Checkpoint do WAL antes de copiar: garante snapshot consistente
+  const db = new Database(DB_FILE, { readonly: true })
+  try {
+    db.pragma('wal_checkpoint(TRUNCATE)')
+  } finally {
+    db.close()
+  }
   fs.copyFileSync(DB_FILE, backupFile)
   console.log(`Backup created: ${backupFile} (${(fs.statSync(backupFile).size / 1024).toFixed(1)} KB)`)
 } else {

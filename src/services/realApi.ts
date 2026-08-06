@@ -301,6 +301,16 @@ export const realSettings = {
   deleteBackup: (id: string) =>
     api.delete<void>(`/settings/backups/${id}`),
 
+  downloadBackup: async (id: string): Promise<void> => {
+    const blob = await api.download(`/settings/backups/${id}/download`)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `backup_${id}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
   logs: (page: number, pageSize: number) =>
     api.get<{ data: any[]; total: number }>('/settings/logs', { page, pageSize }),
 

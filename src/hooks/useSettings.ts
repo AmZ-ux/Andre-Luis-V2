@@ -192,6 +192,11 @@ export function useSettings() {
       .catch(() => {})
   }, [reload])
 
+  const downloadBackup = useCallback((id: string) => {
+    if (!config.realApi) return
+    realSettings.downloadBackup(id).catch(() => {})
+  }, [])
+
   const clearLogs = useCallback(() => {
     if (!config.realApi) {
       logsService.clear()
@@ -214,7 +219,7 @@ export function useSettings() {
     settings, auditLog, logs, backups,
     activeCategory, setActiveCategory,
     loading, saved,
-    updateCategory, createBackup, restoreBackup, deleteBackup, reload,
+    updateCategory, createBackup, restoreBackup, deleteBackup, downloadBackup, reload,
     clearLogs, clearAudit,
   }
 }

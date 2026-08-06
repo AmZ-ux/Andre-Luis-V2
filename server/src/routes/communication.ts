@@ -61,7 +61,7 @@ router.post('/', requireAdmin, (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, title, subject || '', body, type || 'individual', channel || 'app', JSON.stringify(recipientList), scheduledAt || null, templateId || '', priority || 'normal', status, req.user!.userId)
 
-  addHistory(db, id, status === 'scheduled' ? 'scheduled' : 'created', status === 'scheduled' ? `Agendada para ${scheduledAt}` : `Mensagem criada: ${title}`, req.user!.userName || req.user!.userId)
+  addHistory(db, id, status === 'scheduled' ? 'scheduled' : 'created', status === 'scheduled' ? `Agendada para ${scheduledAt}` : `Mensagem criada: ${title}`, req.user!.role === 'admin' ? 'Administrador' : 'Passageiro')
 
   if (status !== 'scheduled') {
     dispatchMessage(db, db.prepare('SELECT * FROM messages WHERE id = ?').get(id))
@@ -88,7 +88,7 @@ router.post('/messages/:id/history', requireAdmin, (req, res) => {
   const { action, description } = req.body || {}
   const existing = db.prepare('SELECT id FROM messages WHERE id = ?').get(req.params.id)
   if (!existing) { res.status(404).json({ error: 'Mensagem não encontrada' }); return }
-  addHistory(db, req.params.id, action || 'created', description || '', req.user!.userName || req.user!.userId)
+  addHistory(db, String(req.params.id), action || 'created', description || '', req.user!.role === 'admin' ? 'Administrador' : 'Passageiro')
   res.status(201).json(db.prepare('SELECT * FROM message_history WHERE message_id = ? ORDER BY created_at DESC').all(req.params.id)[0])
 })
 
@@ -109,7 +109,7 @@ router.put('/messages/:id/status', requireAdmin, (req, res) => {
   if (status === 'cancelled') {
     db.prepare("UPDATE messages SET scheduled_at = NULL WHERE id = ?").run(req.params.id)
   }
-  addHistory(db, req.params.id, status === 'cancelled' ? 'cancelled' : status, `Status alterado para ${status}`, req.user!.userName || req.user!.userId)
+  addHistory(db, String(req.params.id), status === 'cancelled' ? 'cancelled' : status, `Status alterado para ${status}`, req.user!.role === 'admin' ? 'Administrador' : 'Passageiro')
   res.json(db.prepare('SELECT * FROM messages WHERE id = ?').get(req.params.id))
 })
 
@@ -204,7 +204,7 @@ router.post('/schedules', requireAdmin, (req, res) => {
 
   const scheduledAt = `${match[3]}-${match[2]}-${match[1]}T${time}:00`
   db.prepare("UPDATE messages SET scheduled_at = ?, status = 'scheduled', updated_at = datetime('now') WHERE id = ?").run(scheduledAt, messageId)
-  addHistory(db, messageId, 'scheduled', `Agendada para ${date} às ${time}`, req.user!.userName || req.user!.userId)
+  addHistory(db, messageId, 'scheduled', `Agendada para ${date} às ${time}`, req.user!.role === 'admin' ? 'Administrador' : 'Passageiro')
   res.json({ id: messageId, messageId, scheduledDate: date, scheduledTime: time, scheduledAt, status: 'pending', createdAt: existing.created_at })
 })
 

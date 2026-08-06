@@ -3,13 +3,10 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
 import { requireAdmin } from '../middleware/roles.js'
+import { addLog } from '../services/appLogService.js'
+import { createBackup, listBackups, getBackupPath, restoreBackup, deleteBackup, pruneBackups, isValidBackupId } from '../services/backupService.js'
 
 const router = Router()
-
-function addLog(db: any, action: string, description: string, user: { userId: string; role: string }, category = 'general'): void {
-  db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(uuid(), action, description, user.role === 'admin' ? 'Administrador' : 'Passageiro', user.role, category)
-}
 
 router.get('/', (req, res) => {
   const db = getDb()
@@ -18,7 +15,7 @@ router.get('/', (req, res) => {
 
 router.put('/:category', requireAdmin, (req, res) => {
   const db = getDb()
-  const { category } = req.params
+  const category = String(req.params.category)
   const data = req.body
 
   const existing = db.prepare('SELECT id, data FROM settings WHERE category = ?').get(category)
@@ -52,7 +49,7 @@ router.put('/:category', requireAdmin, (req, res) => {
     db.prepare('INSERT INTO settings (id, category, data) VALUES (?, ?, ?)').run(uuid(), category, JSON.stringify(data))
   }
 
-  addLog(db, 'settings_update', `Configuração "${category}" alterada`, req.user, category)
+  addLog(db, 'settings_update', `Configuração "${category}" alterada`, req.user!, category)
   res.json(loadSettings(db))
 })
 
@@ -72,71 +69,58 @@ router.get('/users', requireAdmin, (_req, res) => {
   res.json(db.prepare('SELECT id, name, email, cpf, phone, role, created_at, last_access FROM users').all())
 })
 
-// Backup
-const BACKUP_TABLES = ['passengers', 'monthly_fees', 'payments', 'receipts', 'receipt_history', 'availabilities', 'availability_history', 'messages', 'notifications', 'settings']
-
+// Backup em arquivos reais (volume persistente)
 router.post('/backup', requireAdmin, (_req, res) => {
   const db = getDb()
-  const backup: any = {}
-  for (const table of BACKUP_TABLES) {
-    backup[table] = db.prepare(`SELECT * FROM ${table}`).all()
-  }
-  const id = uuid()
-  db.prepare('INSERT INTO settings (id, category, data) VALUES (?, ?, ?)').run(uuid(), `backup_${id}`, JSON.stringify(backup))
-  addLog(db, 'backup_create', `Backup criado: ${id}`, _req.user!, 'backup')
-  res.json({ id, timestamp: new Date().toISOString(), size: JSON.stringify(backup).length })
+  const info = createBackup(db, 'manual')
+  addLog(db, 'backup_create', `Backup manual criado: ${info.id}`, _req.user!, 'backup')
+  res.json(info)
 })
 
 // Lista backups salvos
 router.get('/backups', requireAdmin, (_req, res) => {
-  const db = getDb()
-  const rows = db.prepare("SELECT category, data, created_at FROM settings WHERE category LIKE 'backup_%' ORDER BY created_at DESC").all() as any[]
-  res.json(rows.map((row: any) => {
-    const id = row.category.replace('backup_', '')
-    return {
-      id,
-      timestamp: row.created_at || new Date().toISOString(),
-      size: row.data ? JSON.stringify(JSON.parse(row.data)).length : 0,
-      type: 'manual',
-    }
-  }))
+  res.json(listBackups())
+})
+
+// Download de um backup
+router.get('/backups/:id/download', requireAdmin, (req, res) => {
+  const filePath = getBackupPath(String(req.params.id))
+  if (!filePath) {
+    res.status(404).json({ error: 'Backup não encontrado' })
+    return
+  }
+  res.download(filePath, `backup_${String(req.params.id)}.json`)
 })
 
 // Restaura um backup salvo
 router.post('/backups/:id/restore', requireAdmin, (req, res) => {
+  const id = String(req.params.id)
+  if (!isValidBackupId(id)) {
+    res.status(400).json({ error: 'ID de backup inválido' })
+    return
+  }
   const db = getDb()
-  const row = db.prepare('SELECT data FROM settings WHERE category = ?').get(`backup_${req.params.id}`) as any
-  if (!row) {
-    res.status(404).json({ error: 'Backup não encontrado' })
-    return
-  }
-
-  let backup: any
   try {
-    backup = JSON.parse(row.data)
-  } catch {
-    res.status(500).json({ error: 'Backup corrompido' })
+    restoreBackup(db, id)
+  } catch (err: any) {
+    res.status(err.message === 'Backup não encontrado' ? 404 : 500).json({ error: err.message || 'Falha ao restaurar backup' })
     return
   }
-
-  for (const table of BACKUP_TABLES) {
-    db.prepare(`DELETE FROM ${table}`).run()
-    for (const item of backup[table] || []) {
-      const columns = Object.keys(item)
-      const placeholders = columns.map(() => '?').join(', ')
-      db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`).run(...columns.map((c) => item[c]))
-    }
-  }
-
-  addLog(db, 'backup_restore', `Backup restaurado: ${req.params.id}`, req.user!, 'backup')
+  addLog(db, 'backup_restore', `Backup restaurado: ${id}`, req.user!, 'backup')
   res.json({ success: true })
 })
 
 // Remove um backup salvo
 router.delete('/backups/:id', requireAdmin, (req, res) => {
+  const id = String(req.params.id)
+  if (!isValidBackupId(id)) {
+    res.status(400).json({ error: 'ID de backup inválido' })
+    return
+  }
   const db = getDb()
-  db.prepare('DELETE FROM settings WHERE category = ?').run(`backup_${req.params.id}`)
-  addLog(db, 'backup_delete', `Backup removido: ${req.params.id}`, req.user!, 'backup')
+  deleteBackup(id)
+  addLog(db, 'backup_delete', `Backup removido: ${id}`, req.user!, 'backup')
+  pruneBackups(30)
   res.status(204).end()
 })
 

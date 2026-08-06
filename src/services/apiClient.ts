@@ -101,4 +101,19 @@ export const api = {
     const json = await res.json()
     return transformKeys<T>(json)
   },
+
+  async download(path: string): Promise<Blob> {
+    const url = `${getBaseUrl()}${path}`
+    const session = sessionManager.load()
+    const headers: Record<string, string> = {}
+    if (session?.token) headers['Authorization'] = `Bearer ${session.token}`
+
+    const res = await fetch(url, { headers })
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`
+      try { const d = await res.json(); message = d.error || message } catch {}
+      throw { status: res.status, message }
+    }
+    return res.blob()
+  },
 }

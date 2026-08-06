@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import { v4 as uuid } from 'uuid'
 import { runMigrations } from '../database/schema.js'
 import { logger } from '../utils/logger.js'
-import { getDb, saveDb } from '../database/connection.js'
+import { getDb } from '../database/connection.js'
 
 export async function runSeed(): Promise<void> {
   await runMigrations()
@@ -28,5 +28,4 @@ export async function runSeed(): Promise<void> {
   `).run(ADMIN_ID, 'Administrador', superAdminEmail, '000.000.000-00', '(11) 99999-9999', 'admin', PASSWORD_HASH)
 
   logger.info({ superAdmin: superAdminEmail }, 'Database seeded with super admin')
-  saveDb()
 }
