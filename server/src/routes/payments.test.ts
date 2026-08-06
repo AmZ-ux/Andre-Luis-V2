@@ -8,15 +8,14 @@ import { runMigrations } from '../database/schema.js'
 import { sanitizeBody } from '../middleware/validation.js'
 import { resetDb, getDb } from '../database/connection.js'
 import { authMiddleware } from '../middleware/auth.js'
-import { paymentsRouter, handleAsaasWebhook } from '../routes/payments.js'
+import { paymentsRouter } from '../routes/payments.js'
 
 process.env.DATABASE_PATH = ':memory:'
-delete process.env.ASAAS_API_KEY
+delete process.env.MERCADO_PAGO_ACCESS_TOKEN
 
 const app = express()
 app.use(express.json({ limit: '10mb' }))
 app.use(sanitizeBody)
-app.post('/api/asaas/webhook', handleAsaasWebhook)
 app.use('/api/payments', authMiddleware, paymentsRouter)
 
 let token: string
@@ -67,7 +66,7 @@ function seedMonthlyFee(passengerId: string, overrides: Record<string, any> = {}
   return id
 }
 
-describe('POST /api/payments/create (sem ASAAS_API_KEY)', () => {
+describe('POST /api/payments/create (sem MERCADO_PAGO_ACCESS_TOKEN)', () => {
   it('should require monthlyFeeId', async () => {
     const res = await request(app).post('/api/payments/create').set('Authorization', `Bearer ${token}`).send({})
     expect(res.status).toBe(400)
@@ -87,40 +86,42 @@ describe('POST /api/payments/create (sem ASAAS_API_KEY)', () => {
     expect(res.body.error).toContain('já registrado')
   })
 
-  it('should fail with clear message when Asaas key is missing', async () => {
+  it('should fail with clear message when Mercado Pago token is missing', async () => {
     const pid = seedPassenger()
     const fid = seedMonthlyFee(pid)
     const res = await request(app).post('/api/payments/create').set('Authorization', `Bearer ${token}`).send({ monthlyFeeId: fid, method: 'pix' })
     expect(res.status).toBe(502)
-    expect(res.body.error).toContain('ASAAS_API_KEY')
+    expect(res.body.error).toContain('MERCADO_PAGO_ACCESS_TOKEN')
+  })
+
+  it('should fail with clear message for card too', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const res = await request(app).post('/api/payments/create').set('Authorization', `Bearer ${token}`).send({ monthlyFeeId: fid, method: 'card' })
+    expect(res.status).toBe(502)
+    expect(res.body.error).toContain('MERCADO_PAGO_ACCESS_TOKEN')
   })
 })
 
-describe('POST /api/asaas/webhook', () => {
-  it('should reject events without payment', async () => {
-    const res = await request(app).post('/api/asaas/webhook').send({ event: 'PAYMENT_RECEIVED' })
+describe('GET /api/payments/status', () => {
+  it('should require monthlyFeeId', async () => {
+    const res = await request(app).get('/api/payments/status').set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(400)
   })
 
-  it('should ack unknown events without error', async () => {
-    const res = await request(app).post('/api/asaas/webhook').send({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay_1', value: 189.9 } })
+  it('should return fee status when no charge exists (no API call)', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const res = await request(app).get('/api/payments/status').set('Authorization', `Bearer ${token}`).query({ monthlyFeeId: fid })
     expect(res.status).toBe(200)
-    expect(res.body.received).toBe(true)
+    expect(res.body.status).toBe('pending')
   })
 
-  it('should reject webhooks with invalid token when ASAAS_WEBHOOK_TOKEN is set', async () => {
-    process.env.ASAAS_WEBHOOK_TOKEN = 'token-secreto'
-    const res = await request(app).post('/api/asaas/webhook').send({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay_1', value: 189.9 } })
-    expect(res.status).toBe(401)
-  })
-
-  it('should accept webhooks with valid token', async () => {
-    process.env.ASAAS_WEBHOOK_TOKEN = 'token-secreto'
-    const res = await request(app).post('/api/asaas/webhook')
-      .set('asaas-access-token', 'token-secreto')
-      .send({ event: 'PAYMENT_RECEIVED', payment: { id: 'pay_1', value: 189.9 } })
+  it('should return paid when fee is already paid', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid, { status: 'paid' })
+    const res = await request(app).get('/api/payments/status').set('Authorization', `Bearer ${token}`).query({ monthlyFeeId: fid })
     expect(res.status).toBe(200)
-    expect(res.body.received).toBe(true)
-    delete process.env.ASAAS_WEBHOOK_TOKEN
+    expect(res.body.status).toBe('paid')
   })
 })

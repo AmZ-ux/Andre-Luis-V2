@@ -221,7 +221,7 @@ export const realDashboard = {
     api.get<DashboardData>('/dashboard'),
 }
 
-// --- Pagamentos (Asaas: PIX e cartão via link) ---
+// --- Pagamentos (Mercado Pago: PIX e cartão via link) ---
 export const realPayments = {
   create: (monthlyFeeId: string, method: 'pix' | 'card' = 'pix') =>
     api.post<{

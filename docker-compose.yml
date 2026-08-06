@@ -19,8 +19,8 @@ services:
       - DATABASE_PATH=/app/data/database.sqlite
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@transporte.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD is required}
-      - ASAAS_API_KEY=${ASAAS_API_KEY:-}
-      - ASAAS_API_URL=${ASAAS_API_URL:-}
+      - MERCADO_PAGO_ACCESS_TOKEN=${MERCADO_PAGO_ACCESS_TOKEN:-}
+      - MERCADO_PAGO_API_URL=${MERCADO_PAGO_API_URL:-}
     volumes:
       - server-data:/app/data
     restart: unless-stopped
