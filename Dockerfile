@@ -4,10 +4,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY . .
+# Build args injetados pelo Railway (variaveis do servico) ou via docker compose
 ARG VITE_REAL_API=true
 ARG VITE_API_URL=/api
 ARG VITE_APP_ENV=production
-ARG VITE_STRIPE_PUBLISHABLE_KEY=pk_live_51S5vcT2NIwvCc2GNfWFLPAmvbWZC8CVtVrYpS8axlefyR7hPvhgeo06URriAWj84moICUFYa6skWTLhuclDbFdE1005fsEE1IQ
+ARG VITE_STRIPE_PUBLISHABLE_KEY
 ENV VITE_REAL_API=$VITE_REAL_API
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_APP_ENV=$VITE_APP_ENV

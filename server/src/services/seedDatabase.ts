@@ -4,6 +4,22 @@ import { runMigrations } from '../database/schema.js'
 import { logger } from '../utils/logger.js'
 import { getDb } from '../database/connection.js'
 
+const WEAK_PASSWORDS = ['admin123', 'password', '123456', '12345678', 'qwerty', 'admin', 'senha', 'senha123']
+
+function resolveSuperAdminPassword(): string {
+  const pw = process.env.SUPER_ADMIN_PASSWORD
+  if (!pw) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SUPER_ADMIN_PASSWORD é obrigatória em produção. Defina uma senha forte no ambiente.')
+    }
+    return 'admin123'
+  }
+  if (WEAK_PASSWORDS.includes(pw.toLowerCase())) {
+    throw new Error('SUPER_ADMIN_PASSWORD muito fraca. Escolha uma senha forte (não use valores comuns como admin123).')
+  }
+  return pw
+}
+
 export async function runSeed(): Promise<void> {
   await runMigrations()
   const db = getDb()
@@ -16,9 +32,9 @@ export async function runSeed(): Promise<void> {
     return
   }
 
+  const superAdminPassword = resolveSuperAdminPassword()
   const ADMIN_ID = uuid()
   const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@transporte.com'
-  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD || 'admin123'
   const PASSWORD_HASH = bcrypt.hashSync(superAdminPassword, 10)
 
   // Default admin user (super admin — o criador do projeto)

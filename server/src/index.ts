@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
@@ -34,14 +35,39 @@ app.set('trust proxy', 1)
 const PORT = Number(process.env.PORT) || 3001
 
 // Security
+const isProduction = process.env.NODE_ENV === 'production'
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: isProduction ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", 'https://js.stripe.com'],
+      frameSrc: ['https://js.stripe.com'],
+      connectSrc: ["'self'", 'https://api.stripe.com'],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      fontSrc: ["'self'", 'data:'],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  } : false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }))
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
 }))
+
+// Rate limit global (por IP, com trust proxy para IPs reais)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.GLOBAL_RATE_LIMIT_MAX) || 300,
+  message: { error: 'Muitas requisições. Tente novamente mais tarde.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+app.use('/api', globalLimiter)
 
 // Stripe webhook (precisa do body raw, antes do express.json)
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook)
