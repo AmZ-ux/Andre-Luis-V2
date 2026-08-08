@@ -1,6 +1,8 @@
 import fs from 'fs'
 import path from 'path'
+import zlib from 'zlib'
 import { v4 as uuid } from 'uuid'
+import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 import { BACKUP_DIR } from '../database/connection.js'
 import type { DatabaseWrapper } from '../database/connection.js'
 
@@ -98,4 +100,54 @@ export function pruneBackups(maxKeep: number): void {
     fs.unlinkSync(path.join(BACKUP_DIR, files[0]))
     files.shift()
   }
+}
+
+export function isOffsiteConfigured(): boolean {
+  return Boolean(
+    process.env.S3_BUCKET &&
+    process.env.S3_ACCESS_KEY_ID &&
+    process.env.S3_SECRET_ACCESS_KEY
+  )
+}
+
+function offsiteClient(): S3Client | null {
+  if (!isOffsiteConfigured()) return null
+  return new S3Client({
+    endpoint: process.env.S3_ENDPOINT || undefined,
+    region: process.env.S3_REGION || 'auto',
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+    },
+  })
+}
+
+const offsitePrefix = (): string => process.env.S3_PREFIX || 'backups'
+
+/** Envia um backup local para o bucket S3/R2 configurado (retorna false se nao configurado). */
+export async function uploadBackupOffsite(id: string): Promise<boolean> {
+  const filePath = getBackupPath(id)
+  if (!filePath) throw new Error('Backup não encontrado')
+  const client = offsiteClient()
+  if (!client) return false
+  const bucket = process.env.S3_BUCKET!
+  const body = zlib.gzipSync(fs.readFileSync(filePath))
+  await client.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: `${offsitePrefix()}/${path.basename(filePath)}.gz`,
+    Body: body,
+    ContentType: 'application/json',
+    ContentEncoding: 'gzip',
+  }))
+  const maxKeep = Number(process.env.MAX_BACKUPS) || 30
+  const listed = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: `${offsitePrefix()}/` }))
+  const keys = (listed.Contents || [])
+    .filter((o) => o.Key)
+    .sort((a, b) => (a.LastModified?.getTime() ?? 0) - (b.LastModified?.getTime() ?? 0))
+    .map((o) => o.Key!)
+  while (keys.length > maxKeep) {
+    const old = keys.shift()!
+    await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: [{ Key: old }] } }))
+  }
+  return true
 }

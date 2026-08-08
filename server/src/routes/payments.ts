@@ -9,12 +9,64 @@ import {
   MpError,
   createCardPaymentLink,
   createPixCharge,
+  getPayment,
   mpStatus,
   searchPaymentByExternalReference,
 } from '../services/mercadopagoService.js'
 import { logger } from '../utils/logger.js'
 
 export const paymentsRouter = Router()
+export const paymentsWebhookRouter = Router()
+
+// Webhook do Mercado Pago (público — montado antes do authMiddleware no index.ts).
+// Elimina a dependência do polling: notificações de pagamento são processadas
+// imediatamente ao chegar. A autenticidade é garantida consultando o próprio MP.
+paymentsWebhookRouter.post('/webhook', async (req, res) => {
+  const body = req.body || {}
+  const paymentId = body?.data?.id ?? body?.payment_id
+  const eventType = String(body?.type || body?.action || '')
+  if (!paymentId || !eventType.toLowerCase().includes('payment')) {
+    res.status(200).json({ received: true, ignored: true })
+    return
+  }
+
+  try {
+    const payment = await getPayment(Number(paymentId))
+    const feeId = payment.external_reference
+    if (!feeId) {
+      res.status(200).json({ received: true, ignored: true })
+      return
+    }
+
+    const db = getDb()
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(feeId) as any
+    if (!fee) {
+      res.status(200).json({ received: true, ignored: true })
+      return
+    }
+
+    const status = mpStatus(payment.status)
+    if (status === 'paid' && fee.status !== 'paid') {
+      finalizePayment(
+        db,
+        fee,
+        String(payment.id),
+        Number(payment.transaction_amount ?? 0),
+        payment.payment_method_id === 'pix' ? 'pix' : 'card'
+      )
+      logger.info({ paymentId: payment.id, feeId }, 'Pagamento finalizado via webhook')
+    } else if (status === 'cancelled') {
+      db.prepare("UPDATE pix_charges SET status = 'cancelled', updated_at = datetime('now') WHERE monthly_fee_id = ? AND status = 'pending'").run(feeId)
+    }
+
+    res.status(200).json({ received: true })
+  } catch (err: any) {
+    logger.error({ err: err.message, paymentId }, 'Webhook do Mercado Pago falhou')
+    alertIntegrationIssue(getDb(), 'Mercado Pago', `Falha ao processar webhook do pagamento ${paymentId}: ${err.message}`)
+    // Sempre 200 para o MP não ficar refazendo retentativas em envios inválidos
+    res.status(200).json({ received: true, ignored: true })
+  }
+})
 
 // Tabela pix_charges e usada como registro generico de cobrancas (PIX e cartao)
 

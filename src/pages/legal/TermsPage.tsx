@@ -1,4 +1,6 @@
 import { LegalLayout } from '../../components/legal/LegalLayout'
+import { useCompanyInfo } from '../../hooks/useCompanyInfo'
+import { fillLegalText } from '../../utils/legalText'
 
 interface TermsSection {
   title: string
@@ -10,7 +12,7 @@ const sections: TermsSection[] = [
   {
     title: '1. Aceitação dos Termos',
     paragraphs: [
-      'Estes Termos de Uso ("Termos") regulam o acesso e a utilização da plataforma digital da Transporte André Luis ("Transporte André Luis", "nós" ou "nós"), inscrita sob o CNPJ [CNPJ], com sede em [cidade/UF], destinada à gestão de mensalidades, disponibilidade, comprovantes de pagamento e comunicação entre a empresa e os passageiros.',
+      'Estes Termos de Uso ("Termos") regulam o acesso e a utilização da plataforma digital da Transporte André Luis ("Transporte André Luis", "nós" ou "nós"), inscrita sob o CNPJ {cnpj}, com sede em {cidadeUf}, destinada à gestão de mensalidades, disponibilidade, comprovantes de pagamento e comunicação entre a empresa e os passageiros.',
       'Ao criar uma conta ou utilizar os serviços, você declara ter lido, compreendido e aceitado integralmente estes Termos e a Política de Privacidade, em conformidade com a Lei nº 13.709/2018 (LGPD) e demais legislações aplicáveis. Caso não concorde com qualquer disposição, não utilize os serviços.',
     ],
   },
@@ -128,29 +130,30 @@ const sections: TermsSection[] = [
   {
     title: '14. Lei aplicável e foro',
     paragraphs: [
-      'Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro da comarca de [cidade/UF] para dirimir quaisquer controvérsias decorrentes destes Termos, com renúncia a qualquer outro, por mais privilegiado que seja.',
+      'Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro da comarca de {cidadeUf} para dirimir quaisquer controvérsias decorrentes destes Termos, com renúncia a qualquer outro, por mais privilegiado que seja.',
       'Para dúvidas ou atendimento relacionado a estes Termos, contate-nos pelos canais indicados na Política de Privacidade.',
     ],
   },
 ]
 
 export function TermsPage() {
+  const company = useCompanyInfo()
   return (
-    <LegalLayout title="Termos de Uso" updatedAt="07/08/2026">
+    <LegalLayout title="Termos de Uso" updatedAt="08/08/2026">
       {sections.map((section) => (
         <section key={section.title}>
           <h2 className="text-base sm:text-lg font-semibold text-text mb-3">{section.title}</h2>
 
           {section.paragraphs?.map((paragraph, i) => (
             <p key={i} className="mb-3">
-              {paragraph}
+              {fillLegalText(paragraph, company)}
             </p>
           ))}
 
           {section.items && (
             <ul className="space-y-2 list-disc pl-5">
               {section.items.map((item, i) => (
-                <li key={i}>{item}</li>
+                <li key={i}>{fillLegalText(item, company)}</li>
               ))}
             </ul>
           )}

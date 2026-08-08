@@ -28,6 +28,7 @@ export function SettingsHome() {
   const {
     settings, auditLog, logs, backups, saved,
     updateCategory, createBackup, restoreBackup, deleteBackup, downloadBackup, reload,
+    clearLogs, clearAudit,
   } = useSettings()
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory | null>('company')
@@ -43,7 +44,7 @@ export function SettingsHome() {
             <h3 className="text-sm font-semibold text-text">Auditoria de Alterações</h3>
             <p className="text-xs text-gray-500 mt-0.5">Registro de todas as alterações de configuração</p>
           </div>
-          <AuditHistory auditLog={auditLog} onClear={() => { localStorage.removeItem('app_audit_log'); reload() }} />
+          <AuditHistory auditLog={auditLog} onClear={clearAudit} />
         </Card>
       )
     }
@@ -55,7 +56,7 @@ export function SettingsHome() {
             <h3 className="text-sm font-semibold text-text">Central de Logs</h3>
             <p className="text-xs text-gray-500 mt-0.5">Registro de eventos do sistema</p>
           </div>
-          <LogsViewer logs={logs} onClear={() => { localStorage.removeItem('app_logs'); reload() }} />
+          <LogsViewer logs={logs} onClear={clearLogs} />
         </Card>
       )
     }

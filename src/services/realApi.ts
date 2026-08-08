@@ -335,6 +335,9 @@ export const realSettings = {
 
   clearLogs: () =>
     api.delete<void>('/settings/logs'),
+
+  clearAudit: () =>
+    api.delete<void>('/settings/audit'),
 }
 
 // --- Health ---

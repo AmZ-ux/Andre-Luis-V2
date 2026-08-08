@@ -392,3 +392,78 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('POST /api/auth/forgot-password', () => {
+  it('should not reveal whether the email exists', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'naoexiste@teste.com' })
+    expect(res.status).toBe(200)
+    expect(res.body.message).toContain('Se o email existir')
+  })
+
+  it('should store a reset token for an existing user (demo mode)', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'login@teste.com' })
+    expect(res.status).toBe(200)
+    const user = db.prepare('SELECT reset_token, reset_token_expires FROM users WHERE email = ?').get('login@teste.com') as any
+    expect(user.reset_token).toBeTruthy()
+    expect(user.reset_token_expires).toBeGreaterThan(Date.now())
+  })
+
+  it('should require email field', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({})
+    expect(res.status).toBe(400)
+  })
+})
+
+describe('POST /api/auth/reset-password', () => {
+  it('should reset the password with a valid token', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'login@teste.com' })
+    const user = db.prepare('SELECT reset_token FROM users WHERE email = ?').get('login@teste.com') as any
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: user.reset_token, password: 'NovaSenha@123' })
+    expect(res.status).toBe(200)
+    expect(res.body.message).toContain('redefinida')
+    const updated = db.prepare('SELECT reset_token, failed_login_attempts, locked_until FROM users WHERE email = ?').get('login@teste.com') as any
+    expect(updated.reset_token).toBeNull()
+    expect(Number(updated.failed_login_attempts)).toBe(0)
+    expect(updated.locked_until).toBeNull()
+  })
+
+  it('should reject an invalid token', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: 'token-invalido', password: 'NovaSenha@123' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('Token inválido ou expirado')
+  })
+
+  it('should reject an expired token', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'login@teste.com' })
+    db.prepare("UPDATE users SET reset_token_expires = 1 WHERE email = 'login@teste.com'").run()
+    const user = db.prepare('SELECT reset_token FROM users WHERE email = ?').get('login@teste.com') as any
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: user.reset_token, password: 'NovaSenha@123' })
+    expect(res.status).toBe(400)
+  })
+
+  it('should require token and password', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({})
+    expect(res.status).toBe(400)
+  })
+})

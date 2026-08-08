@@ -299,4 +299,16 @@ describe('GET /api/settings/audit', () => {
     expect(res.body.data).toHaveLength(2)
     expect(res.body.total).toBe(5)
   })
+
+  it('should clear audit logs via DELETE', async () => {
+    const db = getDb()
+    for (let i = 0; i < 3; i++) {
+      db.prepare('INSERT INTO audit_logs (id, user_id, user_name, action, category, details) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(uuid(), adminId, 'Admin', `action-${i}`, 'test', '{}')
+    }
+    const res = await request(app).delete('/api/settings/audit').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(204)
+    const total = (db.prepare('SELECT COUNT(*) as c FROM audit_logs').get() as any).c
+    expect(total).toBe(0)
+  })
 })

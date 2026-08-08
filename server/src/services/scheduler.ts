@@ -4,7 +4,7 @@ import { getDb } from '../database/connection.js'
 import { loadSettings } from './settingsService.js'
 import { ensureContractFees } from './monthlyFeeGenerator.js'
 import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySummaryToAdmins } from './feeAutomation.js'
-import { createBackup, pruneBackups } from './backupService.js'
+import { createBackup, pruneBackups, uploadBackupOffsite } from './backupService.js'
 import { searchPaymentByExternalReference, mpStatus } from './mercadopagoService.js'
 import { finalizePayment } from './paymentService.js'
 import { alertIntegrationIssue } from './integrationAlert.js'
@@ -75,6 +75,15 @@ function runAutoBackup(): void {
     addLog(db, 'backup_create', `Backup automático criado: ${info.id}`, { userId: 'scheduler', role: 'admin' }, 'backup')
     pruneBackups(30)
     logger.info({ id: info.id, size: info.size }, 'Automatic backup created')
+    uploadBackupOffsite(info.id)
+      .then((uploaded: boolean) => {
+        if (uploaded) logger.info({ id: info.id }, 'Backup uploaded off-site')
+        else logger.warn({ id: info.id }, 'Off-site backup skipped (S3 not configured)')
+      })
+      .catch((err: any) => {
+        logger.error({ err, id: info.id }, 'Off-site backup upload failed')
+        alertIntegrationIssue(db, 'S3/R2', `Falha no envio do backup ${info.id} para o armazenamento off-site: ${err.message}`)
+      })
   } catch (err) {
     logger.error({ err }, 'Automatic backup task failed')
   }

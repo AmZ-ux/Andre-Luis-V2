@@ -4,7 +4,9 @@ import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
 import { requireAdmin } from '../middleware/roles.js'
 import { addLog } from '../services/appLogService.js'
-import { createBackup, listBackups, getBackupPath, restoreBackup, deleteBackup, pruneBackups, isValidBackupId } from '../services/backupService.js'
+import { alertIntegrationIssue } from '../services/integrationAlert.js'
+import { createBackup, listBackups, getBackupPath, restoreBackup, deleteBackup, pruneBackups, isValidBackupId, uploadBackupOffsite } from '../services/backupService.js'
+import { logger } from '../utils/logger.js'
 
 const router = Router()
 
@@ -70,11 +72,19 @@ router.get('/users', requireAdmin, (_req, res) => {
 })
 
 // Backup em arquivos reais (volume persistente)
-router.post('/backup', requireAdmin, (_req, res) => {
+router.post('/backup', requireAdmin, (req, res) => {
   const db = getDb()
   const info = createBackup(db, 'manual')
-  addLog(db, 'backup_create', `Backup manual criado: ${info.id}`, _req.user!, 'backup')
-  res.json(info)
+  addLog(db, 'backup_create', `Backup manual criado: ${info.id}`, req.user!, 'backup')
+  uploadBackupOffsite(info.id)
+    .then((uploaded: boolean) => {
+      res.json({ ...info, offsite: uploaded })
+    })
+    .catch((err: any) => {
+      logger.error({ err, id: info.id }, 'Off-site backup upload failed')
+      alertIntegrationIssue(db, 'S3/R2', `Falha no envio do backup ${info.id} para o armazenamento off-site: ${err.message}`)
+      res.json({ ...info, offsite: false })
+    })
 })
 
 // Lista backups salvos
@@ -137,6 +147,13 @@ router.get('/logs', requireAdmin, (req, res) => {
 router.delete('/logs', requireAdmin, (_req, res) => {
   const db = getDb()
   db.prepare('DELETE FROM app_logs').run()
+  res.status(204).end()
+})
+
+// Limpa o histórico de auditoria
+router.delete('/audit', requireAdmin, (_req, res) => {
+  const db = getDb()
+  db.prepare('DELETE FROM audit_logs').run()
   res.status(204).end()
 })
 

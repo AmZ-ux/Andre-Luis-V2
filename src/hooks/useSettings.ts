@@ -210,9 +210,15 @@ export function useSettings() {
   }, [reload])
 
   const clearAudit = useCallback(() => {
-    if (config.realApi) return
-    auditService.clear()
-    reload()
+    if (!config.realApi) {
+      auditService.clear()
+      reload()
+      return
+    }
+
+    realSettings.clearAudit()
+      .then(() => reload())
+      .catch(() => {})
   }, [reload])
 
   return {

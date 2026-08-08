@@ -1,4 +1,6 @@
 import { LegalLayout } from '../../components/legal/LegalLayout'
+import { useCompanyInfo } from '../../hooks/useCompanyInfo'
+import { fillLegalText } from '../../utils/legalText'
 
 interface DataSection {
   title: string
@@ -11,7 +13,7 @@ const sections: DataSection[] = [
   {
     title: '1. Quem somos (Controlador)',
     paragraphs: [
-      'A Transporte André Luis (doravante "Transporte André Luis", "nós" ou "nós"), inscrita sob o CNPJ [CNPJ], com sede em [cidade/UF], é a controladora dos dados pessoais tratados por meio desta plataforma, nos termos do art. 5º, VI, da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais – "LGPD").',
+      'A Transporte André Luis (doravante "Transporte André Luis", "nós" ou "nós"), inscrita sob o CNPJ {cnpj}, com sede em {cidadeUf}, é a controladora dos dados pessoais tratados por meio desta plataforma, nos termos do art. 5º, VI, da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais – "LGPD").',
       'Esta Política de Privacidade descreve, de forma clara e transparente, como coletamos, utilizamos, armazenamos, compartilhamos e protegemos os seus dados pessoais no âmbito do serviço de gestão de mensalidades e transporte de passageiros, bem como os seus direitos como titular de dados.',
     ],
   },
@@ -119,7 +121,7 @@ const sections: DataSection[] = [
       'Informação sobre as entidades públicas e privadas com as quais o controlador realizou uso compartilhado de dados;',
       'Informação sobre a possibilidade de não fornecer consentimento e sobre as consequências da negativa;',
       'Revogação do consentimento, quando o tratamento estiver fundamentado nessa base legal.',
-      'As solicitações devem ser encaminhadas ao Encarregado pelo e-mail [email] e serão respondidas em até 15 (quinze) dias, nos termos do art. 19 da LGPD. Havendo pedido de eliminação, os dados serão apagados, ressalvadas as hipóteses legais de conservação.',
+      'As solicitações devem ser encaminhadas ao Encarregado pelo e-mail {email} e serão respondidas em até 15 (quinze) dias, nos termos do art. 19 da LGPD. Havendo pedido de eliminação, os dados serão apagados, ressalvadas as hipóteses legais de conservação.',
     ],
   },
   {
@@ -135,9 +137,9 @@ const sections: DataSection[] = [
       'O Encarregado pelo tratamento de dados pessoais (DPO), nos termos do art. 41 da LGPD, pode ser contatado pelos seguintes canais:',
     ],
     items: [
-      'E-mail: [email]',
-      'Endereço: [endereço da empresa]',
-      'Telefone/WhatsApp: [telefone]',
+      'E-mail: {email}',
+      'Endereço: {endereco}',
+      'Telefone/WhatsApp: {telefone}',
     ],
   },
   {
@@ -150,29 +152,30 @@ const sections: DataSection[] = [
   {
     title: '13. Legislação e foro',
     paragraphs: [
-      'Esta Política é regida pela legislação brasileira, em especial pela Lei nº 13.709/2018 (LGPD), pelo Código de Defesa do Consumidor (Lei nº 8.078/1990) e pelo Marco Civil da Internet (Lei nº 12.965/2014). Fica eleito o foro da comarca de [cidade/UF] para dirimir eventuais controvérsias, sem prejuízo das competências da Autoridade Nacional de Proteção de Dados (ANPD).',
+      'Esta Política é regida pela legislação brasileira, em especial pela Lei nº 13.709/2018 (LGPD), pelo Código de Defesa do Consumidor (Lei nº 8.078/1990) e pelo Marco Civil da Internet (Lei nº 12.965/2014). Fica eleito o foro da comarca de {cidadeUf} para dirimir eventuais controvérsias, sem prejuízo das competências da Autoridade Nacional de Proteção de Dados (ANPD).',
       'Para dúvidas, reclamações ou exercício de direitos, contate o Encarregado pelos canais indicados na seção 11 desta Política.',
     ],
   },
 ]
 
 export function PrivacyPage() {
+  const company = useCompanyInfo()
   return (
-    <LegalLayout title="Política de Privacidade" updatedAt="07/08/2026">
+    <LegalLayout title="Política de Privacidade" updatedAt="08/08/2026">
       {sections.map((section) => (
         <section key={section.title}>
           <h2 className="text-base sm:text-lg font-semibold text-text mb-3">{section.title}</h2>
 
           {section.paragraphs?.map((paragraph, i) => (
             <p key={i} className="mb-3">
-              {paragraph}
+              {fillLegalText(paragraph, company)}
             </p>
           ))}
 
           {section.items && (
             <ul className="space-y-2 list-disc pl-5">
               {section.items.map((item, i) => (
-                <li key={i}>{item}</li>
+                <li key={i}>{fillLegalText(item, company)}</li>
               ))}
             </ul>
           )}
