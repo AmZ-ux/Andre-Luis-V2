@@ -23,12 +23,37 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
   const db = getDb()
 
   const user = db.prepare('SELECT * FROM users WHERE email = ? OR cpf = ?').get(login, login) as any
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+  if (!user) {
     res.status(401).json({ error: 'Credenciais inválidas' })
     return
   }
 
-  db.prepare('UPDATE users SET last_access = datetime(\'now\') WHERE id = ?').run(user.id)
+  const now = Date.now()
+  const lockedUntil = Number(user.locked_until || 0)
+  if (lockedUntil > now) {
+    const minsLeft = Math.ceil((lockedUntil - now) / 60000)
+    res.status(423).json({ error: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${minsLeft} min.` })
+    return
+  }
+
+  if (!bcrypt.compareSync(password, user.password_hash)) {
+    const attempts = Number(user.failed_login_attempts || 0) + 1
+    const maxAttempts = Number(process.env.LOGIN_MAX_ATTEMPTS) || 5
+    if (attempts >= maxAttempts) {
+      const lockMinutes = Number(process.env.LOGIN_LOCK_MINUTES) || 15
+      db.prepare('UPDATE users SET failed_login_attempts = 0, locked_until = ? WHERE id = ?')
+        .run(String(now + lockMinutes * 60000), user.id)
+      db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(uuid(), 'login_blocked', `Conta bloqueada por ${lockMinutes} min após ${maxAttempts} tentativas de login falhas`, user.email, user.role, 'security')
+      res.status(423).json({ error: `Muitas tentativas com credenciais inválidas. Conta bloqueada por ${lockMinutes} minutos.` })
+    } else {
+      db.prepare('UPDATE users SET failed_login_attempts = ? WHERE id = ?').run(attempts, user.id)
+      res.status(401).json({ error: 'Credenciais inválidas' })
+    }
+    return
+  }
+
+  db.prepare('UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_access = datetime(\'now\') WHERE id = ?').run(user.id)
   db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
     .run(uuid(), 'login', 'Login realizado', user.name, user.role, 'login')
 
@@ -385,7 +410,7 @@ router.post('/reset-password', validateBody('token', 'password'), (req, res) => 
   }
 
   db.prepare(
-    'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?'
+    'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL, failed_login_attempts = 0, locked_until = NULL WHERE id = ?'
   ).run(bcrypt.hashSync(password, 10), user.id)
 
   res.json({ success: true, message: 'Senha redefinida com sucesso.' })

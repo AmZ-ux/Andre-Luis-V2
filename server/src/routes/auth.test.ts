@@ -327,6 +327,57 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(401)
   })
 
+  it('should lock the account after 5 failed attempts and reject even correct password', async () => {
+    const prevMax = process.env.LOGIN_MAX_ATTEMPTS
+    const prevLock = process.env.LOGIN_LOCK_MINUTES
+    try {
+      process.env.LOGIN_MAX_ATTEMPTS = '5'
+      process.env.LOGIN_LOCK_MINUTES = '15'
+      await request(app)
+        .post('/api/auth/register')
+        .send({ name: 'Lock Test', email: 'lock@teste.com', cpf: '222.333.444-55', password: 'Senha@123' })
+
+      for (let i = 0; i < 4; i++) {
+        const res = await request(app)
+          .post('/api/auth/login')
+          .send({ login: 'lock@teste.com', password: 'wrong' })
+        expect(res.status).toBe(401)
+      }
+
+      const fifth = await request(app)
+        .post('/api/auth/login')
+        .send({ login: 'lock@teste.com', password: 'wrong' })
+      expect(fifth.status).toBe(423)
+
+      const blocked = await request(app)
+        .post('/api/auth/login')
+        .send({ login: 'lock@teste.com', password: 'Senha@123' })
+      expect(blocked.status).toBe(423)
+      expect(blocked.body.error).toContain('bloqueada')
+
+      const db = (await import('../database/connection.js')).getDb()
+      const user = db.prepare('SELECT locked_until FROM users WHERE email = ?').get('lock@teste.com') as any
+      expect(Number(user.locked_until)).toBeGreaterThan(Date.now())
+    } finally {
+      if (prevMax === undefined) delete process.env.LOGIN_MAX_ATTEMPTS
+      else process.env.LOGIN_MAX_ATTEMPTS = prevMax
+      if (prevLock === undefined) delete process.env.LOGIN_LOCK_MINUTES
+      else process.env.LOGIN_LOCK_MINUTES = prevLock
+    }
+  })
+
+  it('should clear lock and counter after lock expires', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    db.prepare("UPDATE users SET locked_until = 1, failed_login_attempts = 5 WHERE email = 'lock@teste.com'").run()
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'lock@teste.com', password: 'Senha@123' })
+    expect(res.status).toBe(200)
+    const user = db.prepare('SELECT locked_until, failed_login_attempts FROM users WHERE email = ?').get('lock@teste.com') as any
+    expect(user.locked_until).toBeNull()
+    expect(Number(user.failed_login_attempts)).toBe(0)
+  })
+
   it('should reject non-existent user', async () => {
     const res = await request(app)
       .post('/api/auth/login')

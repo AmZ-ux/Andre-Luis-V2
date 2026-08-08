@@ -163,6 +163,49 @@ describe('DELETE /api/passengers/:id', () => {
     expect(deleted).toBeUndefined()
   })
 
+  it('should cascade delete related data (fees, payments, receipts, availabilities, login)', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(id, 'Cascade', '999.888.777-66', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'Cascade', 'cascade@teste.com', '999.888.777-66')
+
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 189.90, 5, '07/2026', 'pending')")
+      .run(feeId, id, 'Cascade', '999.888.777-66')
+    db.prepare("INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method) VALUES (?, ?, ?, ?, 'pix')")
+      .run(uuid(), feeId, 189.90, '05/07/2026')
+    db.prepare("INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status) VALUES (?, 'mp-1', ?, 189.90, 'pending')")
+      .run(uuid(), feeId)
+
+    const recId = uuid()
+    db.prepare("INSERT INTO receipts (id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, file_name, file_type, file_size, status) VALUES (?, ?, ?, ?, ?, 'university', 7, 2026, 189.90, 'r.pdf', 'application/pdf', 10, 'awaiting')")
+      .run(recId, feeId, id, 'Cascade', '999.888.777-66')
+    db.prepare("INSERT INTO receipt_history (id, receipt_id, action, performed_by, performed_by_id) VALUES (?, ?, 'created', 'admin', 'admin')")
+      .run(uuid(), recId)
+
+    const avId = uuid()
+    db.prepare("INSERT INTO availabilities (id, passenger_id, passenger_name, cpf, transport_type, type, start_date, end_date, status) VALUES (?, ?, ?, ?, 'university', 'vacation', '2026-08-01', '2026-08-15', 'scheduled')")
+      .run(avId, id, 'Cascade', '999.888.777-66')
+    db.prepare("INSERT INTO availability_history (id, availability_id, action, performed_by, performed_by_id) VALUES (?, ?, 'created', 'admin', 'admin')")
+      .run(uuid(), avId)
+
+    db.prepare("INSERT INTO notifications (id, user_id, title, message) VALUES (?, ?, 'T', 'M')").run(uuid(), id)
+
+    await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${token}`)
+
+    expect(db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(feeId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM payments WHERE monthly_fee_id = ?').get(feeId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM pix_charges WHERE monthly_fee_id = ?').get(feeId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM receipts WHERE id = ?').get(recId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM receipt_history WHERE receipt_id = ?').get(recId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM availabilities WHERE id = ?').get(avId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM availability_history WHERE availability_id = ?').get(avId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM notifications WHERE user_id = ?').get(id)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM users WHERE id = ?').get(id)).toBeUndefined()
+  })
+
   it('should succeed even if passenger does not exist', async () => {
     const res = await request(app).delete('/api/passengers/non-existent').set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(200)

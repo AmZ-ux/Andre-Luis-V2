@@ -160,12 +160,92 @@ describe('POST /api/monthly-fees', () => {
     expect(res.body.due_date).toBe('05/07/2026')
   })
 
-  it('should return 500 when required fields are missing', async () => {
+  it('should return 400 when required fields are missing', async () => {
     const res = await request(app)
       .post('/api/monthly-fees')
       .set('Authorization', `Bearer ${token}`)
       .send({})
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Passageiro é obrigatório')
+  })
+
+  it('should return 400 for invalid month, year, amount or due day', async () => {
+    const pid = seedPassenger()
+    const base = {
+      passengerId: pid,
+      passengerName: 'Test Passenger',
+      cpf: '111.111.111-11',
+      transportType: 'university',
+      month: 13,
+      year: 2026,
+      amount: 189.90,
+      dueDay: 5,
+    }
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send(base)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Mês inválido')
+
+    const res2 = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...base, month: 7, year: 99 })
+    expect(res2.status).toBe(400)
+    expect(res2.body.error).toBe('Ano inválido')
+
+    const res3 = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...base, month: 7, year: 2026, amount: -5 })
+    expect(res3.status).toBe(400)
+    expect(res3.body.error).toBe('Valor da mensalidade inválido')
+
+    const res4 = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...base, month: 7, year: 2026, amount: 189.90, dueDay: 32 })
+    expect(res4.status).toBe(400)
+    expect(res4.body.error).toBe('Dia de vencimento inválido')
+  })
+
+  it('should return 404 when passenger does not exist', async () => {
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        passengerId: 'nao-existe',
+        passengerName: 'Test',
+        cpf: '111.111.111-11',
+        transportType: 'university',
+        month: 7,
+        year: 2026,
+        amount: 100,
+        dueDay: 5,
+      })
+    expect(res.status).toBe(404)
+    expect(res.body.error).toBe('Passageiro não encontrado')
+  })
+
+  it('should return 409 when a fee already exists for passenger and period', async () => {
+    const pid = seedPassenger()
+    seedMonthlyFee(pid)
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        passengerId: pid,
+        passengerName: 'Test Passenger',
+        cpf: '111.111.111-11',
+        transportType: 'university',
+        month: 7,
+        year: 2026,
+        amount: 189.90,
+        dueDay: 5,
+      })
+    expect(res.status).toBe(409)
+    expect(res.body.error).toContain('já existe')
   })
 })
 
