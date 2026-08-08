@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { AuthLayout } from '../../components/auth/AuthLayout'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
+import { Checkbox } from '../../components/ui/Checkbox'
 import { PasswordInput } from '../../components/auth/PasswordInput'
 import { Button } from '../../components/ui/Button'
 import { UserPlus, ArrowRight, ArrowLeft, MapPin, CalendarClock, Wallet } from 'lucide-react'
@@ -55,7 +56,9 @@ export function RegisterPage() {
     monthlyFee: '',
   })
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [termsAccepted, setTermsAccepted] = useState(false)
   const [errors, setErrors] = useState<RegisterErrors>({})
+  const [termsError, setTermsError] = useState('')
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />
@@ -105,6 +108,12 @@ export function RegisterPage() {
     e.preventDefault()
 
     if (!validateStep1() || !validateStep2()) return
+
+    if (!termsAccepted) {
+      setTermsError('Você precisa aceitar os Termos de Uso e a Política de Privacidade para continuar')
+      return
+    }
+    setTermsError('')
 
     try {
       await register(form)
@@ -294,6 +303,31 @@ export function RegisterPage() {
                   <>A data de início define o dia de vencimento da mensalidade todo mês.</>
                 )}
               </p>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-4 py-3">
+              <Checkbox
+                id="accept-terms"
+                checked={termsAccepted}
+                onChange={(e) => {
+                  setTermsAccepted(e.target.checked)
+                  if (termsError) setTermsError('')
+                }}
+                error={termsError}
+                label={
+                  <span className="text-xs text-gray-600 dark:text-gray-300">
+                    Li e aceito os{' '}
+                    <Link to="/termos-de-uso" target="_blank" rel="noopener noreferrer" className="text-primary font-medium underline underline-offset-2 hover:text-primary-light">
+                      Termos de Uso
+                    </Link>{' '}
+                    e a{' '}
+                    <Link to="/politica-de-privacidade" target="_blank" rel="noopener noreferrer" className="text-primary font-medium underline underline-offset-2 hover:text-primary-light">
+                      Política de Privacidade
+                    </Link>{' '}
+                    da Transporte André Luis
+                  </span>
+                }
+              />
             </div>
 
             {error && (

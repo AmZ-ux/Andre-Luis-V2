@@ -22,6 +22,8 @@ import { ProfilePage } from './pages/user/ProfilePage'
 import { ChangePasswordPage } from './pages/user/ChangePasswordPage'
 import { SessionExpiredPage } from './pages/errors/SessionExpiredPage'
 import { ServerErrorPage } from './pages/errors/ServerErrorPage'
+import { PrivacyPage } from './pages/legal/PrivacyPage'
+import { TermsPage } from './pages/legal/TermsPage'
 
 function protect(element: React.ReactElement) {
   return <ProtectedRoute>{element}</ProtectedRoute>
@@ -47,6 +49,14 @@ export const router = createBrowserRouter([
   {
     path: '/sessao-expirada',
     element: <SessionExpiredPage />,
+  },
+  {
+    path: '/politica-de-privacidade',
+    element: <PrivacyPage />,
+  },
+  {
+    path: '/termos-de-uso',
+    element: <TermsPage />,
   },
   {
     path: '/',

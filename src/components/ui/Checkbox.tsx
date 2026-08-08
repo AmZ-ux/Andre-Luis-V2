@@ -1,14 +1,14 @@
-import { type InputHTMLAttributes } from 'react'
+import { type InputHTMLAttributes, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { cn } from '../../utils/cn'
 
 interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  label?: string
+  label?: ReactNode
   error?: string
 }
 
 export function Checkbox({ label, error, className: _className, id, checked, onChange, disabled, ...props }: CheckboxProps) {
-  const checkboxId = id || label?.toLowerCase().replace(/\s+/g, '-')
+  const checkboxId = id || (typeof label === 'string' ? label.toLowerCase().replace(/\s+/g, '-') : undefined)
 
   return (
     <div className="flex flex-col">

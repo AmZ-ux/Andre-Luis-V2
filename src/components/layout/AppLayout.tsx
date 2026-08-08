@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
@@ -28,6 +28,23 @@ export function AppLayout() {
             </AnimatePresence>
           </Container>
         </main>
+        <footer className="hidden lg:block py-4 text-center border-t border-gray-100 dark:border-gray-800">
+          <div className="flex items-center justify-center gap-4">
+            <Link
+              to="/termos-de-uso"
+              className="text-xs text-gray-400 hover:text-primary transition-colors"
+            >
+              Termos de Uso
+            </Link>
+            <span className="text-xs text-gray-300 dark:text-gray-600">|</span>
+            <Link
+              to="/politica-de-privacidade"
+              className="text-xs text-gray-400 hover:text-primary transition-colors"
+            >
+              Política de Privacidade
+            </Link>
+          </div>
+        </footer>
       </div>
 
       <MobileNav />

@@ -46,6 +46,21 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         <p className="text-xs text-gray-400">
           &copy; {new Date().getFullYear()} Transporte André Luis. Todos os direitos reservados.
         </p>
+        <div className="mt-2 flex items-center justify-center gap-4">
+          <Link
+            to="/termos-de-uso"
+            className="text-xs text-gray-400 hover:text-primary transition-colors"
+          >
+            Termos de Uso
+          </Link>
+          <span className="text-xs text-gray-300 dark:text-gray-600">|</span>
+          <Link
+            to="/politica-de-privacidade"
+            className="text-xs text-gray-400 hover:text-primary transition-colors"
+          >
+            Política de Privacidade
+          </Link>
+        </div>
       </footer>
     </div>
   )
