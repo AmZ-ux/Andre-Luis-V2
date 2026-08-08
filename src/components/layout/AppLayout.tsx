@@ -1,17 +1,37 @@
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { NotificationBell } from './NotificationBell'
 import { Container } from '../ui/Container'
+import { useAuth } from '../../auth/AuthContext'
 
 export function AppLayout() {
+  const { user } = useAuth()
+  const location = useLocation()
+
+  const showGreeting = user?.role === 'passenger' && location.pathname === '/'
+  const firstName = showGreeting ? (user?.name?.split(' ')[0] ?? '') : ''
+  const todayLabel = showGreeting
+    ? new Date().toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      })
+    : ''
+
   return (
     <div className="min-h-screen bg-secondary dark:bg-gray-950">
       <Sidebar />
 
       <div className="lg:ml-64 flex flex-col min-h-screen pb-16 lg:pb-0">
-        <header className="sticky top-0 z-30 flex items-center justify-end px-4 sm:px-6 py-3 bg-secondary/80 dark:bg-gray-950/80 backdrop-blur lg:border-b lg:border-gray-100 lg:dark:border-gray-800">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 sm:px-6 py-3 bg-secondary/80 dark:bg-gray-950/80 backdrop-blur lg:border-b lg:border-gray-100 lg:dark:border-gray-800">
+          {showGreeting && (
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-text truncate">Olá, {firstName}</h1>
+              <p className="text-xs text-gray-500 mt-0.5 capitalize truncate">{todayLabel}</p>
+            </div>
+          )}
           <NotificationBell />
         </header>
         <main className="flex-1 py-6 sm:py-8">

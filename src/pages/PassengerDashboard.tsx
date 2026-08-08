@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
 import { passengerService } from '../services/passengerService'
 import { monthlyFeeService } from '../services/monthlyFeeService'
-import { availabilityService } from '../services/availabilityService'
 import { calculateStatus } from '../services/statusCalculator'
 import { FeeCheckoutModal } from '../components/monthlyFees/FeeCheckoutModal'
 import { Card } from '../components/ui/Card'
@@ -13,14 +12,12 @@ import { Badge } from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 import {
   Calendar,
-  CalendarOff,
   CheckCircle2,
   Clock,
   Wallet,
 } from 'lucide-react'
 import type { Passenger } from '../types/passenger'
 import type { MonthlyFee, MonthlyFeeStatus } from '../types/monthlyFee'
-import type { Availability } from '../types/availability'
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -79,7 +76,6 @@ export function PassengerDashboard() {
   const navigate = useNavigate()
   const [passenger, setPassenger] = useState<Passenger | null>(null)
   const [fees, setFees] = useState<MonthlyFee[]>([])
-  const [availabilities, setAvailabilities] = useState<Availability[]>([])
   const [checkoutFee, setCheckoutFee] = useState<MonthlyFee | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -88,14 +84,12 @@ export function PassengerDashboard() {
     setLoading(true)
     try {
       try { await monthlyFeeService.ensureCurrent() } catch {}
-      const [passengerData, feeData, availabilityData] = await Promise.all([
+      const [passengerData, feeData] = await Promise.all([
         passengerService.getById(user.id),
         monthlyFeeService.getByPassengerId(user.id),
-        availabilityService.getByPassengerId(user.id),
       ])
       setPassenger(passengerData)
       setFees(feeData)
-      setAvailabilities(availabilityData)
     } finally {
       setLoading(false)
     }
@@ -107,25 +101,12 @@ export function PassengerDashboard() {
 
   if (loading || !user) return <PageSpinner />
 
-  const now = new Date()
-  const todayLabel = now.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
-  const firstName = user.name.split(' ')[0]
-
   const sortedFees = [...fees].sort((a, b) => b.year - a.year || b.month - a.month)
   const nextUnpaid = [...fees]
     .sort((a, b) => a.year - b.year || a.month - b.month)
     .find((f) => f.status === 'pending' || f.status === 'overdue')
   const currentFee = nextUnpaid || sortedFees[0] || null
   const feeStatus = currentFee ? calculateStatus(currentFee, currentFee.payment) : null
-
-  const upcoming = availabilities
-    .filter((a) => a.status !== 'cancelled' && a.status !== 'finished')
-    .sort((a, b) => a.startDate.localeCompare(b.startDate))
-    .slice(0, 3)
 
   const contractDate = passenger?.contractStartDate
     ? formatISOToBR(passenger.contractStartDate)
@@ -138,22 +119,6 @@ export function PassengerDashboard() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Olá, {firstName}</h1>
-          <p className="text-sm text-gray-500 mt-1 capitalize">{todayLabel}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            icon={<CalendarOff className="h-4 w-4" />}
-            onClick={() => navigate('/minha-disponibilidade')}
-          >
-            Ausência
-          </Button>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <Card className="h-full">
@@ -277,83 +242,44 @@ export function PassengerDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                <h2 className="text-sm font-bold text-text">Minhas mensalidades</h2>
-              </div>
-              <button
-                onClick={() => navigate('/minhas-mensalidades')}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Ver tudo
-              </button>
-            </div>
-
-            {sortedFees.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">Nenhuma mensalidade lançada</p>
-            ) : (
-              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                {sortedFees.slice(0, 5).map((fee) => {
-                  const status = calculateStatus(fee, fee.payment)
-                  return (
-                    <li key={fee.id} className="flex items-center justify-between gap-3 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-text">
-                          {MONTH_NAMES[fee.month - 1]} de {fee.year}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">Venceu em {fee.dueDate}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-semibold text-text">{formatBR(fee.amount)}</span>
-                        <Badge variant={feeStatusVariant[status]}>{feeStatusLabel[status]}</Badge>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </Card>
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-primary" />
+            <h2 className="text-sm font-bold text-text">Minhas mensalidades</h2>
+          </div>
+          <button
+            onClick={() => navigate('/minhas-mensalidades')}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            Ver tudo
+          </button>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <CalendarOff className="h-5 w-5 text-primary" />
-                <h2 className="text-sm font-bold text-text">Ausências</h2>
-              </div>
-              <button
-                onClick={() => navigate('/minha-disponibilidade')}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Ver tudo
-              </button>
-            </div>
-
-            {upcoming.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">Nenhuma ausência programada</p>
-            ) : (
-              <ul className="space-y-3">
-                {upcoming.map((av) => (
-                  <li key={av.id} className="flex items-start gap-3">
-                    <Calendar className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-text">
-                        {av.startDate} — {av.endDate}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5 truncate">{av.reason}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </div>
-      </div>
+        {sortedFees.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">Nenhuma mensalidade lançada</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {sortedFees.slice(0, 5).map((fee) => {
+              const status = calculateStatus(fee, fee.payment)
+              return (
+                <li key={fee.id} className="flex items-center justify-between gap-3 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-text">
+                      {MONTH_NAMES[fee.month - 1]} de {fee.year}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">Venceu em {fee.dueDate}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-text">{formatBR(fee.amount)}</span>
+                    <Badge variant={feeStatusVariant[status]}>{feeStatusLabel[status]}</Badge>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Card>
 
       <FeeCheckoutModal
         fee={checkoutFee}

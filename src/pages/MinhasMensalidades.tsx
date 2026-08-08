@@ -5,15 +5,22 @@ import { useAuth } from '../auth/AuthContext'
 import { monthlyFeeService } from '../services/monthlyFeeService'
 import { MonthlyFeeStatus } from '../components/monthlyFees/MonthlyFeeStatus'
 import { FeeCheckoutModal } from '../components/monthlyFees/FeeCheckoutModal'
+import { PageTabs } from '../components/ui/PageTabs'
 import { Button } from '../components/ui/Button'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useToast } from '../contexts/ToastContext'
-import { Wallet, RefreshCw, CreditCard } from 'lucide-react'
+import { MinhaDisponibilidade } from './MinhaDisponibilidade'
+import { Wallet, RefreshCw, CreditCard, CalendarOff } from 'lucide-react'
 import type { MonthlyFee } from '../types/monthlyFee'
 
 const monthNames = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+]
+
+const tabs = [
+  { key: 'faturas', label: 'Mensalidades', icon: Wallet },
+  { key: 'ausencias', label: 'Ausências', icon: CalendarOff },
 ]
 
 export function MinhasMensalidades() {
@@ -24,6 +31,12 @@ export function MinhasMensalidades() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [checkoutFee, setCheckoutFee] = useState<MonthlyFee | null>(null)
+
+  const tab = searchParams.get('tab') === 'ausencias' ? 'ausencias' : 'faturas'
+
+  const handleTabChange = (key: string) => {
+    setSearchParams(key === 'faturas' ? {} : { tab: key }, { replace: true })
+  }
 
   const load = useCallback(async (ensure = true) => {
     if (!user) return
@@ -77,25 +90,46 @@ export function MinhasMensalidades() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-text flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-primary" />
-            Minhas Mensalidades
+            {tab === 'ausencias' ? (
+              <>
+                <CalendarOff className="h-5 w-5 text-primary" />
+                Disponibilidade
+              </>
+            ) : (
+              <>
+                <Wallet className="h-5 w-5 text-primary" />
+                Minhas Mensalidades
+              </>
+            )}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Pague suas mensalidades com PIX ou cartão</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {tab === 'ausencias'
+              ? 'Gerencie seus períodos de ausência e férias'
+              : 'Pague suas mensalidades com PIX ou cartão'}
+          </p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<RefreshCw className="h-4 w-4" />}
-          onClick={handleEnsureCurrent}
-        >
-          Atualizar
-        </Button>
+        {tab === 'faturas' && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RefreshCw className="h-4 w-4" />}
+            onClick={handleEnsureCurrent}
+          >
+            Atualizar
+          </Button>
+        )}
       </div>
 
-      {loading ? (
+      <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+
+      {tab === 'ausencias' ? (
+        <MinhaDisponibilidade embedded />
+      ) : (
+        <>
+          {loading ? (
         <PageSpinner />
       ) : loadError ? (
         <div className="text-center py-12">
@@ -149,6 +183,8 @@ export function MinhasMensalidades() {
       )}
 
       <FeeCheckoutModal fee={checkoutFee} onClose={() => setCheckoutFee(null)} onPaid={handlePaid} />
+        </>
+      )}
     </div>
   )
 }

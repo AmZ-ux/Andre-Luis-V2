@@ -13,7 +13,7 @@ import { Plus, Calendar, Clock } from 'lucide-react'
 import { availabilityRules } from '../services/availabilityRules'
 import type { Availability, AvailabilityFormData } from '../types/availability'
 
-export function MinhaDisponibilidade() {
+export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth()
   const { addToast } = useToast()
   const [availabilities, setAvailabilities] = useState<Availability[]>([])
@@ -95,18 +95,20 @@ export function MinhaDisponibilidade() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`space-y-6 ${embedded ? '' : 'max-w-3xl mx-auto'}`}>
+      {!embedded && (
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-text">Minha Disponibilidade</h1>
           <p className="text-sm text-gray-500 mt-1">Gerencie seus períodos de ausência</p>
         </div>
-        {!showForm && (
+      )}
+      {!showForm && (
+        <div className="flex justify-end">
           <Button icon={<Plus className="h-4 w-4" />} onClick={() => setShowForm(true)}>
             Novo Período
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       {showForm && (
         <Card>

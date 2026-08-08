@@ -64,21 +64,23 @@ export function Sidebar() {
       </nav>
 
       <div className="px-3 pb-4 space-y-1">
-        <NavLink
-          to={PROFILE_ITEM.path}
-          className={({ isActive }) =>
-            cn(
-              'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
-              'hover:bg-primary/5 hover:text-primary',
-              isActive
-                ? 'bg-primary/10 text-primary font-semibold'
-                : 'text-gray-500 dark:text-gray-400'
-            )
-          }
-        >
-          <Icons.UserCircle className="h-5 w-5 shrink-0" />
-          <span>{PROFILE_ITEM.label}</span>
-        </NavLink>
+        {user?.role !== 'passenger' && (
+          <NavLink
+            to={PROFILE_ITEM.path}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                'hover:bg-primary/5 hover:text-primary',
+                isActive
+                  ? 'bg-primary/10 text-primary font-semibold'
+                  : 'text-gray-500 dark:text-gray-400'
+              )
+            }
+          >
+            <Icons.UserCircle className="h-5 w-5 shrink-0" />
+            <span>{PROFILE_ITEM.label}</span>
+          </NavLink>
+        )}
       </div>
 
       <div className="px-3 py-4 border-t border-gray-100 dark:border-gray-800">
