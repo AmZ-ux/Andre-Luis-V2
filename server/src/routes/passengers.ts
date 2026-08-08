@@ -90,18 +90,12 @@ router.delete('/:id', (req, res) => {
     db.prepare('DELETE FROM payments WHERE monthly_fee_id = ?').run(feeId)
   }
 
-  const receiptIds = (db.prepare('SELECT id FROM receipts WHERE passenger_id = ?').all(req.params.id) as any[]).map((r) => r.id)
-  for (const rid of receiptIds) {
-    db.prepare('DELETE FROM receipt_history WHERE receipt_id = ?').run(rid)
-  }
-
   const availabilityIds = (db.prepare('SELECT id FROM availabilities WHERE passenger_id = ?').all(req.params.id) as any[]).map((a) => a.id)
   for (const aid of availabilityIds) {
     db.prepare('DELETE FROM availability_history WHERE availability_id = ?').run(aid)
   }
 
   db.prepare('DELETE FROM monthly_fees WHERE passenger_id = ?').run(req.params.id)
-  db.prepare('DELETE FROM receipts WHERE passenger_id = ?').run(req.params.id)
   db.prepare('DELETE FROM availabilities WHERE passenger_id = ?').run(req.params.id)
   db.prepare('DELETE FROM notifications WHERE user_id = ?').run(req.params.id)
   db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id)

@@ -89,41 +89,6 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS receipts (
-  id TEXT PRIMARY KEY,
-  monthly_fee_id TEXT NOT NULL REFERENCES monthly_fees(id),
-  passenger_id TEXT NOT NULL REFERENCES passengers(id),
-  passenger_name TEXT NOT NULL,
-  cpf TEXT NOT NULL,
-  transport_type TEXT NOT NULL,
-  institution TEXT DEFAULT '',
-  company TEXT DEFAULT '',
-  month INTEGER NOT NULL,
-  year INTEGER NOT NULL,
-  amount REAL NOT NULL,
-  file_name TEXT NOT NULL,
-  file_type TEXT NOT NULL,
-  file_data TEXT DEFAULT '',
-  file_path TEXT DEFAULT '',
-  file_size INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'awaiting',
-  reviewed_by TEXT DEFAULT '',
-  review_date TEXT DEFAULT '',
-  review_notes TEXT DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS receipt_history (
-  id TEXT PRIMARY KEY,
-  receipt_id TEXT NOT NULL REFERENCES receipts(id),
-  action TEXT NOT NULL,
-  performed_by TEXT NOT NULL,
-  performed_by_id TEXT NOT NULL,
-  notes TEXT DEFAULT '',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 CREATE TABLE IF NOT EXISTS availabilities (
   id TEXT PRIMARY KEY,
   passenger_id TEXT NOT NULL REFERENCES passengers(id),
@@ -254,8 +219,6 @@ export async function runMigrations(): Promise<void> {
   db.exec(SCHEMA)
 
   // Add new columns if missing (for existing databases)
-  try { db.exec('ALTER TABLE receipts ADD COLUMN file_path TEXT DEFAULT \'\'') } catch {}
-  try { db.exec("ALTER TABLE receipts ALTER COLUMN file_data SET DEFAULT ''") } catch {}
   try { db.exec("ALTER TABLE monthly_fees ADD COLUMN due_date TEXT DEFAULT ''") } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN reset_token TEXT DEFAULT NULL") } catch {}
   try { db.exec("ALTER TABLE users ADD COLUMN reset_token_expires INTEGER DEFAULT NULL") } catch {}

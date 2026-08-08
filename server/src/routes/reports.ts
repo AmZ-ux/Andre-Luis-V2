@@ -110,52 +110,6 @@ router.get('/overview', (_req, res) => {
     passengers,
   }
 
-  // ===== Comprovantes =====
-  const receipts = db.prepare('SELECT * FROM receipts').all() as any[]
-  const statusLabels: Record<string, string> = {
-    approved: 'Aprovados', rejected: 'Rejeitados', awaiting: 'Pendentes', cancelled: 'Cancelados',
-  }
-  const monthMap = new Map<string, number>()
-  receipts.forEach((r) => {
-    const key = `${MONTH_NAMES[Number(r.month) - 1]}/${r.year}`
-    monthMap.set(key, (monthMap.get(key) || 0) + 1)
-  })
-  const byMonth = Array.from(monthMap.entries()).map(([month, count]) => ({ month, count }))
-  const receiptStatusMap = new Map<string, number>()
-  receipts.forEach((r) => {
-    const label = statusLabels[r.status] || r.status
-    receiptStatusMap.set(label, (receiptStatusMap.get(label) || 0) + 1)
-  })
-  const byStatus = Array.from(receiptStatusMap.entries()).map(([status, count]) => ({ status, count }))
-
-  const approvedReceipts = receipts.filter((r) => r.status === 'approved')
-  let tempoMedioAprovacao = 'N/A'
-  if (approvedReceipts.length > 0) {
-    const diffs = approvedReceipts
-      .map((r) => {
-        const created = r.created_at ? new Date(r.created_at.replace(' ', 'T')).getTime() : 0
-        const reviewed = r.review_date ? new Date(r.review_date.replace(' ', 'T')).getTime() : 0
-        return reviewed > 0 && created > 0 ? reviewed - created : null
-      })
-      .filter((d): d is number => d !== null)
-    if (diffs.length > 0) {
-      const avgHours = diffs.reduce((s, d) => s + d, 0) / diffs.length / 3600000
-      tempoMedioAprovacao = `${avgHours < 24 ? Math.max(1, Math.round(avgHours)) + 'h' : (avgHours / 24).toFixed(1) + 'd'}`
-    }
-  }
-
-  const receiptsData = {
-    aprovados: approvedReceipts.length,
-    rejeitados: receipts.filter((r) => r.status === 'rejected').length,
-    pendentes: receipts.filter((r) => r.status === 'awaiting').length,
-    cancelados: receipts.filter((r) => r.status === 'cancelled').length,
-    total: receipts.length,
-    tempoMedioAprovacao,
-    byStatus,
-    byMonth,
-    receipts,
-  }
-
   // ===== Disponibilidade =====
   const availabilities = db.prepare('SELECT * FROM availabilities').all() as any[]
   const today = todayBR()
@@ -181,7 +135,6 @@ router.get('/overview', (_req, res) => {
   res.json({
     financial,
     passengers: passengersData,
-    receipts: receiptsData,
     availability: availabilityData,
   })
 })

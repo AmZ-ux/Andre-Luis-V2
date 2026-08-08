@@ -40,7 +40,6 @@ const sections: DataSection[] = [
         ['Endereço', 'CEP, logradouro, número, complemento, bairro, cidade, estado', 'Definição de rotas e logística do serviço', 'Execução de contrato (inc. V)'],
         ['Financeiro', 'Valor da mensalidade, dia de vencimento, forma de pagamento, histórico de mensalidades e pagamentos', 'Cobrança e gestão financeira do contrato', 'Execução de contrato (inc. V) e cumprimento de obrigação legal/fiscal (inc. II)'],
         ['Pagamentos', 'E-mail, CPF e nome enviados ao provedor de pagamento para a transação', 'Processamento de pagamentos via PIX e cartão', 'Execução de contrato (inc. V) e consentimento do titular junto ao provedor'],
-        ['Comprovantes', 'Arquivos de comprovantes de pagamento (imagem/PDF) enviados pelo titular', 'Validação e registro dos pagamentos', 'Execução de contrato (inc. V)'],
         ['Disponibilidade', 'Períodos de ausência, motivos e observações', 'Gestão de disponibilidade do transporte', 'Execução de contrato (inc. V)'],
         ['Comunicação', 'Mensagens enviadas pelo aplicativo e por WhatsApp, notificações', 'Comunicação sobre o serviço, avisos de vencimento e informações relevantes', 'Execução de contrato (inc. V) e legítimo interesse (inc. IX)'],
         ['Navegação e segurança', 'Endereço IP, dados de acesso, logs de auditoria e de aplicação', 'Segurança da informação, prevenção de fraudes e conformidade', 'Legítimo interesse (inc. IX) e cumprimento de obrigação legal (inc. II)'],
@@ -87,7 +86,7 @@ const sections: DataSection[] = [
     ],
     items: [
       'Dados do contrato e mensalidades: enquanto durar o contrato de transporte e, após o encerramento, pelo prazo de 5 (cinco) anos para fins de cumprimento de obrigações fiscais e contábeis (art. 7º, II, LGPD);',
-      'Dados de pagamento e comprovantes: pelo prazo de 5 (cinco) anos, para fins fiscais;',
+      'Dados de pagamento: pelo prazo de 5 (cinco) anos, para fins fiscais;',
       'Logs de auditoria e segurança: conforme a política de retenção do sistema, limitada ao período necessário à segurança da informação;',
       'Após o término do prazo, os dados são eliminados ou anonimizados de forma segura.',
     ],

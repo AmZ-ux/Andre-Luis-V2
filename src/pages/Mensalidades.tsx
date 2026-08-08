@@ -10,7 +10,6 @@ import { MonthlyFeeCard } from '../components/monthlyFees/MonthlyFeeCard'
 import { CancelModal } from '../components/monthlyFees/CancelModal'
 import { ExemptionModal } from '../components/monthlyFees/ExemptionModal'
 import { EditFeeModal } from '../components/monthlyFees/EditFeeModal'
-import { ComprovantesSection } from './CentralComprovantes'
 import { BillingSettingsForm } from '../components/settings/BillingSettings'
 import { PageTabs } from '../components/ui/PageTabs'
 import { ViewToggle } from '../components/passengers/ViewToggle'
@@ -18,14 +17,13 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useToast } from '../contexts/ToastContext'
 import { useIsMobile } from '../hooks/useBreakpoint'
-import { ChevronLeft, ChevronRight, Wallet, FileCheck, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Wallet, SlidersHorizontal } from 'lucide-react'
 import { cn } from '../utils/cn'
 import type { MonthlyFee } from '../types/monthlyFee'
 import type { ViewMode } from '../types/passenger'
 
 const tabs = [
   { key: 'faturas', label: 'Faturas', icon: Wallet },
-  { key: 'comprovantes', label: 'Comprovantes', icon: FileCheck },
   { key: 'regras', label: 'Regras de cobrança', icon: SlidersHorizontal },
 ]
 
@@ -42,7 +40,7 @@ export function Mensalidades() {
   const isMobile = useIsMobile()
 
   const tabParam = searchParams.get('tab')
-  const tab = tabParam === 'comprovantes' || tabParam === 'regras' ? tabParam : 'faturas'
+  const tab = tabParam === 'regras' ? 'regras' : 'faturas'
 
   const handleTabChange = (key: string) => {
     setSearchParams(key === 'faturas' ? {} : { tab: key }, { replace: true })
@@ -136,17 +134,13 @@ export function Mensalidades() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-text">Mensalidades</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {tab === 'comprovantes'
-            ? 'Analise os comprovantes enviados pelos passageiros'
-            : tab === 'regras'
-              ? 'Regras de cobrança e férias'
-              : 'Controle de pagamentos mensais'}
+          {tab === 'regras'
+            ? 'Regras de cobrança e férias'
+            : 'Controle de pagamentos mensais'}
         </p>
       </div>
 
       <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
-
-      {tab === 'comprovantes' && <ComprovantesSection embedded />}
 
       {tab === 'regras' && (
         <Card>

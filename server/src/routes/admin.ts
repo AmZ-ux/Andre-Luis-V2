@@ -122,14 +122,12 @@ router.post('/reset-data', requireSuperAdmin, (req, res) => {
   const superAdminId = req.user?.userId
 
   const tables = [
-    'receipt_history',
     'availability_history',
     'pix_charges',
     'payments',
     'notifications',
     'audit_logs',
     'messages',
-    'receipts',
     'availabilities',
     'monthly_fees',
     'passengers',

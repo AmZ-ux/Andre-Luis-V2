@@ -5,7 +5,6 @@ import { api } from './apiClient'
 import type { LoginCredentials, AuthResponse, User, RegisterCredentials } from '../types/auth'
 import type { Passenger, PassengerFilters, SortState } from '../types/passenger'
 import type { MonthlyFee, MonthlyFeeFilters, MonthlyFeeSort, Payment } from '../types/monthlyFee'
-import type { Receipt, ReceiptFilters } from '../types/receipt'
 import type { Availability } from '../types/availability'
 import type { DashboardData } from '../types/dashboard'
 
@@ -160,38 +159,6 @@ export const realMonthlyFees = {
 
   remove: (id: string) =>
     api.delete<void>(`/monthly-fees/${id}`),
-}
-
-// --- Receipts ---
-export const realReceipts = {
-  list: (filters: ReceiptFilters, page: number, pageSize: number) =>
-    api.get<{ data: Receipt[]; total: number }>('/receipts', { ...filters, page, pageSize }),
-
-  summary: () =>
-    api.get<{ awaiting: number; approved: number; rejected: number; cancelled: number; total: number }>('/receipts/summary'),
-
-  getByPassengerId: (passengerId: string) =>
-    api.get<Receipt[]>(`/receipts/passenger/${passengerId}`),
-
-  getWithHistory: (id: string) =>
-    api.get<{ receipt: Receipt; history: any[] }>(`/receipts/${id}`),
-
-  create: (data: any) => {
-    if (data instanceof FormData) return api.upload<Receipt>('/receipts', data)
-    return api.post<Receipt>('/receipts', data)
-  },
-
-  approve: (id: string, data?: any) =>
-    api.put<Receipt>(`/receipts/${id}/approve`, data),
-
-  reject: (id: string, reason: string) =>
-    api.put<Receipt>(`/receipts/${id}/reject`, { reason }),
-
-  cancel: (id: string, reason: string) =>
-    api.put<Receipt>(`/receipts/${id}/cancel`, { reason }),
-
-  replace: (id: string, data: any) =>
-    api.put<Receipt>(`/receipts/${id}/replace`, data),
 }
 
 // --- Availability ---

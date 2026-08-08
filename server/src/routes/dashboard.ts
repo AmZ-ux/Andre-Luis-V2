@@ -131,7 +131,6 @@ router.get('/', (_req, res) => {
   const totalRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM monthly_fees WHERE status = 'paid'").get() as any).total
   const expectedRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM monthly_fees").get() as any).total
   const pendingRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM monthly_fees WHERE status IN ('pending', 'overdue')").get() as any).total
-  const awaitingReceipts = (db.prepare("SELECT COUNT(*) as c FROM receipts WHERE status = 'awaiting'").get() as any).c
   const av = db.prepare("SELECT COUNT(*) as c FROM availabilities WHERE status = 'active'").get() as any
 
   const receivedPercentage = expectedRevenue > 0 ? Math.round((totalRevenue / expectedRevenue) * 100) : 0
@@ -143,12 +142,6 @@ router.get('/', (_req, res) => {
     ORDER BY mf.updated_at DESC LIMIT 10
   `).all() as any[]
 
-  const recentReceipts = db.prepare(`
-    SELECT r.id, r.passenger_name as person, r.updated_at
-    FROM receipts r WHERE r.status IN ('approved', 'rejected')
-    ORDER BY r.updated_at DESC LIMIT 5
-  `).all() as any[]
-
   const recentAvailabilities = db.prepare(`
     SELECT a.id, a.passenger_name as person, a.updated_at
     FROM availabilities a WHERE a.updated_at IS NOT NULL
@@ -158,9 +151,6 @@ router.get('/', (_req, res) => {
   const allActivities: any[] = []
   for (const p of recentPayments) {
     allActivities.push({ id: `act-pay-${p.id}`, person: p.person, initials: initials(p.person), description: `Pagamento de R$ ${Number(p.amount).toFixed(2)}`, time: p.updated_at || '', type: 'payment' })
-  }
-  for (const r of recentReceipts) {
-    allActivities.push({ id: `act-rec-${r.id}`, person: r.person, initials: initials(r.person), description: 'Comprovante atualizado', time: r.updated_at || '', type: 'document' })
   }
   for (const a of recentAvailabilities) {
     allActivities.push({ id: `act-av-${a.id}`, person: a.person, initials: initials(a.person), description: 'Disponibilidade atualizada', time: a.updated_at || '', type: 'vacation' })
@@ -217,11 +207,10 @@ router.get('/', (_req, res) => {
       { id: '1', title: 'Passageiros Ativos', value: String(activePassengers), description: `de ${totalPassengers} total`, icon: 'Users', change: 0, changeType: 'increase', color: 'primary' },
       { id: '2', title: 'Mensalidades Pendentes', value: String(pendingFees), description: `${overdueFees} vencidas`, icon: 'DollarSign', change: 0, changeType: 'decrease', color: 'warning' },
       { id: '3', title: 'Receita do Mês', value: `R$ ${Number(paidThisMonth).toFixed(2)}`, description: `${paidThisMonthCount} mensalidades pagas`, icon: 'TrendingUp', change: 0, changeType: 'increase', color: 'success' },
-      { id: '4', title: 'Comprovantes Pendentes', value: String(awaitingReceipts), description: 'aguardando revisão', icon: 'FileText', change: 0, changeType: 'increase', color: 'error' },
-      { id: '5', title: 'Em Férias', value: String(av.c), description: 'atualmente', icon: 'Plane', change: 0, changeType: 'increase', color: 'info' },
-      { id: '6', title: 'Taxa de Adimplência', value: `${receivedPercentage}%`, description: 'geral', icon: 'CheckCircle', change: 0, changeType: 'increase', color: 'success' },
-      { id: '7', title: 'Receita Prevista', value: `R$ ${expectedRevenue.toFixed(2)}`, description: 'total esperado', icon: 'Calendar', change: 0, changeType: 'increase', color: 'primary' },
-      { id: '8', title: 'Receita Realizada', value: `R$ ${totalRevenue.toFixed(2)}`, description: 'total recebido', icon: 'BarChart3', change: 0, changeType: 'increase', color: 'success' },
+      { id: '4', title: 'Em Férias', value: String(av.c), description: 'atualmente', icon: 'Plane', change: 0, changeType: 'increase', color: 'info' },
+      { id: '5', title: 'Taxa de Adimplência', value: `${receivedPercentage}%`, description: 'geral', icon: 'CheckCircle', change: 0, changeType: 'increase', color: 'success' },
+      { id: '6', title: 'Receita Prevista', value: `R$ ${expectedRevenue.toFixed(2)}`, description: 'total esperado', icon: 'Calendar', change: 0, changeType: 'increase', color: 'primary' },
+      { id: '7', title: 'Receita Realizada', value: `R$ ${totalRevenue.toFixed(2)}`, description: 'total recebido', icon: 'BarChart3', change: 0, changeType: 'increase', color: 'success' },
     ],
     recentActivities: allActivities.slice(0, 10),
     upcomingPayments,

@@ -7,12 +7,11 @@ export type Permission =
   | 'settings'
   | 'profile'
   | 'communication'
-  | 'myReceipts'
   | 'myAvailability'
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: ['dashboard', 'passengers', 'payments', 'settings', 'profile', 'communication'],
-  passenger: ['dashboard', 'myReceipts', 'myAvailability', 'profile'],
+  passenger: ['dashboard', 'myAvailability', 'profile'],
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {

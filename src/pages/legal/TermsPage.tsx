@@ -12,7 +12,7 @@ const sections: TermsSection[] = [
   {
     title: '1. Aceitação dos Termos',
     paragraphs: [
-      'Estes Termos de Uso ("Termos") regulam o acesso e a utilização da plataforma digital da Transporte André Luis ("Transporte André Luis", "nós" ou "nós"), inscrita sob o CNPJ {cnpj}, com sede em {cidadeUf}, destinada à gestão de mensalidades, disponibilidade, comprovantes de pagamento e comunicação entre a empresa e os passageiros.',
+      'Estes Termos de Uso ("Termos") regulam o acesso e a utilização da plataforma digital da Transporte André Luis ("Transporte André Luis", "nós" ou "nós"), inscrita sob o CNPJ {cnpj}, com sede em {cidadeUf}, destinada à gestão de mensalidades, disponibilidade e comunicação entre a empresa e os passageiros.',
       'Ao criar uma conta ou utilizar os serviços, você declara ter lido, compreendido e aceitado integralmente estes Termos e a Política de Privacidade, em conformidade com a Lei nº 13.709/2018 (LGPD) e demais legislações aplicáveis. Caso não concorde com qualquer disposição, não utilize os serviços.',
     ],
   },
@@ -24,7 +24,6 @@ const sections: TermsSection[] = [
     items: [
       'Acompanhamento de mensalidades, vencimentos e status de pagamento;',
       'Pagamento de mensalidades via PIX ou cartão de crédito, processados pelo Mercado Pago;',
-      'Envio e acompanhamento de comprovantes de pagamento;',
       'Registro de períodos de disponibilidade/ausência (férias, viagens, etc.);',
       'Recebimento de comunicações da empresa, inclusive por WhatsApp;',
       'Acompanhamento de notificações e avisos relevantes.',
@@ -46,7 +45,6 @@ const sections: TermsSection[] = [
       'A mensalidade é gerada mensalmente conforme a data de início do contrato informada no cadastro;',
       'Os pagamentos via PIX e cartão de crédito são processados pelo Mercado Pago, que atua como operador de pagamento, sujeito às próprias políticas e regulamentos;',
       'A confirmação do pagamento via PIX/cartão é verificada eletronicamente junto ao Mercado Pago;',
-      'Comprovantes de pagamento em espécie, transferência ou cartão podem ser enviados pela plataforma para validação da empresa;',
       'A Transporte André Luis não se responsabiliza por falhas na operação do Mercado Pago ou de qualquer outro provedor externo;',
       'O não pagamento da mensalidade poderá implicar a suspensão do serviço de transporte, nos termos do contrato de transporte firmado entre as partes.',
     ],
@@ -75,14 +73,12 @@ const sections: TermsSection[] = [
       'Não acessar, alterar ou utilizar dados de terceiros sem autorização;',
       'Não tentar burlar mecanismos de segurança, autenticação ou pagamento;',
       'Não divulgar dados ou informações de outros passageiros;',
-      'Enviar comprovantes de pagamento legítimos e referentes às próprias mensalidades.',
     ],
   },
   {
     title: '8. Condutas proibidas',
     items: [
       'Utilizar a plataforma para fins ilegais, fraudulentos ou não autorizados;',
-      'Falsificar comprovantes de pagamento ou qualquer documento;',
       'Realizar engenharia reversa, extração ou scraping de dados;',
       'Interferir na disponibilidade ou integridade do sistema;',
       'Causar danos a terceiros ou à empresa por meio da plataforma.',

@@ -10,13 +10,11 @@ interface TemplateCardProps {
 }
 
 const categoryLabels: Record<string, string> = {
-  reminder: 'Lembrete', payment: 'Pagamento', receipt_approved: 'Comprovante Aprovado',
-  receipt_rejected: 'Comprovante Rejeitado', vacation_return: 'Retorno Férias', welcome: 'Boas-vindas', custom: 'Personalizado',
+  reminder: 'Lembrete', payment: 'Pagamento', vacation_return: 'Retorno Férias', welcome: 'Boas-vindas', custom: 'Personalizado',
 }
 
 const categoryColors: Record<string, string> = {
   reminder: 'bg-warning/10 text-warning', payment: 'bg-success/10 text-success',
-  receipt_approved: 'bg-primary/10 text-primary', receipt_rejected: 'bg-error/10 text-error',
   vacation_return: 'bg-purple-500/10 text-purple-500', welcome: 'bg-blue-500/10 text-blue-500', custom: 'bg-gray-100 dark:bg-gray-800 text-gray-500',
 }
 

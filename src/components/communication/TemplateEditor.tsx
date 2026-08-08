@@ -10,8 +10,6 @@ import { X, Variable, Save } from 'lucide-react'
 const categoryOptions = [
   { value: 'reminder', label: 'Lembrete' },
   { value: 'payment', label: 'Pagamento' },
-  { value: 'receipt_approved', label: 'Comprovante Aprovado' },
-  { value: 'receipt_rejected', label: 'Comprovante Rejeitado' },
   { value: 'vacation_return', label: 'Retorno de Férias' },
   { value: 'welcome', label: 'Boas-vindas' },
   { value: 'custom', label: 'Personalizado' },

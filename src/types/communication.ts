@@ -5,7 +5,7 @@ export type ChannelType = 'app' | 'whatsapp' | 'email' | 'sms' | 'push'
 export type ChannelStatusValue = 'connected' | 'disconnected' | 'configuring' | 'error'
 export type NotificationStatus = 'unread' | 'read' | 'favorite' | 'archived'
 export type RecipientFilter = 'individual' | 'city' | 'institution' | 'company' | 'transportType' | 'status' | 'all'
-export type TemplateCategory = 'reminder' | 'payment' | 'receipt_approved' | 'receipt_rejected' | 'vacation_return' | 'welcome' | 'custom'
+export type TemplateCategory = 'reminder' | 'payment' | 'vacation_return' | 'welcome' | 'custom'
 
 export interface Recipient {
   type: RecipientFilter
@@ -80,7 +80,6 @@ export interface NotificationPreferences {
   reminders: boolean
   messageTypes: {
     payment: boolean
-    receipt: boolean
     availability: boolean
     system: boolean
     promotional: boolean

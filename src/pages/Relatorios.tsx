@@ -20,7 +20,6 @@ const categoryIcons: Record<ReportCategory, React.ComponentType<{ className?: st
   financial: BarChart3,
   passengers: TrendingUp,
   availability: Activity,
-  receipts: Filter,
   custom: PieChart,
 }
 
@@ -36,7 +35,6 @@ const chartTypeMap: Record<string, ChartType> = {
   'passengers-by-institution': 'bar',
   'passengers-by-type': 'pie',
   'availability-overview': 'bar',
-  'receipts-overview': 'donut',
 }
 
 export function Relatorios({ embedded = false }: { embedded?: boolean }) {

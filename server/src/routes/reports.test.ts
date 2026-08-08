@@ -60,7 +60,6 @@ describe('GET /api/reports/overview', () => {
     expect(res.body.financial.totalRecebido).toBe(0)
     expect(res.body.financial.monthlyBreakdown).toHaveLength(12)
     expect(res.body.passengers.total).toBe(0)
-    expect(res.body.receipts.total).toBe(0)
     expect(res.body.availability.total).toBe(0)
   })
 

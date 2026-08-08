@@ -1,6 +1,6 @@
 import type { TransportType, PaymentMethod } from './passenger'
 
-export type ReportCategory = 'financial' | 'passengers' | 'availability' | 'receipts' | 'custom'
+export type ReportCategory = 'financial' | 'passengers' | 'availability' | 'custom'
 export type ReportPeriod = 'month' | 'year' | 'custom'
 export type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'donut'
 
@@ -72,17 +72,6 @@ export interface PassengerReportData {
   byTransportType: { type: string; count: number }[]
 }
 
-export interface ReceiptReportData {
-  aprovados: number
-  rejeitados: number
-  pendentes: number
-  cancelados: number
-  total: number
-  tempoMedioAprovacao: string
-  byStatus: { status: string; count: number }[]
-  byMonth: { month: string; count: number }[]
-}
-
 export interface AvailabilityReportData {
   active: number
   scheduled: number
@@ -97,6 +86,5 @@ export const REPORT_CATEGORIES: { key: ReportCategory; label: string }[] = [
   { key: 'financial', label: 'Financeiro' },
   { key: 'passengers', label: 'Passageiros' },
   { key: 'availability', label: 'Disponibilidade' },
-  { key: 'receipts', label: 'Comprovantes' },
   { key: 'custom', label: 'Personalizados' },
 ]

@@ -14,7 +14,6 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js'
 import authRoutes from './routes/auth.js'
 import passengerRoutes from './routes/passengers.js'
 import monthlyFeeRoutes from './routes/monthlyFees.js'
-import receiptRoutes from './routes/receipts.js'
 import availabilityRoutes from './routes/availability.js'
 import dashboardRoutes from './routes/dashboard.js'
 import communicationRoutes from './routes/communication.js'
@@ -90,7 +89,6 @@ app.use('/api/client-error', clientErrorRoutes)
 // Protected routes
 app.use('/api/passengers', authMiddleware, passengerRoutes)
 app.use('/api/monthly-fees', authMiddleware, monthlyFeeRoutes)
-app.use('/api/receipts', authMiddleware, receiptRoutes)
 app.use('/api/availability', authMiddleware, availabilityRoutes)
 app.use('/api/dashboard', authMiddleware, dashboardRoutes)
 app.use('/api/communication', authMiddleware, communicationRoutes)

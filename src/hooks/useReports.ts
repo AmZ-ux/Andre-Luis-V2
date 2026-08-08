@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { financialAnalytics } from '../services/financialAnalytics'
 import { passengerAnalytics } from '../services/passengerAnalytics'
-import { receiptAnalytics } from '../services/receiptAnalytics'
 import { availabilityAnalytics } from '../services/availabilityAnalytics'
 import type {
   ReportCard,
@@ -9,7 +8,6 @@ import type {
   ReportData,
   FinancialSummary,
   PassengerReportData,
-  ReceiptReportData,
   AvailabilityReportData,
 } from '../types/reports'
 
@@ -40,7 +38,6 @@ const reportCards: ReportCard[] = [
   { id: 'passengers-by-institution', title: 'Por Instituição', description: 'Passageiros por instituição de ensino', category: 'passengers', icon: 'School', available: true },
   { id: 'passengers-by-type', title: 'Por Tipo de Transporte', description: 'Distribuição por tipo de transporte', category: 'passengers', icon: 'Bus', available: true },
   { id: 'availability-overview', title: 'Períodos de Ausência', description: 'Visão geral de disponibilidade', category: 'availability', icon: 'CalendarOff', available: true },
-  { id: 'receipts-overview', title: 'Comprovantes', description: 'Análise de comprovantes', category: 'receipts', icon: 'FileCheck', available: true },
 ]
 
 export function useReports() {
@@ -51,22 +48,19 @@ export function useReports() {
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null)
   const [passengerData, setPassengerData] = useState<PassengerReportData | null>(null)
-  const [receiptData, setReceiptData] = useState<ReceiptReportData | null>(null)
   const [availabilityData, setAvailabilityData] = useState<AvailabilityReportData | null>(null)
   const [search, setSearch] = useState('')
 
   const loadAllData = useCallback(async () => {
     setLoading(true)
     try {
-      const [fin, pass, rec, av] = await Promise.all([
+      const [fin, pass, av] = await Promise.all([
         financialAnalytics.getSummary(),
         passengerAnalytics.getReportData(),
-        receiptAnalytics.getReportData(),
         availabilityAnalytics.getReportData(),
       ])
       setFinancialSummary(fin)
       setPassengerData(pass)
-      setReceiptData(rec)
       setAvailabilityData(av)
     } catch {
       setError('Erro ao carregar dados dos relatórios')
@@ -238,26 +232,6 @@ export function useReports() {
           }
           break
         }
-        case 'receipts-overview': {
-          const r = await receiptAnalytics.getReportData()
-          data = {
-            title: 'Análise de Comprovantes',
-            indicators: [
-              { label: 'Aprovados', value: String(r.aprovados) },
-              { label: 'Rejeitados', value: String(r.rejeitados) },
-              { label: 'Pendentes', value: String(r.pendentes) },
-              { label: 'Cancelados', value: String(r.cancelados) },
-              { label: 'Tempo médio', value: r.tempoMedioAprovacao },
-            ],
-            chartData: r.byStatus,
-            tableColumns: [
-              { key: 'status', label: 'Status' },
-              { key: 'count', label: 'Quantidade', align: 'right' },
-            ],
-            tableData: r.byStatus,
-          }
-          break
-        }
       }
 
       setReportData(data)
@@ -284,7 +258,6 @@ export function useReports() {
     filters,
     financialSummary,
     passengerData,
-    receiptData,
     availabilityData,
     reportData,
     search,

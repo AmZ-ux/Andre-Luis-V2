@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
 import { passengerService } from '../services/passengerService'
 import { monthlyFeeService } from '../services/monthlyFeeService'
-import { receiptService } from '../services/receiptService'
 import { availabilityService } from '../services/availabilityService'
 import { calculateStatus } from '../services/statusCalculator'
 import { FeeCheckoutModal } from '../components/monthlyFees/FeeCheckoutModal'
@@ -17,13 +16,10 @@ import {
   CalendarOff,
   CheckCircle2,
   Clock,
-  FileText,
-  Receipt as ReceiptIcon,
   Wallet,
 } from 'lucide-react'
 import type { Passenger } from '../types/passenger'
 import type { MonthlyFee, MonthlyFeeStatus } from '../types/monthlyFee'
-import type { Receipt, ReceiptStatus } from '../types/receipt'
 import type { Availability } from '../types/availability'
 
 const MONTH_NAMES = [
@@ -57,20 +53,6 @@ const feeStatusVariant: Record<MonthlyFeeStatus, 'success' | 'warning' | 'error'
   exempt: 'neutral',
 }
 
-const receiptStatusLabel: Record<ReceiptStatus, string> = {
-  awaiting: 'Em análise',
-  approved: 'Aprovado',
-  rejected: 'Reprovado',
-  cancelled: 'Cancelado',
-}
-
-const receiptStatusVariant: Record<ReceiptStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
-  awaiting: 'warning',
-  approved: 'success',
-  rejected: 'error',
-  cancelled: 'neutral',
-}
-
 function parseBRDate(dateStr: string): Date {
   const [day, month, year] = dateStr.split('/').map(Number)
   return new Date(year, month - 1, day)
@@ -97,7 +79,6 @@ export function PassengerDashboard() {
   const navigate = useNavigate()
   const [passenger, setPassenger] = useState<Passenger | null>(null)
   const [fees, setFees] = useState<MonthlyFee[]>([])
-  const [receipts, setReceipts] = useState<Receipt[]>([])
   const [availabilities, setAvailabilities] = useState<Availability[]>([])
   const [checkoutFee, setCheckoutFee] = useState<MonthlyFee | null>(null)
   const [loading, setLoading] = useState(true)
@@ -107,15 +88,13 @@ export function PassengerDashboard() {
     setLoading(true)
     try {
       try { await monthlyFeeService.ensureCurrent() } catch {}
-      const [passengerData, feeData, receiptData, availabilityData] = await Promise.all([
+      const [passengerData, feeData, availabilityData] = await Promise.all([
         passengerService.getById(user.id),
         monthlyFeeService.getByPassengerId(user.id),
-        receiptService.getByPassengerId(user.id),
         availabilityService.getByPassengerId(user.id),
       ])
       setPassenger(passengerData)
       setFees(feeData)
-      setReceipts(receiptData)
       setAvailabilities(availabilityData)
     } finally {
       setLoading(false)
@@ -148,10 +127,6 @@ export function PassengerDashboard() {
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
     .slice(0, 3)
 
-  const recentReceipts = [...receipts]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 3)
-
   const contractDate = passenger?.contractStartDate
     ? formatISOToBR(passenger.contractStartDate)
     : passenger?.createdAt || user.createdAt
@@ -169,13 +144,6 @@ export function PassengerDashboard() {
           <p className="text-sm text-gray-500 mt-1 capitalize">{todayLabel}</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            icon={<ReceiptIcon className="h-4 w-4" />}
-            onClick={() => navigate('/meus-comprovantes')}
-          >
-            Enviar comprovante
-          </Button>
           <Button
             variant="secondary"
             icon={<CalendarOff className="h-4 w-4" />}
@@ -254,9 +222,6 @@ export function PassengerDashboard() {
                     Mensalidade prevista: {formatBR(expectedFee)} · vence no dia {passenger.dueDay}
                   </p>
                 )}
-                <Button variant="secondary" className="mt-4" onClick={() => navigate('/meus-comprovantes')}>
-                  Ver meus comprovantes
-                </Button>
               </div>
             )}
           </Card>
@@ -321,7 +286,7 @@ export function PassengerDashboard() {
                 <h2 className="text-sm font-bold text-text">Minhas mensalidades</h2>
               </div>
               <button
-                onClick={() => navigate('/meus-comprovantes')}
+                onClick={() => navigate('/minhas-mensalidades')}
                 className="text-xs font-medium text-primary hover:underline"
               >
                 Ver tudo
@@ -382,41 +347,6 @@ export function PassengerDashboard() {
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5 truncate">{av.reason}</p>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                <h2 className="text-sm font-bold text-text">Comprovantes</h2>
-              </div>
-              <button
-                onClick={() => navigate('/meus-comprovantes')}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Ver tudo
-              </button>
-            </div>
-
-            {recentReceipts.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-6">Nenhum comprovante enviado</p>
-            ) : (
-              <ul className="space-y-3">
-                {recentReceipts.map((receipt) => (
-                  <li key={receipt.id} className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-text truncate">{receipt.fileName}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {String(receipt.month).padStart(2, '0')}/{receipt.year} · {formatBR(receipt.amount)}
-                      </p>
-                    </div>
-                    <Badge variant={receiptStatusVariant[receipt.status]}>
-                      {receiptStatusLabel[receipt.status]}
-                    </Badge>
                   </li>
                 ))}
               </ul>

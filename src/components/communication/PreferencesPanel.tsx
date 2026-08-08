@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import {
   Bell, BellOff, Volume2, VolumeX, CalendarClock,
-  DollarSign, FileCheck, CalendarOff, Settings, Megaphone,
+  DollarSign, CalendarOff, Settings, Megaphone,
   Check, X,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
@@ -59,7 +59,6 @@ export function PreferencesPanel({ preferences, onUpdate }: PreferencesPanelProp
         <h3 className="text-sm font-semibold text-text mb-3">Tipos de Mensagem</h3>
         <div className="space-y-2">
           <ToggleRow icon={DollarSign} label="Pagamentos" description="Confirmações e lembretes de pagamento" checked={preferences.messageTypes.payment} onChange={() => toggle('payment')} />
-          <ToggleRow icon={FileCheck} label="Comprovantes" description="Aprovação e rejeição de comprovantes" checked={preferences.messageTypes.receipt} onChange={() => toggle('receipt')} />
           <ToggleRow icon={CalendarOff} label="Disponibilidade" description="Alterações de disponibilidade" checked={preferences.messageTypes.availability} onChange={() => toggle('availability')} />
           <ToggleRow icon={Settings} label="Sistema" description="Atualizações do sistema" checked={preferences.messageTypes.system} onChange={() => toggle('system')} />
           <ToggleRow icon={Megaphone} label="Promocionais" description="Comunicados e avisos" checked={preferences.messageTypes.promotional} onChange={() => toggle('promotional')} />

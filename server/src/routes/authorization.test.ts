@@ -13,7 +13,6 @@ import dashboardRoutes from '../routes/dashboard.js'
 import passengerRoutes from '../routes/passengers.js'
 import communicationRoutes from '../routes/communication.js'
 import settingsRoutes from '../routes/settings.js'
-import receiptRoutes from '../routes/receipts.js'
 import availabilityRoutes from '../routes/availability.js'
 import monthlyFeeRoutes from '../routes/monthlyFees.js'
 
@@ -26,7 +25,6 @@ app.use('/api/dashboard', authMiddleware, dashboardRoutes)
 app.use('/api/passengers', authMiddleware, passengerRoutes)
 app.use('/api/communication', authMiddleware, communicationRoutes)
 app.use('/api/settings', authMiddleware, settingsRoutes)
-app.use('/api/receipts', authMiddleware, receiptRoutes)
 app.use('/api/availabilities', authMiddleware, availabilityRoutes)
 app.use('/api/monthly-fees', authMiddleware, monthlyFeeRoutes)
 app.use(errorHandler)
@@ -106,26 +104,6 @@ describe('Autorização — passageiro não acessa áreas administrativas', () =
 
   it('communication: push send-all bloqueia passageiro (403)', async () => {
     const res = await request(app).post('/api/communication/push/send-all').set('Authorization', `Bearer ${passengerToken}`).send({ title: 'x', body: 'y' })
-    expect(res.status).toBe(403)
-  })
-
-  it('receipts: listagem geral bloqueia passageiro (403)', async () => {
-    const res = await request(app).get('/api/receipts').set('Authorization', `Bearer ${passengerToken}`)
-    expect(res.status).toBe(403)
-  })
-
-  it('receipts: aprovação de comprovante bloqueia passageiro (403)', async () => {
-    const res = await request(app).put('/api/receipts/qualquer-id/approve').set('Authorization', `Bearer ${passengerToken}`).send({})
-    expect(res.status).toBe(403)
-  })
-
-  it('receipts: rejeição bloqueia passageiro (403)', async () => {
-    const res = await request(app).put('/api/receipts/qualquer-id/reject').set('Authorization', `Bearer ${passengerToken}`).send({})
-    expect(res.status).toBe(403)
-  })
-
-  it('receipts: cancelamento bloqueia passageiro (403)', async () => {
-    const res = await request(app).put('/api/receipts/qualquer-id/cancel').set('Authorization', `Bearer ${passengerToken}`).send({})
     expect(res.status).toBe(403)
   })
 
@@ -215,20 +193,5 @@ describe('Autorização — passageiro não acessa áreas administrativas', () =
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
     expect(res.body[0].passenger_id).toBe(passengerId)
-  })
-
-  it('receipts: passageiro não substitui comprovante de outro (403)', async () => {
-    const db = getDb()
-    const otherId = uuid()
-    const rid = uuid()
-    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
-      .run(otherId, 'Outro', '222.222.222-22', '2000-01-01')
-    db.prepare(`
-      INSERT INTO receipts (id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, file_name, file_type, file_size, file_path, status)
-      VALUES (?, ?, ?, ?, ?, 'university', 8, 2026, 200, 'recibo.pdf', 'application/pdf', 100, '/tmp/x.pdf', 'awaiting')
-    `).run(rid, uuid(), otherId, 'Outro', '222.222.222-22')
-
-    const res = await request(app).put(`/api/receipts/${rid}/replace`).set('Authorization', `Bearer ${passengerToken}`).send({})
-    expect(res.status).toBe(403)
   })
 })

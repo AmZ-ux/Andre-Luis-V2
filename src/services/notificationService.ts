@@ -9,7 +9,6 @@ const defaultPrefs: NotificationPreferences = {
   reminders: true,
   messageTypes: {
     payment: true,
-    receipt: true,
     availability: true,
     system: true,
     promotional: false,

@@ -158,11 +158,9 @@ function getDashboardData(): DashboardData {
     ],
     recentActivities: [
       { id: '1', person: 'João Silva', initials: 'JS', description: 'realizou pagamento da mensalidade', time: timeAgo(new Date(now.getTime() - 5 * 60000)), type: 'payment' },
-      { id: '2', person: 'Maria Santos', initials: 'MS', description: 'enviou comprovante de pagamento', time: timeAgo(new Date(now.getTime() - 25 * 60000)), type: 'document' },
-      { id: '3', person: 'Pedro Alves', initials: 'PA', description: 'solicitou férias por 15 dias', time: timeAgo(new Date(now.getTime() - 2 * 3600000)), type: 'vacation' },
-      { id: '4', person: 'Carlos Lima', initials: 'CL', description: 'foi cadastrado no sistema', time: timeAgo(new Date(now.getTime() - 4 * 3600000)), type: 'register' },
-      { id: '5', person: 'Ana Oliveira', initials: 'AO', description: 'realizou pagamento da mensalidade', time: timeAgo(new Date(now.getTime() - 6 * 3600000)), type: 'payment' },
-      { id: '6', person: 'Lucas Costa', initials: 'LC', description: 'enviou comprovante de pagamento', time: timeAgo(new Date(now.getTime() - 8 * 3600000)), type: 'document' },
+      { id: '2', person: 'Pedro Alves', initials: 'PA', description: 'solicitou férias por 15 dias', time: timeAgo(new Date(now.getTime() - 2 * 3600000)), type: 'vacation' },
+      { id: '3', person: 'Carlos Lima', initials: 'CL', description: 'foi cadastrado no sistema', time: timeAgo(new Date(now.getTime() - 4 * 3600000)), type: 'register' },
+      { id: '4', person: 'Ana Oliveira', initials: 'AO', description: 'realizou pagamento da mensalidade', time: timeAgo(new Date(now.getTime() - 6 * 3600000)), type: 'payment' },
     ],
     upcomingPayments: [
       { id: '1', name: 'Fernanda Souza', initials: 'FS', dueDate: '28/07/2026', value: 180, daysRemaining: 3 },
@@ -174,9 +172,8 @@ function getDashboardData(): DashboardData {
     notifications: [
       { id: '1', title: 'Pagamento recebido', message: 'João Silva pagou a mensalidade de Julho', time: timeAgo(new Date(now.getTime() - 10 * 60000)), type: 'payment', read: false },
       { id: '2', title: 'Mensalidade vencendo', message: 'Fernanda Souza vence em 3 dias', time: timeAgo(new Date(now.getTime() - 30 * 60000)), type: 'due', read: false },
-      { id: '3', title: 'Comprovante enviado', message: 'Marina Santos enviou novo comprovante', time: timeAgo(new Date(now.getTime() - 2 * 3600000)), type: 'document', read: false },
-      { id: '4', title: 'Mensalidade atrasada', message: 'Carlos Eduardo está com 15 dias de atraso', time: timeAgo(new Date(now.getTime() - 5 * 3600000)), type: 'due', read: true },
-      { id: '5', title: 'Sistema atualizado', message: 'Nova versão disponível com melhorias', time: timeAgo(new Date(now.getTime() - 24 * 3600000)), type: 'system', read: true },
+      { id: '3', title: 'Mensalidade atrasada', message: 'Carlos Eduardo está com 15 dias de atraso', time: timeAgo(new Date(now.getTime() - 5 * 3600000)), type: 'due', read: true },
+      { id: '4', title: 'Sistema atualizado', message: 'Nova versão disponível com melhorias', time: timeAgo(new Date(now.getTime() - 24 * 3600000)), type: 'system', read: true },
     ],
     chartData: baseChartData['30d'],
   }

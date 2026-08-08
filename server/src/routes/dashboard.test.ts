@@ -72,7 +72,7 @@ describe('GET /api/dashboard', () => {
     expect(res.body).toHaveProperty('chartData')
     expect(res.body.financialSummary.expectedRevenue).toBe(0)
     expect(res.body.financialSummary.receivedRevenue).toBe(0)
-    expect(res.body.statistics).toHaveLength(8)
+    expect(res.body.statistics).toHaveLength(7)
   })
 
   it('should reflect active passengers count', async () => {
@@ -93,21 +93,6 @@ describe('GET /api/dashboard', () => {
     const pendingStat = res.body.statistics.find((s: any) => s.id === '2')
     expect(pendingStat).toBeTruthy()
     expect(Number(pendingStat.value)).toBeGreaterThanOrEqual(1)
-  })
-
-  it('should include pending receipts count', async () => {
-    const pid = seedPassenger()
-    const mfid = seedMonthlyFee(pid, { status: 'pending', month: 7, year: 2026 })
-    const db = getDb()
-    db.prepare(`
-      INSERT INTO receipts (id, monthly_fee_id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, file_name, file_type, file_size, file_data, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 'awaiting')
-    `).run(uuid(), mfid, pid, 'Test Passenger', '111.111.111-11', 'university', 7, 2026, 189.90, 'receipt.pdf', 'application/pdf', 1024)
-    const res = await request(app).get('/api/dashboard').set('Authorization', `Bearer ${token}`)
-    expect(res.status).toBe(200)
-    const receiptsStat = res.body.statistics.find((s: any) => s.id === '4')
-    expect(receiptsStat).toBeTruthy()
-    expect(Number(receiptsStat.value)).toBe(1)
   })
 
   it('should include chart data with 12 months', async () => {
