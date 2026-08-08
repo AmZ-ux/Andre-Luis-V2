@@ -338,9 +338,9 @@ export function ProfilePage() {
                 icon={<UserMinus className="h-4 w-4" />}
                 onClick={() => {
                   if (openFees > 0) {
-                    addToast('error', openFees === 1
-                      ? 'Você possui 1 mensalidade em aberto. Regularize o pagamento antes de encerrar o contrato.'
-                      : `Você possui ${openFees} mensalidades em aberto. Regularize os pagamentos antes de encerrar o contrato.`)
+                    addToast('error', 'Mensalidades em aberto', openFees === 1
+                      ? 'Regularize o pagamento para encerrar o contrato.'
+                      : `Regularize os pagamentos (${openFees} mensalidades) para encerrar o contrato.`)
                     return
                   }
                   setShowEndContract(true)
