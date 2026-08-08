@@ -7,6 +7,7 @@ import { loadSettings } from '../services/settingsService.js'
 import { signToken, authMiddleware } from '../middleware/auth.js'
 import { validateBody } from '../middleware/validation.js'
 import { sendEmail, emailDisabled } from '../services/emailService.js'
+import { notifyAdmins } from '../services/notificationService.js'
 import { logger } from '../utils/logger.js'
 
 const router = Router()
@@ -156,11 +157,15 @@ router.get('/me', authMiddleware, (req, res) => {
   const db = getDb()
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.userId) as any
   if (!user) { res.status(404).json({ error: 'Usuário não encontrado' }); return }
+  const passenger = req.user.role === 'passenger'
+    ? db.prepare('SELECT status FROM passengers WHERE id = ?').get(req.user.userId) as any
+    : undefined
   res.json({
     id: user.id, name: user.name, email: user.email, cpf: user.cpf,
     phone: user.phone, photo: user.photo, role: user.role,
     superAdmin: !!user.super_admin,
     emailVerified: !!user.email_verified,
+    contractStatus: passenger ? passenger.status : undefined,
     createdAt: user.created_at, lastAccess: user.last_access,
   })
 })
@@ -306,6 +311,52 @@ router.post('/verify-email/confirm', authMiddleware, validateBody('code'), (req,
 
   db.prepare('UPDATE users SET email_verified = 1, verify_token = NULL, verify_token_expires = NULL WHERE id = ?').run(user.id)
   res.json({ success: true })
+})
+
+router.post('/end-contract', authMiddleware, (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  if (req.user.role !== 'passenger') {
+    res.status(403).json({ error: 'Apenas passageiros podem encerrar o próprio contrato' })
+    return
+  }
+
+  const db = getDb()
+  const passenger = db.prepare('SELECT * FROM passengers WHERE id = ?').get(req.user.userId) as any
+  if (!passenger) {
+    res.status(404).json({ error: 'Passageiro não encontrado' })
+    return
+  }
+  if (passenger.status === 'inactive') {
+    res.status(400).json({ error: 'Seu contrato já está encerrado' })
+    return
+  }
+  if (passenger.status === 'blocked') {
+    res.status(400).json({ error: 'Contratos bloqueados devem ser encerrados pela administração' })
+    return
+  }
+
+  db.prepare("UPDATE passengers SET status = 'inactive', updated_at = datetime('now') WHERE id = ?").run(req.user.userId)
+
+  // Cancela mensalidades em aberto e cobranças PIX pendentes para não gerar novos lembretes
+  const fees = db.prepare("SELECT id FROM monthly_fees WHERE passenger_id = ? AND status IN ('pending', 'overdue')").all(req.user.userId) as any[]
+  for (const fee of fees) {
+    db.prepare("UPDATE monthly_fees SET status = 'cancelled', cancellation_reason = 'Contrato encerrado pelo passageiro', updated_at = datetime('now') WHERE id = ?").run(fee.id)
+    db.prepare("UPDATE pix_charges SET status = 'cancelled', updated_at = datetime('now') WHERE monthly_fee_id = ? AND status = 'pending'").run(fee.id)
+  }
+
+  const user = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(req.user.userId) as any
+  notifyAdmins(
+    db,
+    'Contrato encerrado',
+    `${user.name} (${user.email}) encerrou o contrato${fees.length > 0 ? ` — ${fees.length} mensalidade(s) em aberto foram canceladas` : ''}.`,
+    { type: 'warning', link: `/passageiros/${req.user.userId}` }
+  )
+
+  db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(uuid(), 'contract_end', `Passageiro encerrou o contrato${fees.length > 0 ? ` (${fees.length} mensalidades canceladas)` : ''}`, user.name, 'passenger', 'contract')
+
+  logger.info({ userId: req.user.userId, cancelledFees: fees.length }, 'Contract ended by passenger')
+  res.json({ success: true, status: 'inactive', cancelledFees: fees.length })
 })
 
 router.put('/change-password', authMiddleware, (req, res) => {

@@ -5,6 +5,7 @@ import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { PageSpinner } from '../../components/ui/Spinner'
 import { Badge } from '../../components/ui/Badge'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { ThemeCustomizer } from '../../components/settings/ThemeCustomizer'
 import { useNavigate } from 'react-router-dom'
 import { useInstallPrompt } from '../../hooks/useInstallPrompt'
@@ -14,14 +15,14 @@ import { UserAvatar } from '../../components/auth/UserAvatar'
 import { getRoleLabel } from '../../constants/permissions'
 import {
   Lock, LogOut, Pencil, X, Check, Mail, Phone, CreditCard, Calendar, Clock,
-  Download, ShieldCheck, ShieldAlert, KeyRound,
+  Download, ShieldCheck, ShieldAlert, KeyRound, UserMinus, CheckCircle2,
 } from 'lucide-react'
 import { formatPhone } from '../../validators/passengerValidators'
 import { validatePhone } from '../../utils/validators'
 
 export function ProfilePage() {
   const {
-    user, isLoading, logout, updateProfile, sendVerificationEmail, confirmVerificationEmail,
+    user, isLoading, logout, updateProfile, sendVerificationEmail, confirmVerificationEmail, endContract,
   } = useAuth()
   const { canInstall, install } = useInstallPrompt()
   const { addToast } = useToast()
@@ -34,10 +35,12 @@ export function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [codeSent, setCodeSent] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [showEndContract, setShowEndContract] = useState(false)
+  const [endingContract, setEndingContract] = useState(false)
   const [demoCode, setDemoCode] = useState<string | undefined>(undefined)
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState(false)
 
   if (isLoading || !user) {
     return <PageSpinner />
@@ -105,6 +108,18 @@ export function ProfilePage() {
       setCodeError(err instanceof Error ? err.message : 'Código incorreto')
     } finally {
       setConfirming(false)
+    }
+  }
+
+  const handleEndContract = async () => {
+    setEndingContract(true)
+    try {
+      await endContract()
+      addToast('success', 'Contrato encerrado! A administração foi notificada.')
+    } catch (err) {
+      addToast('error', err instanceof Error ? err.message : 'Erro ao encerrar contrato')
+    } finally {
+      setEndingContract(false)
     }
   }
 
@@ -302,11 +317,35 @@ export function ProfilePage() {
               Instalar aplicativo
             </Button>
           )}
+          {user.role === 'passenger' &&
+            (user.contractStatus === 'inactive' ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success py-2">
+                <CheckCircle2 className="h-4 w-4" /> Seu contrato está encerrado
+              </span>
+            ) : (
+              <Button
+                variant="danger"
+                icon={<UserMinus className="h-4 w-4" />}
+                onClick={() => setShowEndContract(true)}
+              >
+                Encerrar contrato
+              </Button>
+            ))}
           <Button variant="ghost" icon={<LogOut className="h-4 w-4" />} onClick={logout}>
             Sair da conta
           </Button>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={showEndContract}
+        onClose={() => setShowEndContract(false)}
+        onConfirm={handleEndContract}
+        title="Encerrar contrato"
+        message="Tem certeza? Seu contrato será encerrado, as mensalidades em aberto serão canceladas e a administração será notificada. Esta ação não pode ser desfeita."
+        confirmLabel={endingContract ? 'Encerrando...' : 'Encerrar contrato'}
+        variant="danger"
+      />
     </div>
   )
 }

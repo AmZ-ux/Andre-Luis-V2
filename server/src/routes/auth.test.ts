@@ -467,3 +467,92 @@ describe('POST /api/auth/reset-password', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('POST /api/auth/end-contract', () => {
+  async function registerPassenger(email: string, cpf: string): Promise<{ token: string; id: string }> {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Passageiro Encerrar', email, cpf, password: 'Test@123' })
+    expect(res.status).toBe(201)
+    return { token: res.body.token, id: res.body.user.id }
+  }
+
+  it('should end the contract, cancel open fees and notify admins', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const { getAdminToken } = await import('./testUtils.js')
+    getAdminToken() // garante que existe um admin para receber a notificação
+    const adminId = (db.prepare('SELECT id FROM users WHERE email = ?').get('admin-comum@teste.com') as any)?.id
+
+    const { token, id } = await registerPassenger('encerrar@teste.com', '777.888.999-00')
+
+    // Segunda mensalidade pendente para verificar cancelamento
+    db.prepare(`
+      INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)
+      VALUES (?, ?, ?, ?, 'university', '', '', 9, 2026, 189.9, 5, '05/09/2026', 'pending')
+    `).run('fee-encerrar-2', id, 'Passageiro Encerrar', '777.888.999-00')
+
+    const res = await request(app)
+      .post('/api/auth/end-contract')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.status).toBe('inactive')
+
+    const passenger = db.prepare('SELECT status FROM passengers WHERE id = ?').get(id) as { status: string }
+    expect(passenger.status).toBe('inactive')
+
+    const fees = db.prepare("SELECT status, cancellation_reason FROM monthly_fees WHERE passenger_id = ? AND status = 'cancelled'").all(id) as any[]
+    expect(fees.length).toBe(2)
+    expect(fees[0].cancellation_reason).toBe('Contrato encerrado pelo passageiro')
+
+    expect(res.body.cancelledFees).toBe(2)
+
+    if (adminId) {
+      const notif = db.prepare("SELECT title, type FROM notifications WHERE user_id = ? AND title = 'Contrato encerrado'").get(adminId) as { title: string; type: string }
+      expect(notif).toBeDefined()
+      expect(notif.type).toBe('warning')
+    }
+
+    const log = db.prepare("SELECT action FROM app_logs WHERE action = 'contract_end'").get() as { action: string }
+    expect(log).toBeDefined()
+  })
+
+  it('should reject admins', async () => {
+    const { getAdminToken } = await import('./testUtils.js')
+    const res = await request(app)
+      .post('/api/auth/end-contract')
+      .set('Authorization', `Bearer ${getAdminToken()}`)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toContain('Apenas passageiros')
+  })
+
+  it('should reject when contract is already inactive', async () => {
+    const { token } = await registerPassenger('encerrar2@teste.com', '333.444.555-66')
+    await request(app).post('/api/auth/end-contract').set('Authorization', `Bearer ${token}`)
+    const res = await request(app).post('/api/auth/end-contract').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('já está encerrado')
+  })
+
+  it('should reject blocked passengers', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const { token, id } = await registerPassenger('encerrar3@teste.com', '444.555.666-77')
+    db.prepare("UPDATE passengers SET status = 'blocked' WHERE id = ?").run(id)
+    const res = await request(app).post('/api/auth/end-contract').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('bloqueados')
+  })
+
+  it('should return 404 when no passenger record exists', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const { token, id } = await registerPassenger('encerrar4@teste.com', '666.777.888-99')
+    db.prepare('DELETE FROM passengers WHERE id = ?').run(id)
+    const res = await request(app).post('/api/auth/end-contract').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
+  })
+
+  it('should require authentication', async () => {
+    const res = await request(app).post('/api/auth/end-contract')
+    expect(res.status).toBe(401)
+  })
+})

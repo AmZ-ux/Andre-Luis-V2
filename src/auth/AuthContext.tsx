@@ -14,6 +14,7 @@ interface AuthContextType extends AuthState {
   updateProfile: (data: { name?: string; phone?: string; email?: string }) => Promise<User>
   sendVerificationEmail: () => Promise<{ demoCode?: string }>
   confirmVerificationEmail: (code: string) => Promise<User>
+  endContract: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -150,6 +151,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [state.user]
   )
 
+  const endContract = useCallback(async () => {
+    if (!state.user) throw new Error('Usuário não autenticado')
+    await authService.endContract(state.user.id)
+    await refreshProfile()
+  }, [state.user, refreshProfile])
+
   useEffect(() => {
     const interval = setInterval(async () => {
       if (state.isAuthenticated) {
@@ -178,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateProfile,
         sendVerificationEmail,
         confirmVerificationEmail,
+        endContract,
       }}
     >
       {children}

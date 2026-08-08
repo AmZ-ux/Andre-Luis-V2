@@ -286,6 +286,24 @@ export const authService = {
     storage.set(SESSION_CONFIG.userListKey, updatedUsers)
   },
 
+  async endContract(userId: string): Promise<void> {
+    if (config.realApi) {
+      await realAuth.endContract()
+      return
+    }
+
+    await delay(600)
+
+    const passenger = await passengerService.getById(userId)
+    if (!passenger) {
+      throw new Error('Passageiro não encontrado')
+    }
+    if (passenger.status === 'inactive') {
+      throw new Error('Seu contrato já está encerrado')
+    }
+    await passengerService.update(userId, { status: 'inactive' })
+  },
+
   async getProfile(userId: string): Promise<User> {
     if (config.realApi) {
       return realAuth.me()
@@ -300,8 +318,14 @@ export const authService = {
       throw new Error('Usuário não encontrado')
     }
 
+    let contractStatus: User['contractStatus']
+    if (user.role === 'passenger') {
+      const passenger = await passengerService.getById(userId)
+      contractStatus = passenger?.status
+    }
+
     const { passwordHash: _, ...safeUser } = user
-    return safeUser
+    return contractStatus ? { ...safeUser, contractStatus } : safeUser
   },
 
   async updateProfile(

@@ -10,6 +10,7 @@ export interface User {
   role: UserRole
   superAdmin?: boolean
   emailVerified?: boolean
+  contractStatus?: 'active' | 'inactive' | 'vacation' | 'blocked'
   createdAt: string
   lastAccess: string
 }
