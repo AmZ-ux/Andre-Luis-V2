@@ -137,4 +137,30 @@ describe('runPaymentReconciliation', () => {
 
     await expect(runPaymentReconciliation()).resolves.toBeUndefined()
   })
+
+  it('should expire charges older than PIX expiry when MP has no payment', async () => {
+    const pid = seedPassenger()
+    const feeId = seedFee(pid)
+    const chargeId = seedCharge(feeId, 25 * 60)
+    mockSearch.mockResolvedValue(null)
+
+    await runPaymentReconciliation()
+
+    const db = getDb()
+    const charge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
+    expect(charge.status).toBe('expired')
+  })
+
+  it('should keep charge pending when MP has no payment but charge is recent', async () => {
+    const pid = seedPassenger()
+    const feeId = seedFee(pid)
+    const chargeId = seedCharge(feeId, 15)
+    mockSearch.mockResolvedValue(null)
+
+    await runPaymentReconciliation()
+
+    const db = getDb()
+    const charge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
+    expect(charge.status).toBe('pending')
+  })
 })

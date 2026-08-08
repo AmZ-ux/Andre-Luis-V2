@@ -124,4 +124,32 @@ describe('GET /api/payments/status', () => {
     expect(res.status).toBe(200)
     expect(res.body.status).toBe('paid')
   })
+
+  it('should return expired when pending charge is older than PIX expiry', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status, created_at)
+      VALUES (?, 'mp-1', ?, 189.90, 'pending', datetime('now', '-25 hours'))
+    `).run(uuid(), fid)
+    const res = await request(app).get('/api/payments/status').set('Authorization', `Bearer ${token}`).query({ monthlyFeeId: fid })
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('expired')
+    const charge = db.prepare('SELECT status FROM pix_charges WHERE monthly_fee_id = ?').get(fid) as any
+    expect(charge.status).toBe('expired')
+  })
+
+  it('should not expire recent pending charges', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    db.prepare(`
+      INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status, created_at)
+      VALUES (?, 'mp-2', ?, 189.90, 'pending', datetime('now', '-2 hours'))
+    `).run(uuid(), fid)
+    const res = await request(app).get('/api/payments/status').set('Authorization', `Bearer ${token}`).query({ monthlyFeeId: fid })
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('pending')
+  })
 })

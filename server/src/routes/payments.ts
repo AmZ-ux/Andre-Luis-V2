@@ -4,6 +4,7 @@ import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
 import { calculateDueFromFee } from '../services/billingRules.js'
 import { finalizePayment, type PaymentMethod } from '../services/paymentService.js'
+import { alertIntegrationIssue } from '../services/integrationAlert.js'
 import {
   MpError,
   createCardPaymentLink,
@@ -97,12 +98,15 @@ paymentsRouter.post('/create', async (req, res) => {
       paymentUrl: preference.init_point,
     })
   } catch (err: any) {
+    const db = getDb()
     if (err instanceof MpError) {
       logger.error({ err: err.message }, 'Falha ao gerar cobrança no Mercado Pago')
+      alertIntegrationIssue(db, 'Mercado Pago', `Falha ao gerar cobrança: ${err.message}`)
       res.status(err.status).json({ error: err.message })
       return
     }
     logger.error({ err: err.message }, 'Falha ao gerar cobrança no Mercado Pago')
+    alertIntegrationIssue(db, 'Mercado Pago', `Falha ao gerar cobrança: ${err.message}`)
     res.status(502).json({ error: `Falha ao gerar cobrança: ${err.message}` })
   }
 })
@@ -120,6 +124,14 @@ paymentsRouter.get('/status', async (req, res) => {
   }
 
   if (fee.status === 'paid') { res.json({ status: 'paid' }); return }
+
+  const expiryHours = Number(process.env.MP_PIX_EXPIRY_HOURS) || 24
+  const activeCharge = db.prepare("SELECT id FROM pix_charges WHERE monthly_fee_id = ? AND status = 'pending' AND created_at <= datetime('now', ?)").get(monthlyFeeId, `-${expiryHours} hours`)
+  if (activeCharge) {
+    db.prepare("UPDATE pix_charges SET status = 'expired', updated_at = datetime('now') WHERE id = ?").run(activeCharge.id)
+    res.json({ status: 'expired' })
+    return
+  }
 
   // Conciliação: consulta o Mercado Pago pelo external_reference (id da mensalidade)
   try {
@@ -140,6 +152,7 @@ paymentsRouter.get('/status', async (req, res) => {
   } catch (err: any) {
     if (err instanceof MpError) {
       logger.error({ err: err.message }, 'Falha ao consultar pagamento no Mercado Pago')
+      alertIntegrationIssue(db, 'Mercado Pago', `Falha ao consultar pagamento: ${err.message}`)
       res.status(err.status).json({ error: `Falha ao consultar o pagamento: ${err.message}` })
       return
     }

@@ -151,13 +151,14 @@ export function useCommunication() {
     }
 
     try {
-      const [msgRes, tplRes, chRes, notifRes, schedRes, unreadRes] = await Promise.all([
+      const [msgRes, tplRes, chRes, notifRes, schedRes, unreadRes, prefsRes] = await Promise.all([
         realCommunication.list(),
         realCommunication.templates(),
         realCommunication.channels(),
         realCommunication.notifications(),
         realCommunication.schedules(),
         realCommunication.unreadCount(),
+        realCommunication.getPreferences(),
       ])
       const msgList = msgRes.map(toMessage)
       setMessages(msgList)
@@ -168,6 +169,10 @@ export function useCommunication() {
       setHistory([])
       setSummary(computeSummary(msgList))
       setUnreadCount(unreadRes.count ?? 0)
+      if (prefsRes?.prefs) setPreferences({ ...notificationService.getPreferences(), ...prefsRes.prefs })
+      if (prefsRes?.channelEnabled) {
+        setChannels((prev) => prev.map((c) => ({ ...c, enabled: prefsRes.channelEnabled[c.type] ?? c.enabled })))
+      }
     } catch {
       setError('Erro ao carregar dados de comunicação')
     } finally {
@@ -301,11 +306,17 @@ export function useCommunication() {
   const updatePreferences = useCallback((prefs: Partial<NotificationPreferences>) => {
     const updated = notificationService.updatePreferences(prefs)
     setPreferences(updated)
+    if (config.realApi) {
+      realCommunication.updatePreferences({ prefs: updated }).catch(() => {})
+    }
   }, [])
 
   const toggleChannel = useCallback((type: ChannelType, enabled: boolean) => {
     channelService.toggleEnabled(type, enabled)
     loadAll()
+    if (config.realApi) {
+      realCommunication.updatePreferences({ channelEnabled: { [type]: enabled } }).catch(() => {})
+    }
   }, [loadAll])
 
   return {

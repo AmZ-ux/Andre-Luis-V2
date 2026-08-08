@@ -35,6 +35,10 @@ export function PixCheckout({ fee, onPaid, onBack, onError }: PixCheckoutProps) 
             onPaid()
             return
           }
+          if (status.status === 'expired') {
+            setExpired(true)
+            return
+          }
           const elapsed = Date.now() - startedAt
           if (elapsed >= POLL_TIMEOUT_MS) {
             setExpired(true)

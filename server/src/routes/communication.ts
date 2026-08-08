@@ -3,6 +3,9 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { whatsappService } from '../services/whatsapp.js'
 import { pushService } from '../services/push.js'
+import { sendEmail, emailConfigured } from '../services/emailService.js'
+import { alertIntegrationIssue } from '../services/integrationAlert.js'
+import { logger } from '../utils/logger.js'
 import { requireAdmin } from '../middleware/roles.js'
 
 const router = Router()
@@ -14,13 +17,40 @@ function addHistory(db: any, messageId: string, action: string, description: str
 
 export function dispatchMessage(db: any, message: any): void {
   const recipients = (() => { try { return JSON.parse(message.recipients || '[]') } catch { return [] } })()
+  const hasRecipients = recipients.length > 0
 
   if (message.channel === 'whatsapp' || message.channel === 'all') {
-    if (recipients.length > 0) {
+    if (hasRecipients) {
       for (const r of recipients) {
         const phone = r?.phone || r?.value || ''
-        if (phone) whatsappService.send(phone, message.body).catch(() => {})
+        if (phone) whatsappService.send(phone, message.body).catch(() => {
+          alertIntegrationIssue(db, 'WhatsApp', `Falha ao enviar mensagem para ${phone}`)
+        })
       }
+    }
+  }
+
+  if (message.channel === 'email' || message.channel === 'all') {
+    const emails: string[] = []
+    for (const r of recipients) {
+      const email = r?.email || (typeof r === 'string' && /@/.test(r) ? r : '')
+      if (email) { emails.push(email); continue }
+      const uid = r?.id || (typeof r === 'string' && !/@/.test(r) ? r : '')
+      if (uid) {
+        const user = db.prepare('SELECT email FROM users WHERE id = ?').get(uid) as any
+        if (user?.email) emails.push(user.email)
+      }
+    }
+    if (emails.length === 0 && !hasRecipients) {
+      const all = db.prepare('SELECT email FROM users WHERE email != \'\'').all() as any[]
+      for (const u of all) if (u.email) emails.push(u.email)
+    }
+    for (const email of [...new Set(emails)]) {
+      sendEmail(email, message.subject || message.title || 'Comunicado', `<p>${message.body}</p>`)
+        .catch((err) => {
+          logger.error({ email, err: String(err) }, 'Message email delivery failed')
+          alertIntegrationIssue(db, 'E-mail (Resend)', `Falha ao enviar email para ${email}: ${err}`)
+        })
     }
   }
 
@@ -29,7 +59,7 @@ export function dispatchMessage(db: any, message: any): void {
   }
 
   if (message.channel === 'app' || message.channel === 'all') {
-    const users = recipients.length > 0
+    const users = hasRecipients
       ? recipients.map((r: any) => (typeof r === 'string' ? r : r.id)).filter(Boolean)
       : (db.prepare('SELECT id FROM users').all() as any[]).map((u: any) => u.id)
     for (const userId of users) {
@@ -325,9 +355,49 @@ router.get('/channels', (_req, res) => {
     { type: 'app', name: 'Aplicativo', icon: 'Smartphone', status: 'connected', enabled: true, configurable: false },
     { type: 'whatsapp', name: 'WhatsApp', icon: 'MessageCircle', status: (process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE) ? 'connected' : 'disconnected', enabled: true, configurable: true },
     { type: 'push', name: 'Push Notification', icon: 'BellRing', status: pushService.isAvailable() ? 'connected' : 'disconnected', enabled: true, configurable: true },
-    { type: 'email', name: 'E-mail', icon: 'Mail', status: 'disconnected', enabled: true, configurable: true },
-    { type: 'sms', name: 'SMS', icon: 'MessageSquare', status: 'disconnected', enabled: true, configurable: true },
+    { type: 'email', name: 'E-mail', icon: 'Mail', status: emailConfigured() ? 'connected' : 'disconnected', enabled: true, configurable: true },
+    { type: 'sms', name: 'SMS', icon: 'MessageSquare', status: 'disconnected', enabled: false, configurable: true },
   ])
+})
+
+// Preferências de notificação e canais habilitados por usuário
+function loadUserPrefs(db: any, userId: string): any {
+  const row = db.prepare('SELECT data FROM settings WHERE category = ?').get(`user_prefs_${userId}`) as any
+  if (!row) return {}
+  try { return JSON.parse(row.data) } catch { return {} }
+}
+
+function saveUserPrefs(db: any, userId: string, data: any): void {
+  const category = `user_prefs_${userId}`
+  const raw = JSON.stringify(data)
+  const existing = db.prepare('SELECT id FROM settings WHERE category = ?').get(category)
+  if (existing) {
+    db.prepare("UPDATE settings SET data = ?, updated_at = datetime('now') WHERE category = ?").run(raw, category)
+  } else {
+    db.prepare('INSERT INTO settings (id, category, data) VALUES (?, ?, ?)').run(uuid(), category, raw)
+  }
+}
+
+router.get('/preferences', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  const db = getDb()
+  res.json(loadUserPrefs(db, req.user.userId))
+})
+
+router.put('/preferences', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  const db = getDb()
+  const { prefs, channelEnabled } = req.body || {}
+  const current = loadUserPrefs(db, req.user.userId)
+  const updated = {
+    prefs: { ...(current.prefs || {}), ...(prefs || {}) },
+    channelEnabled: { ...(current.channelEnabled || {}), ...(channelEnabled || {}) },
+  }
+  if (prefs?.messageTypes) {
+    updated.prefs.messageTypes = { ...((current.prefs || {}).messageTypes || {}), ...prefs.messageTypes }
+  }
+  saveUserPrefs(db, req.user.userId, updated)
+  res.json(updated)
 })
 
 export default router

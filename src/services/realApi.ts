@@ -286,6 +286,12 @@ export const realCommunication = {
 
   channels: () =>
     api.get<any[]>('/communication/channels'),
+
+  getPreferences: () =>
+    api.get<any>('/communication/preferences'),
+
+  updatePreferences: (data: any) =>
+    api.put<any>('/communication/preferences', data),
 }
 
 // --- Settings ---

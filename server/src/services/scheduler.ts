@@ -7,6 +7,7 @@ import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySu
 import { createBackup, pruneBackups } from './backupService.js'
 import { searchPaymentByExternalReference, mpStatus } from './mercadopagoService.js'
 import { finalizePayment } from './paymentService.js'
+import { alertIntegrationIssue } from './integrationAlert.js'
 import { logger } from '../utils/logger.js'
 import { addLog } from './appLogService.js'
 
@@ -94,8 +95,16 @@ export async function runPaymentReconciliation(): Promise<void> {
 
     for (const charge of charges) {
       try {
+        const expiryHours = Number(process.env.MP_PIX_EXPIRY_HOURS) || 24
+        const expiredLocal = db.prepare("SELECT 1 FROM pix_charges WHERE id = ? AND created_at <= datetime('now', ?)").get(charge.id, `-${expiryHours} hours`)
         const payment = await searchPaymentByExternalReference(String(charge.monthly_fee_id))
-        if (!payment) continue
+        if (!payment) {
+          if (expiredLocal) {
+            db.prepare("UPDATE pix_charges SET status = 'expired', updated_at = datetime('now') WHERE id = ?").run(charge.id)
+            logger.info({ chargeId: charge.id }, 'Charge marked as expired (no payment found after PIX expiry)')
+          }
+          continue
+        }
         const status = mpStatus(payment.status)
         if (status === 'paid') {
           const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(charge.monthly_fee_id) as any
@@ -116,6 +125,7 @@ export async function runPaymentReconciliation(): Promise<void> {
         }
       } catch (err: any) {
         logger.error({ chargeId: charge.id, err: err.message }, 'Payment reconciliation check failed')
+        alertIntegrationIssue(db, 'Mercado Pago', `Falha na conciliação da cobrança ${charge.id}: ${err.message}`)
       }
     }
   } catch (err) {
