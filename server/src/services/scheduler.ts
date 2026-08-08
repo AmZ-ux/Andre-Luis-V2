@@ -5,6 +5,8 @@ import { loadSettings } from './settingsService.js'
 import { ensureContractFees } from './monthlyFeeGenerator.js'
 import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySummaryToAdmins } from './feeAutomation.js'
 import { createBackup, pruneBackups } from './backupService.js'
+import { searchPaymentByExternalReference, mpStatus } from './mercadopagoService.js'
+import { finalizePayment } from './paymentService.js'
 import { logger } from '../utils/logger.js'
 import { addLog } from './appLogService.js'
 
@@ -77,6 +79,50 @@ function runAutoBackup(): void {
   }
 }
 
+// Reconcilia cobrancas pendentes com o Mercado Pago: pagamentos confirmados fora
+// da sessao (aba fechada, timeout) sao finalizados e cobrancas canceladas marcadas.
+export async function runPaymentReconciliation(): Promise<void> {
+  const db = getDb()
+  try {
+    // Ignora cobrancas recentes (< 10 min): o polling do checkout ja cuida delas
+    const charges = db.prepare(`
+      SELECT * FROM pix_charges
+      WHERE status = 'pending' AND created_at <= datetime('now', '-10 minutes')
+      ORDER BY created_at ASC LIMIT 20
+    `).all() as any[]
+    if (charges.length === 0) return
+
+    for (const charge of charges) {
+      try {
+        const payment = await searchPaymentByExternalReference(String(charge.monthly_fee_id))
+        if (!payment) continue
+        const status = mpStatus(payment.status)
+        if (status === 'paid') {
+          const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(charge.monthly_fee_id) as any
+          if (fee && fee.status !== 'paid') {
+            finalizePayment(
+              db,
+              fee,
+              String(payment.id),
+              Number(payment.transaction_amount ?? 0),
+              payment.payment_method_id === 'pix' ? 'pix' : 'card',
+              charge.id
+            )
+          } else if (fee) {
+            db.prepare("UPDATE pix_charges SET status = 'succeeded', updated_at = datetime('now') WHERE id = ?").run(charge.id)
+          }
+        } else if (status === 'cancelled') {
+          db.prepare("UPDATE pix_charges SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(charge.id)
+        }
+      } catch (err: any) {
+        logger.error({ chargeId: charge.id, err: err.message }, 'Payment reconciliation check failed')
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, 'Payment reconciliation task failed')
+  }
+}
+
 export function startScheduler(): void {
   if (started) return
   started = true
@@ -84,6 +130,7 @@ export function startScheduler(): void {
   cron.schedule('0 2 * * *', runAutoBackup, { timezone: 'America/Sao_Paulo' })
   cron.schedule('0 8 * * *', runDaily, { timezone: 'America/Sao_Paulo' })
   cron.schedule('0 9 * * *', runContractGeneration, { timezone: 'America/Sao_Paulo' })
+  cron.schedule('*/10 * * * *', () => { runPaymentReconciliation() }, { timezone: 'America/Sao_Paulo' })
 
-  logger.info('Scheduler started (02:00 BRT: auto backup; 08:00 BRT: overdue + reminders; 09:00 BRT: fee generation per contract)')
+  logger.info('Scheduler started (02:00 BRT: auto backup; 08:00 BRT: overdue + reminders; 09:00 BRT: fee generation per contract; */10: payment reconciliation)')
 }

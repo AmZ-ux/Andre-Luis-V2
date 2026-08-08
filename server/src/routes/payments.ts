@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
 import { calculateDueFromFee } from '../services/billingRules.js'
+import { finalizePayment, type PaymentMethod } from '../services/paymentService.js'
 import {
   MpError,
   createCardPaymentLink,
@@ -10,46 +11,11 @@ import {
   mpStatus,
   searchPaymentByExternalReference,
 } from '../services/mercadopagoService.js'
-import { notifyPaymentReceived } from '../services/feeAutomation.js'
 import { logger } from '../utils/logger.js'
 
 export const paymentsRouter = Router()
 
-type PaymentMethod = 'pix' | 'card'
-
-function todayBR(): string {
-  const now = new Date()
-  const offset = now.getTimezoneOffset()
-  const br = new Date(now.getTime() - offset * 60000)
-  return br.toISOString().split('T')[0].split('-').reverse().join('/')
-}
-
 // Tabela pix_charges e usada como registro generico de cobrancas (PIX e cartao)
-function finalizePayment(db: any, fee: any, paymentId: string, amountReceived: number, method: PaymentMethod): void {
-  if (!fee || fee.status === 'paid') return
-
-  const amount = amountReceived > 0 ? amountReceived : Number(fee.amount)
-  const payId = uuid()
-  db.prepare(`
-    INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest)
-    VALUES (?, ?, ?, ?, ?, ?, 0, 0)
-  `).run(payId, fee.id, amount, todayBR(), method, `${method.toUpperCase()} Mercado Pago ${paymentId}`)
-
-  db.prepare('UPDATE monthly_fees SET status = \'paid\', updated_at = datetime(\'now\') WHERE id = ?').run(fee.id)
-  db.prepare('UPDATE pix_charges SET status = \'succeeded\', updated_at = datetime(\'now\') WHERE payment_intent_id = ?').run(paymentId)
-
-  const updated = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fee.id) as any
-  const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(fee.id)
-  notifyPaymentReceived(db, updated, payment)
-
-  const methodLabel = method === 'pix' ? 'PIX' : 'Cartão'
-  db.prepare(`
-    INSERT INTO notifications (id, user_id, title, message, type, status)
-    VALUES (?, ?, ?, ?, 'payment', 'unread')
-  `).run(uuid(), fee.passenger_id, `${methodLabel} confirmado`, `Pagamento ${methodLabel} de R$ ${amount.toFixed(2)} confirmado para a mensalidade ${String(fee.month).padStart(2, '0')}/${fee.year}.`)
-
-  logger.info({ feeId: fee.id, paymentId, method }, 'Pagamento confirmado')
-}
 
 paymentsRouter.post('/create', async (req, res) => {
   const db = getDb()

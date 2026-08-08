@@ -76,28 +76,4 @@ export const paymentService = {
 
     return { payment, feeStatus: 'paid' }
   },
-
-  async getByFeeId(monthlyFeeId: string): Promise<Payment | null> {
-    await delay(100)
-    const payments = loadPayments()
-    return payments.find((p) => p.monthlyFeeId === monthlyFeeId) || null
-  },
-
-  async remove(monthlyFeeId: string): Promise<void> {
-    await delay(200)
-    const payments = loadPayments()
-    savePayments(payments.filter((p) => p.monthlyFeeId !== monthlyFeeId))
-
-    const fees = storage.get<MonthlyFee[]>('mock_monthly_fees') || []
-    const feeIdx = fees.findIndex((f) => f.id === monthlyFeeId)
-    if (feeIdx !== -1) {
-      fees[feeIdx] = {
-        ...fees[feeIdx],
-        status: 'pending',
-        payment: undefined,
-        updatedAt: new Date().toLocaleDateString('pt-BR'),
-      }
-      storage.set('mock_monthly_fees', fees)
-    }
-  },
 }

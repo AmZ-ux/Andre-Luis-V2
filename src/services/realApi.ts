@@ -219,6 +219,9 @@ export const realAvailability = {
 export const realDashboard = {
   get: () =>
     api.get<DashboardData>('/dashboard'),
+
+  chart: (period: string) =>
+    api.get<any[]>('/dashboard/chart', { period }),
 }
 
 // --- Pagamentos (Mercado Pago: PIX e cartão via link) ---

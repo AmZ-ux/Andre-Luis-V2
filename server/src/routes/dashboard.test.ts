@@ -123,3 +123,56 @@ describe('GET /api/dashboard', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('GET /api/dashboard/chart', () => {
+  function seedPaidFee(passengerId: string, paymentDate: string, month: number, year: number, amount: number) {
+    const db = getDb()
+    const mfid = seedMonthlyFee(passengerId, { status: 'paid', month, year, amount })
+    db.prepare('INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method) VALUES (?, ?, ?, ?, ?)')
+      .run(uuid(), mfid, amount, paymentDate, 'pix')
+    return mfid
+  }
+
+  it('should return 400 for invalid period', async () => {
+    const res = await request(app).get('/api/dashboard/chart?period=abc').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(400)
+  })
+
+  it('should return 12 monthly buckets with real values', async () => {
+    const pid = seedPassenger()
+    seedPaidFee(pid, '15/07/2026', 7, 2026, 189.90)
+    seedPaidFee(pid, '10/07/2026', 7, 2026, 150.00)
+    seedMonthlyFee(pid, { status: 'overdue', month: 6, year: 2026, amount: 200.00 })
+
+    const res = await request(app).get('/api/dashboard/chart?period=12m').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(12)
+    const july = res.body[6]
+    expect(july.label).toBe('Jul')
+    expect(july.receita).toBe(339.9)
+    expect(july.pagamentos).toBe(2)
+    const june = res.body[5]
+    expect(june.inadimplencia).toBe(200)
+  })
+
+  it('should return 7 daily buckets from payment dates', async () => {
+    const pid = seedPassenger()
+    const now = new Date()
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+    seedPaidFee(pid, fmt(now), now.getMonth() + 1, now.getFullYear(), 100.00)
+
+    const res = await request(app).get('/api/dashboard/chart?period=7d').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(7)
+    const withPayment = res.body.filter((b: any) => b.pagamentos > 0)
+    expect(withPayment).toHaveLength(1)
+    expect(withPayment[0].receita).toBe(100)
+  })
+
+  it('should return 4 weekly buckets for 30d', async () => {
+    const res = await request(app).get('/api/dashboard/chart?period=30d').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(4)
+    expect(res.body[0].label).toBe('Sem 1')
+  })
+})

@@ -213,32 +213,6 @@ export const availabilityService = {
     return availability
   },
 
-  async update(
-    id: string,
-    updates: Partial<Availability>,
-    updatedBy: string,
-    updatedById: string
-  ): Promise<Availability> {
-    await delay(300)
-    const items = loadAvailabilities()
-    const idx = items.findIndex((a) => a.id === id)
-    if (idx === -1) throw new Error('Período não encontrado')
-
-    const current = items[idx]
-    if (!availabilityRules.canEdit(current)) throw new Error('Não é possível editar este período')
-
-    items[idx] = {
-      ...current,
-      ...updates,
-      updatedAt: new Date().toLocaleString('pt-BR'),
-    }
-    saveAvailabilities(items)
-
-    await availabilityHistory.add(id, 'updated', updatedBy, updatedById)
-
-    return items[idx]
-  },
-
   async cancel(
     id: string,
     reason: string,

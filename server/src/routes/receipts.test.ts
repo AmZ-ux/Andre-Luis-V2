@@ -200,6 +200,32 @@ describe('PUT /api/receipts/:id/approve', () => {
     expect(res.body.reviewed_by).toBe(adminId)
   })
 
+  it('should create payment record when approving', async () => {
+    const rid = seedReceipt()
+    const db = getDb()
+    const feeId = (db.prepare('SELECT monthly_fee_id FROM receipts WHERE id = ?').get(rid) as any).monthly_fee_id
+    await request(app)
+      .put(`/api/receipts/${rid}/approve`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ notes: 'Aprovado' })
+    const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(feeId) as any
+    expect(payment).toBeTruthy()
+    expect(payment.amount).toBe(189.9)
+    expect(payment.payment_method).toBe('transfer')
+    expect(payment.payment_date).toMatch(/^\d{2}\/\d{2}\/\d{4}$/)
+  })
+
+  it('should not duplicate payment record on second approval', async () => {
+    const rid = seedReceipt()
+    const db = getDb()
+    const feeId = (db.prepare('SELECT monthly_fee_id FROM receipts WHERE id = ?').get(rid) as any).monthly_fee_id
+    await request(app).put(`/api/receipts/${rid}/approve`).set('Authorization', `Bearer ${token}`).send({ notes: 'Ok' })
+    const res = await request(app).put(`/api/receipts/${rid}/approve`).set('Authorization', `Bearer ${token}`).send({ notes: 'Ok' })
+    expect(res.status).toBe(400)
+    const payments = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').all(feeId)
+    expect(payments).toHaveLength(1)
+  })
+
   it('should return 404 when receipt not found', async () => {
     const res = await request(app)
       .put('/api/receipts/non-existent/approve')

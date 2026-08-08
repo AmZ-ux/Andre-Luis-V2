@@ -138,6 +138,10 @@ export const receiptService = {
   },
 
   async getByMonthlyFeeId(monthlyFeeId: string): Promise<Receipt | null> {
+    if (config.realApi) {
+      const { data } = await realReceipts.list({ search: '', status: '', month: '', year: '', transportType: '' }, 1, 100)
+      return data.find((r) => r.monthlyFeeId === monthlyFeeId) || null
+    }
     const receipts = loadReceipts()
     return receipts.find((r) => r.monthlyFeeId === monthlyFeeId) || null
   },
@@ -224,6 +228,9 @@ export const receiptService = {
   },
 
   async update(id: string, updates: Partial<Receipt>): Promise<Receipt> {
+    if (config.realApi) {
+      throw new Error('Atualização de comprovante deve usar os endpoints de aprovação/rejeição/cancelamento da API')
+    }
     await delay(200)
     const receipts = loadReceipts()
     const idx = receipts.findIndex((r) => r.id === id)
@@ -289,11 +296,5 @@ export const receiptService = {
       cancelled: receipts.filter((r) => r.status === 'cancelled').length,
       total: receipts.length,
     }
-  },
-
-  async remove(id: string): Promise<void> {
-    await delay(200)
-    const receipts = loadReceipts()
-    saveReceipts(receipts.filter((r) => r.id !== id))
   },
 }

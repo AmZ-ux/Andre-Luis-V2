@@ -194,6 +194,7 @@ export const dashboardService = {
   },
 
   async getChartData(period: ChartPeriod): Promise<ChartDataPoint[]> {
+    if (config.realApi) return realDashboard.chart(period)
     await delay(300)
     return baseChartData[period]
   },

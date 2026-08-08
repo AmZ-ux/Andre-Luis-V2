@@ -5,6 +5,7 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { upload, getUploadsDir } from '../middleware/upload.js'
 import { requireAdmin } from '../middleware/roles.js'
+import { todayBR } from '../services/paymentService.js'
 
 const router = Router()
 
@@ -116,11 +117,20 @@ router.put('/:id/approve', requireAdmin, (req, res) => {
   const { notes } = req.body
   const existing = db.prepare('SELECT * FROM receipts WHERE id = ?').get(req.params.id) as any
   if (!existing) { res.status(404).json({ error: 'Comprovante não encontrado' }); return }
+  if (existing.status === 'approved') { res.status(400).json({ error: 'Comprovante já aprovado' }); return }
 
   db.prepare('UPDATE receipts SET status = \'approved\', reviewed_by = ?, review_date = datetime(\'now\'), review_notes = ? WHERE id = ?')
     .run(req.user!.userId, notes || '', req.params.id)
 
   db.prepare("UPDATE monthly_fees SET status = 'paid', updated_at = datetime('now') WHERE id = ?").run(existing.monthly_fee_id)
+
+  const existingPayment = db.prepare('SELECT id FROM payments WHERE monthly_fee_id = ?').get(existing.monthly_fee_id)
+  if (!existingPayment) {
+    db.prepare(`
+      INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest)
+      VALUES (?, ?, ?, ?, 'transfer', ?, 0, 0)
+    `).run(uuid(), existing.monthly_fee_id, Number(existing.amount), todayBR(), 'Pagamento via comprovante aprovado')
+  }
 
   db.prepare('INSERT INTO receipt_history (id, receipt_id, action, performed_by, performed_by_id, notes) VALUES (?, ?, \'approved\', ?, ?, ?)')
     .run(uuid(), req.params.id, req.user!.userId, req.user!.userId, notes || '')
