@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../auth/AuthContext'
+import { monthlyFeeService } from '../../services/monthlyFeeService'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
@@ -41,6 +42,15 @@ export function ProfilePage() {
   const [demoCode, setDemoCode] = useState<string | undefined>(undefined)
   const [code, setCode] = useState('')
   const [codeError, setCodeError] = useState<string | null>(null)
+  const [openFees, setOpenFees] = useState(0)
+
+  useEffect(() => {
+    if (user?.role !== 'passenger') return
+    monthlyFeeService
+      .getByPassengerId(user.id)
+      .then((fees) => setOpenFees(fees.filter((f) => f.status === 'pending' || f.status === 'overdue').length))
+      .catch(() => {})
+  }, [user])
 
   if (isLoading || !user) {
     return <PageSpinner />
@@ -322,6 +332,13 @@ export function ProfilePage() {
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success py-2">
                 <CheckCircle2 className="h-4 w-4" /> Seu contrato está encerrado
               </span>
+            ) : openFees > 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-error py-2">
+                <ShieldAlert className="h-4 w-4" />
+                {openFees === 1
+                  ? 'Você possui 1 mensalidade em aberto — regularize o pagamento para encerrar o contrato.'
+                  : `Você possui ${openFees} mensalidades em aberto — regularize os pagamentos para encerrar o contrato.`}
+              </span>
             ) : (
               <Button
                 variant="danger"
@@ -342,7 +359,7 @@ export function ProfilePage() {
         onClose={() => setShowEndContract(false)}
         onConfirm={handleEndContract}
         title="Encerrar contrato"
-        message="Tem certeza? Seu contrato será encerrado, as mensalidades em aberto serão canceladas e a administração será notificada. Esta ação não pode ser desfeita."
+        message="Tem certeza? Seu contrato será encerrado e a administração será notificada. Esta ação não pode ser desfeita."
         confirmLabel={endingContract ? 'Encerrando...' : 'Encerrar contrato'}
         variant="danger"
       />

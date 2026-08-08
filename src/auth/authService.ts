@@ -301,6 +301,15 @@ export const authService = {
     if (passenger.status === 'inactive') {
       throw new Error('Seu contrato já está encerrado')
     }
+    const fees = await monthlyFeeService.getByPassengerId(userId)
+    const open = fees.filter((f) => f.status === 'pending' || f.status === 'overdue')
+    if (open.length > 0) {
+      throw new Error(
+        open.length === 1
+          ? 'Você possui 1 mensalidade em aberto. Regularize o pagamento antes de encerrar o contrato.'
+          : `Você possui ${open.length} mensalidades em aberto. Regularize os pagamentos antes de encerrar o contrato.`
+      )
+    }
     await passengerService.update(userId, { status: 'inactive' })
   },
 

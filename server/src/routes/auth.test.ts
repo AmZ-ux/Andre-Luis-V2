@@ -477,7 +477,7 @@ describe('POST /api/auth/end-contract', () => {
     return { token: res.body.token, id: res.body.user.id }
   }
 
-  it('should end the contract, cancel open fees and notify admins', async () => {
+  it('should end the contract (no open fees) and notify admins', async () => {
     const db = (await import('../database/connection.js')).getDb()
     const { getAdminToken } = await import('./testUtils.js')
     getAdminToken() // garante que existe um admin para receber a notificação
@@ -485,11 +485,12 @@ describe('POST /api/auth/end-contract', () => {
 
     const { token, id } = await registerPassenger('encerrar@teste.com', '777.888.999-00')
 
-    // Segunda mensalidade pendente para verificar cancelamento
+    // Segunda mensalidade pendente e primeira quitada (nenhuma em aberto)
     db.prepare(`
       INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)
-      VALUES (?, ?, ?, ?, 'university', '', '', 9, 2026, 189.9, 5, '05/09/2026', 'pending')
+      VALUES (?, ?, ?, ?, 'university', '', '', 9, 2026, 189.9, 5, '05/09/2026', 'paid')
     `).run('fee-encerrar-2', id, 'Passageiro Encerrar', '777.888.999-00')
+    db.prepare("UPDATE monthly_fees SET status = 'paid' WHERE passenger_id = ?").run(id)
 
     const res = await request(app)
       .post('/api/auth/end-contract')
@@ -501,11 +502,8 @@ describe('POST /api/auth/end-contract', () => {
     const passenger = db.prepare('SELECT status FROM passengers WHERE id = ?').get(id) as { status: string }
     expect(passenger.status).toBe('inactive')
 
-    const fees = db.prepare("SELECT status, cancellation_reason FROM monthly_fees WHERE passenger_id = ? AND status = 'cancelled'").all(id) as any[]
-    expect(fees.length).toBe(2)
-    expect(fees[0].cancellation_reason).toBe('Contrato encerrado pelo passageiro')
-
-    expect(res.body.cancelledFees).toBe(2)
+    const openFees = db.prepare("SELECT COUNT(*) as c FROM monthly_fees WHERE passenger_id = ? AND status IN ('pending', 'overdue')").get(id) as { c: number }
+    expect(openFees.c).toBe(0)
 
     if (adminId) {
       const notif = db.prepare("SELECT title, type FROM notifications WHERE user_id = ? AND title = 'Contrato encerrado'").get(adminId) as { title: string; type: string }
@@ -515,6 +513,21 @@ describe('POST /api/auth/end-contract', () => {
 
     const log = db.prepare("SELECT action FROM app_logs WHERE action = 'contract_end'").get() as { action: string }
     expect(log).toBeDefined()
+  })
+
+  it('should reject when there are open (unpaid) monthly fees', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const { token, id } = await registerPassenger('encerrar-pendente@teste.com', '808.808.808-00')
+
+    const res = await request(app)
+      .post('/api/auth/end-contract')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('em aberto')
+    expect(res.body.openFees).toBeGreaterThan(0)
+
+    const passenger = db.prepare('SELECT status FROM passengers WHERE id = ?').get(id) as { status: string }
+    expect(passenger.status).toBe('active')
   })
 
   it('should reject admins', async () => {
@@ -527,7 +540,9 @@ describe('POST /api/auth/end-contract', () => {
   })
 
   it('should reject when contract is already inactive', async () => {
-    const { token } = await registerPassenger('encerrar2@teste.com', '333.444.555-66')
+    const db = (await import('../database/connection.js')).getDb()
+    const { token, id } = await registerPassenger('encerrar2@teste.com', '333.444.555-66')
+    db.prepare("UPDATE monthly_fees SET status = 'paid' WHERE passenger_id = ?").run(id)
     await request(app).post('/api/auth/end-contract').set('Authorization', `Bearer ${token}`)
     const res = await request(app).post('/api/auth/end-contract').set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(400)

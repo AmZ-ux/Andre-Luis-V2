@@ -335,28 +335,33 @@ router.post('/end-contract', authMiddleware, (req, res) => {
     return
   }
 
-  db.prepare("UPDATE passengers SET status = 'inactive', updated_at = datetime('now') WHERE id = ?").run(req.user.userId)
-
-  // Cancela mensalidades em aberto e cobranças PIX pendentes para não gerar novos lembretes
-  const fees = db.prepare("SELECT id FROM monthly_fees WHERE passenger_id = ? AND status IN ('pending', 'overdue')").all(req.user.userId) as any[]
-  for (const fee of fees) {
-    db.prepare("UPDATE monthly_fees SET status = 'cancelled', cancellation_reason = 'Contrato encerrado pelo passageiro', updated_at = datetime('now') WHERE id = ?").run(fee.id)
-    db.prepare("UPDATE pix_charges SET status = 'cancelled', updated_at = datetime('now') WHERE monthly_fee_id = ? AND status = 'pending'").run(fee.id)
+  // O contrato só pode ser encerrado com todas as mensalidades regularizadas
+  const openFees = (db.prepare("SELECT COUNT(*) as c FROM monthly_fees WHERE passenger_id = ? AND status IN ('pending', 'overdue')").get(req.user.userId) as { c: number }).c
+  if (openFees > 0) {
+    res.status(400).json({
+      error: openFees === 1
+        ? 'Você possui 1 mensalidade em aberto. Regularize o pagamento antes de encerrar o contrato.'
+        : `Você possui ${openFees} mensalidades em aberto. Regularize os pagamentos antes de encerrar o contrato.`,
+      openFees,
+    })
+    return
   }
+
+  db.prepare("UPDATE passengers SET status = 'inactive', updated_at = datetime('now') WHERE id = ?").run(req.user.userId)
 
   const user = db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(req.user.userId) as any
   notifyAdmins(
     db,
     'Contrato encerrado',
-    `${user.name} (${user.email}) encerrou o contrato${fees.length > 0 ? ` — ${fees.length} mensalidade(s) em aberto foram canceladas` : ''}.`,
+    `${user.name} (${user.email}) encerrou o contrato.`,
     { type: 'warning', link: `/passageiros/${req.user.userId}` }
   )
 
   db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(uuid(), 'contract_end', `Passageiro encerrou o contrato${fees.length > 0 ? ` (${fees.length} mensalidades canceladas)` : ''}`, user.name, 'passenger', 'contract')
+    .run(uuid(), 'contract_end', 'Passageiro encerrou o contrato', user.name, 'passenger', 'contract')
 
-  logger.info({ userId: req.user.userId, cancelledFees: fees.length }, 'Contract ended by passenger')
-  res.json({ success: true, status: 'inactive', cancelledFees: fees.length })
+  logger.info({ userId: req.user.userId }, 'Contract ended by passenger')
+  res.json({ success: true, status: 'inactive' })
 })
 
 router.put('/change-password', authMiddleware, (req, res) => {

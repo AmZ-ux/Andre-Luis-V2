@@ -38,7 +38,7 @@ export const realAuth = {
     api.post<{ success: boolean }>('/auth/change-password', data),
 
   endContract: () =>
-    api.post<{ success: boolean; status: string; cancelledFees: number }>('/auth/end-contract'),
+    api.post<{ success: boolean; status: string }>('/auth/end-contract'),
 
   refresh: () =>
     api.post<{ token: string; expiresAt: number }>('/auth/refresh'),
