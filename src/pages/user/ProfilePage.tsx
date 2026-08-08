@@ -332,18 +332,19 @@ export function ProfilePage() {
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success py-2">
                 <CheckCircle2 className="h-4 w-4" /> Seu contrato está encerrado
               </span>
-            ) : openFees > 0 ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-error py-2">
-                <ShieldAlert className="h-4 w-4" />
-                {openFees === 1
-                  ? 'Você possui 1 mensalidade em aberto — regularize o pagamento para encerrar o contrato.'
-                  : `Você possui ${openFees} mensalidades em aberto — regularize os pagamentos para encerrar o contrato.`}
-              </span>
             ) : (
               <Button
                 variant="danger"
                 icon={<UserMinus className="h-4 w-4" />}
-                onClick={() => setShowEndContract(true)}
+                onClick={() => {
+                  if (openFees > 0) {
+                    addToast('error', openFees === 1
+                      ? 'Você possui 1 mensalidade em aberto. Regularize o pagamento antes de encerrar o contrato.'
+                      : `Você possui ${openFees} mensalidades em aberto. Regularize os pagamentos antes de encerrar o contrato.`)
+                    return
+                  }
+                  setShowEndContract(true)
+                }}
               >
                 Encerrar contrato
               </Button>
