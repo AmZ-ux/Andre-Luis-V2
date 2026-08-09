@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { monthlyFeeService } from '../../services/monthlyFeeService'
 import { Button } from '../../components/ui/Button'
@@ -7,19 +7,77 @@ import { Input } from '../../components/ui/Input'
 import { PageSpinner } from '../../components/ui/Spinner'
 import { Badge } from '../../components/ui/Badge'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
-import { ThemeCustomizer } from '../../components/settings/ThemeCustomizer'
 import { useNavigate } from 'react-router-dom'
 import { useInstallPrompt } from '../../hooks/useInstallPrompt'
 import { useToast } from '../../contexts/ToastContext'
-import { useSettings } from '../../hooks/useSettings'
+import { useTheme } from '../../contexts/ThemeContext'
 import { UserAvatar } from '../../components/auth/UserAvatar'
 import { getRoleLabel } from '../../constants/permissions'
 import {
   Lock, LogOut, Pencil, X, Check, Mail, Phone, CreditCard, Calendar, Clock,
   Download, ShieldCheck, ShieldAlert, KeyRound, UserMinus, CheckCircle2,
+  Sun, Moon, ChevronDown,
 } from 'lucide-react'
+import { cn } from '../../utils/cn'
 import { formatPhone } from '../../validators/passengerValidators'
 import { validatePhone } from '../../utils/validators'
+
+function ThemeDropdown() {
+  const { isDark, toggleTheme } = useTheme()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    if (open) document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  const applyTheme = (dark: boolean) => {
+    if (dark !== isDark) toggleTheme()
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-text hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        {isDark ? <Moon className="h-4 w-4 text-primary" /> : <Sun className="h-4 w-4 text-primary" />}
+        <span>{isDark ? 'Escuro' : 'Claro'}</span>
+        <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-44 rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-xl z-50 p-1">
+          {[false, true].map((dark) => (
+            <button
+              key={String(dark)}
+              onClick={() => applyTheme(dark)}
+              className={cn(
+                'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
+                dark === isDark
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+              )}
+            >
+              <span className="flex items-center gap-2">
+                {dark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                {dark ? 'Escuro' : 'Claro'}
+              </span>
+              {dark === isDark && <Check className="h-4 w-4" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function ProfilePage() {
   const {
@@ -27,7 +85,6 @@ export function ProfilePage() {
   } = useAuth()
   const { canInstall, install } = useInstallPrompt()
   const { addToast } = useToast()
-  const { settings, updateCategory, saved } = useSettings()
   const navigate = useNavigate()
 
   const [editing, setEditing] = useState(false)
@@ -143,9 +200,12 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-2xl mx-auto">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-text">Meu Perfil</h1>
-        <p className="text-sm text-gray-500 mt-1">Suas informações pessoais e preferências</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-text">Meu Perfil</h1>
+          <p className="text-sm text-gray-500 mt-1">Suas informações pessoais e preferências</p>
+        </div>
+        <ThemeDropdown />
       </div>
 
       <Card>
@@ -302,15 +362,6 @@ export function ProfilePage() {
           </div>
         </Card>
       )}
-
-      <Card>
-        <h2 className="text-base font-semibold text-text mb-4">Aparência</h2>
-        <ThemeCustomizer
-          settings={settings.appearance}
-          onSave={(v) => updateCategory('appearance', v, user.name)}
-          saved={saved}
-        />
-      </Card>
 
       <Card>
         <h2 className="text-base font-semibold text-text mb-4">Ações</h2>
