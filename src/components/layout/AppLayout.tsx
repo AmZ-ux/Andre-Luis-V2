@@ -11,6 +11,10 @@ export function AppLayout() {
   const location = useLocation()
 
   const showGreeting = user?.role === 'passenger' && location.pathname === '/'
+  const hideBell =
+    user?.role === 'passenger' &&
+    (location.pathname === '/minhas-mensalidades' || location.pathname === '/perfil')
+  const hasHeaderContent = showGreeting || !hideBell
   const firstName = showGreeting ? (user?.name?.split(' ')[0] ?? '') : ''
   const todayLabel = showGreeting
     ? new Date().toLocaleDateString('pt-BR', {
@@ -25,6 +29,7 @@ export function AppLayout() {
       <Sidebar />
 
       <div className="lg:ml-64 flex flex-col min-h-screen pb-16 lg:pb-0">
+        {hasHeaderContent && (
         <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 sm:px-6 py-3 bg-secondary/80 dark:bg-gray-950/80 backdrop-blur lg:border-b lg:border-gray-100 lg:dark:border-gray-800">
           {showGreeting && (
             <div className="min-w-0">
@@ -32,8 +37,9 @@ export function AppLayout() {
               <p className="text-xs text-gray-500 mt-0.5 capitalize truncate">{todayLabel}</p>
             </div>
           )}
-          <NotificationBell />
+          {!hideBell && <NotificationBell />}
         </header>
+        )}
         <main className="flex-1 py-6 sm:py-8">
           <Container>
             <AnimatePresence mode="wait">
