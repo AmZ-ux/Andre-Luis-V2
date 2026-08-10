@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import * as Icons from 'lucide-react'
+import { DynamicIcon } from '../ui/DynamicIcon'
 import { cn } from '../../utils/cn'
 import type { Statistic } from '../../types/dashboard'
 
@@ -17,9 +17,7 @@ const colorMap: Record<string, string> = {
 }
 
 function IconRenderer({ name, className }: { name: string; className?: string }) {
-  const Icon = Icons[name as keyof typeof Icons] as React.ComponentType<{ className?: string }> | undefined
-  if (!Icon) return null
-  return <Icon className={className} />
+  return <DynamicIcon name={name} className={className} />
 }
 
 export function StatisticCard({ data, index }: StatisticCardProps) {

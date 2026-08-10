@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, NavLink } from 'react-router-dom'
-import * as Icons from 'lucide-react'
+import { DynamicIcon } from '../ui/DynamicIcon'
 import { cn } from '../../utils/cn'
 import { NAV_ITEMS, PASSENGER_NAV_ITEMS, PROFILE_ITEM } from '../../constants/navigation'
 import { useAuth } from '../../auth/AuthContext'
@@ -45,7 +45,6 @@ export function MobileNav() {
   const moreActive = moreItems.some((item) => isItemActive(location.pathname, item.path))
 
   const renderItem = (item: { label: string; path: string; icon: string }, onClick?: () => void) => {
-    const Icon = Icons[item.icon as keyof typeof Icons] as React.ComponentType<{ className?: string }>
     const isActive = isItemActive(location.pathname, item.path)
     return (
       <NavLink
@@ -58,14 +57,13 @@ export function MobileNav() {
           onClick && 'flex-row justify-start gap-3 w-full px-2 min-h-[48px] rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'
         )}
       >
-        {Icon && (
-          <Icon
-            className={cn(
-              'h-5 w-5 shrink-0 transition-colors',
-              isActive ? 'text-primary' : 'text-gray-400'
-            )}
-          />
-        )}
+        <DynamicIcon
+          name={item.icon}
+          className={cn(
+            'h-5 w-5 shrink-0 transition-colors',
+            isActive ? 'text-primary' : 'text-gray-400'
+          )}
+        />
         <span
           className={cn(
             'text-[10px] font-medium transition-colors',
@@ -90,7 +88,8 @@ export function MobileNav() {
             aria-label="Mais opções"
             aria-expanded={moreOpen}
           >
-            <Icons.MoreHorizontal
+            <DynamicIcon
+              name="MoreHorizontal"
               className={cn('h-5 w-5 transition-colors', moreActive ? 'text-primary' : 'text-gray-400')}
             />
             <span

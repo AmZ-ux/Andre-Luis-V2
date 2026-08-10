@@ -27,7 +27,7 @@ const innerTabs: { key: InnerTab; label: string; icon: typeof FileText }[] = [
 export function SettingsHome() {
   const {
     settings, auditLog, logs, backups, saved,
-    updateCategory, createBackup, restoreBackup, deleteBackup, downloadBackup, reload,
+    updateCategory, createBackup, restoreBackup, deleteBackup, downloadBackup,
     clearLogs, clearAudit,
   } = useSettings()
 

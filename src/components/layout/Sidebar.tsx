@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import * as Icons from 'lucide-react'
+import { DynamicIcon } from '../ui/DynamicIcon'
 import { cn } from '../../utils/cn'
 import { NAV_ITEMS, PASSENGER_NAV_ITEMS, PROFILE_ITEM } from '../../constants/navigation'
 import { useAuth } from '../../auth/AuthContext'
@@ -30,7 +30,7 @@ export function Sidebar() {
     <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 z-40">
       <div className="flex items-center gap-3 px-6 h-18 border-b border-gray-100 dark:border-gray-800">
         <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center">
-          <Icons.Bus className="h-5 w-5 text-white" />
+          <DynamicIcon name="Bus" className="h-5 w-5 text-white" />
         </div>
         <div>
           <p className="text-sm font-bold text-text leading-tight">Transporte</p>
@@ -40,7 +40,6 @@ export function Sidebar() {
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {visibleItems.map((item) => {
-          const Icon = Icons[item.icon as keyof typeof Icons] as React.ComponentType<{ className?: string }>
           return (
             <NavLink
               key={item.path}
@@ -56,7 +55,7 @@ export function Sidebar() {
                 )
               }
             >
-              {Icon && <Icon className="h-5 w-5 shrink-0" />}
+              <DynamicIcon name={item.icon} className="h-5 w-5 shrink-0" />
               <span>{item.label}</span>
             </NavLink>
           )
@@ -77,7 +76,7 @@ export function Sidebar() {
               )
             }
           >
-            <Icons.UserCircle className="h-5 w-5 shrink-0" />
+            <DynamicIcon name="UserCircle" className="h-5 w-5 shrink-0" />
             <span>{PROFILE_ITEM.label}</span>
           </NavLink>
         )}

@@ -1,6 +1,8 @@
 import { storage } from './storage'
 import { config } from '../config'
 import { realMonthlyFees } from './realApi'
+import { passengerService } from './passengerService'
+import { sessionManager } from '../auth/sessionManager'
 import type {
   MonthlyFee,
   MonthlyFeeFilters,
@@ -210,7 +212,6 @@ export const monthlyFeeService = {
   },
 
   async ensureContractFees(passengerId: string): Promise<void> {
-    const { passengerService } = await import('./passengerService')
     const passenger = await passengerService.getById(passengerId)
     if (!passenger || passenger.status !== 'active') return
 
@@ -311,7 +312,6 @@ export const monthlyFeeService = {
 
   async ensureCurrent(): Promise<{ next: MonthlyFee | null; created: number }> {
     if (config.realApi) return realMonthlyFees.ensureCurrent()
-    const { sessionManager } = await import('../auth/sessionManager')
     const session = sessionManager.load()
     if (!session?.user) throw new Error('Não autenticado')
     await this.ensureContractFees(session.user.id)

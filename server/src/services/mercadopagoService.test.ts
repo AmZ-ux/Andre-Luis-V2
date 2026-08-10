@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { MpError, mpStatus, mpAccessToken, mpBase, createPixCharge, getPayment, searchPaymentByExternalReference, createCardPaymentLink } from './mercadopagoService.js'
 
 process.env.MERCADO_PAGO_ACCESS_TOKEN = 'TEST-123'

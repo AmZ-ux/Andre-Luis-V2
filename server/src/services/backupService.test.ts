@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
-import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import zlib from 'zlib'
