@@ -3,7 +3,7 @@ import {
   MoreHorizontal, DollarSign, CheckCircle, Clock, AlertTriangle,
   Umbrella, UserPlus, Users2, BarChart3, TrendingUp, MapPin, School,
   CalendarOff, Building2, Shield, HardDrive, Smartphone, MessageCircle,
-  Mail, Bell,
+  Mail, Bell, Plane, Calendar, FileText, Info,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -12,7 +12,7 @@ const iconMap: Record<string, LucideIcon> = {
   MoreHorizontal, DollarSign, CheckCircle, Clock, AlertTriangle,
   Umbrella, UserPlus, Users2, BarChart3, TrendingUp, MapPin, School,
   CalendarOff, Building2, Shield, HardDrive, Smartphone, MessageCircle,
-  Mail, Bell,
+  Mail, Bell, Plane, Calendar, FileText, Info,
 }
 
 interface DynamicIconProps {

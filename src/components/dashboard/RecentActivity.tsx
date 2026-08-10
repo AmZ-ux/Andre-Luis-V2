@@ -42,7 +42,7 @@ export function RecentActivity({ activities }: RecentActivityProps) {
         />
         <div className="space-y-1">
           {activities.map((activity) => {
-            const Icon = activityIcon[activity.type]
+            const Icon = activityIcon[activity.type] || FileText
             return (
               <div
                 key={activity.id}

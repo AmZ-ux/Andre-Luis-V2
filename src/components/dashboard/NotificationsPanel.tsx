@@ -42,7 +42,7 @@ export function NotificationsPanel({ notifications }: NotificationsPanelProps) {
         />
         <div className="space-y-1">
           {notifications.map((notif) => {
-            const Icon = notifIcon[notif.type]
+            const Icon = notifIcon[notif.type] || Info
             return (
               <div
                 key={notif.id}
