@@ -38,7 +38,11 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
                 <p className="text-sm font-medium text-text">{payment.name}</p>
                 <p className="text-xs text-gray-400">
                   Vence {payment.dueDate} •{' '}
-                  {payment.daysRemaining === 0
+                  {payment.daysRemaining < 0
+                    ? `${Math.abs(payment.daysRemaining)} ${
+                        Math.abs(payment.daysRemaining) === 1 ? 'dia' : 'dias'
+                      } em atraso`
+                    : payment.daysRemaining === 0
                     ? 'Hoje'
                     : `${payment.daysRemaining} dias`}
                 </p>
@@ -49,14 +53,18 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
                 </p>
                 <Badge
                   variant={
-                    payment.daysRemaining <= 3
+                    payment.daysRemaining < 0
+                      ? 'error'
+                      : payment.daysRemaining <= 3
                       ? 'error'
                       : payment.daysRemaining <= 7
                       ? 'warning'
                       : 'neutral'
                   }
                 >
-                  {payment.daysRemaining <= 0
+                  {payment.daysRemaining < 0
+                    ? `Vencida há ${Math.abs(payment.daysRemaining)}d`
+                    : payment.daysRemaining === 0
                     ? 'Vence hoje'
                     : `${payment.daysRemaining}d`}
                 </Badge>

@@ -43,10 +43,14 @@ function seedData(): void {
     .run(p2, 'Bruno Souza', '222.222.222-22', '2001-02-02', 'Campinas', 'UNICAMP', 'school', 'active')
 
   const now = new Date()
+  const nextMonth = now.getMonth() + 2
+  const nextYear = now.getFullYear() + (nextMonth > 12 ? 1 : 0)
+  const nextMonthNum = nextMonth > 12 ? 1 : nextMonth
+  const futureDueDate = `05/${String(nextMonthNum).padStart(2, '0')}/${nextYear}`
   db.prepare('INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(uuid(), p1, 'Ana Silva', '111.111.111-11', 'university', now.getMonth() + 1, now.getFullYear(), 200, 5, '05/01/2026', 'paid')
   db.prepare('INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(uuid(), p2, 'Bruno Souza', '222.222.222-22', 'school', now.getMonth() + 1, now.getFullYear(), 150, 5, '05/01/2026', 'pending')
+    .run(uuid(), p2, 'Bruno Souza', '222.222.222-22', 'school', nextMonthNum, nextYear, 150, 5, futureDueDate, 'pending')
 
   db.prepare('INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method) VALUES (?, ?, ?, ?, ?)')
     .run(uuid(), uuid(), 200, '2026-01-05', 'pix')

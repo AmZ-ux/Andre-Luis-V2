@@ -7,6 +7,7 @@ import type {
   MonthlyFee,
   MonthlyFeeFilters,
   MonthlyFeeSort,
+  MonthlyFeeListResult,
   Payment,
 } from '../types/monthlyFee'
 
@@ -108,7 +109,7 @@ export const monthlyFeeService = {
     sort: MonthlyFeeSort,
     page: number,
     pageSize: number
-  ): Promise<{ data: MonthlyFee[]; total: number }> {
+  ): Promise<MonthlyFeeListResult> {
     if (config.realApi) return realMonthlyFees.list(filters, sort, page, pageSize)
     await delay(400)
     let data = loadFees()
@@ -181,7 +182,19 @@ export const monthlyFeeService = {
     const start = (page - 1) * pageSize
     const paged = data.slice(start, start + pageSize)
 
-    return { data: paged, total }
+    return {
+      data: paged,
+      total,
+      summary: {
+        expected: data.reduce((s, f) => s + f.amount, 0),
+        received: data.filter((f) => f.status === 'paid').reduce((s, f) => s + f.amount, 0),
+        pending: data.filter((f) => f.status === 'pending').reduce((s, f) => s + f.amount, 0),
+        overdue: data.filter((f) => f.status === 'overdue').reduce((s, f) => s + f.amount, 0),
+        paidCount: data.filter((f) => f.status === 'paid').length,
+        pendingCount: data.filter((f) => f.status === 'pending').length,
+        overdueCount: data.filter((f) => f.status === 'overdue').length,
+      },
+    }
   },
 
   async getById(id: string): Promise<MonthlyFee | null> {

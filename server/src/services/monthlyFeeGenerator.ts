@@ -17,9 +17,11 @@ export interface GenerationResult {
 }
 
 export function parseBrDate(value: string): Date | null {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value)
-  if (!match) return null
-  return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]))
+  let m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value)
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]))
+  m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return null
 }
 
 function isMonthContained(

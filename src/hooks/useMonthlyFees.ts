@@ -4,9 +4,11 @@ import type {
   MonthlyFeeFilters,
   MonthlyFeeSort,
   MonthlyFeePagination,
+  MonthlyFeeSummary,
 } from '../types/monthlyFee'
 import { monthlyFeeService } from '../services/monthlyFeeService'
 import { paymentService } from '../services/paymentService'
+import type { PaymentMethod } from '../types/passenger'
 
 const defaultFilters: MonthlyFeeFilters = {
   search: '',
@@ -24,6 +26,7 @@ const defaultSort: MonthlyFeeSort = { field: 'dueDay', direction: 'asc' }
 
 export function useMonthlyFees(pageSize = 15) {
   const [fees, setFees] = useState<MonthlyFee[]>([])
+  const [summary, setSummary] = useState<MonthlyFeeSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<MonthlyFeeFilters>(defaultFilters)
@@ -45,6 +48,7 @@ export function useMonthlyFees(pageSize = 15) {
         pagination.pageSize
       )
       setFees(result.data)
+      setSummary(result.summary ?? null)
       setPagination((prev) => ({ ...prev, total: result.total }))
     } catch {
       setError('Erro ao carregar mensalidades')
@@ -82,7 +86,7 @@ export function useMonthlyFees(pageSize = 15) {
   const registerPayment = useCallback(
     async (
       feeId: string,
-      data: { amount: number; paymentDate: string; paymentMethod: 'pix' | 'cash' | 'transfer' | 'card'; notes?: string }
+      data: { amount: number; paymentDate: string; paymentMethod: PaymentMethod; notes?: string; receipt?: string }
     ) => {
       const result = await paymentService.register(feeId, data)
       setFees((prev) =>
@@ -92,9 +96,10 @@ export function useMonthlyFees(pageSize = 15) {
             : f
         )
       )
+      await load()
       return result
     },
-    []
+    [load]
   )
 
   const cancelFee = useCallback(async (id: string, reason: string) => {
@@ -142,6 +147,7 @@ export function useMonthlyFees(pageSize = 15) {
 
   return {
     fees,
+    summary,
     loading,
     error,
     filters,

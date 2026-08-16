@@ -51,6 +51,10 @@ export const availabilityRules = {
 }
 
 function parseDate(dateStr: string): Date {
+  if (dateStr.includes('-')) {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
   const [d, m, y] = dateStr.split('/').map(Number)
   return new Date(y, m - 1, d)
 }

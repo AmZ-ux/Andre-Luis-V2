@@ -42,7 +42,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   company: { name: 'Transporte André Luis', tradingName: 'Transporte André Luis', cnpj: '', phone: '', whatsapp: '', email: '', website: '', address: '', city: '', state: '', zipCode: '', logo: '', coverImage: '', description: '' },
   financial: { currency: 'BRL', currencyFormat: 'BRL', decimalPlaces: 2, defaultDueDay: 5, allowCustomDueDate: true, defaultMonthlyFee: 189.90, allowDiscount: false, allowLateFee: false, allowInterest: false },
-  billing: { toleranceDays: 5, autoChargeInterest: false, autoChargeLateFee: false, allowExemption: true, allowPartialPayment: false, allowAnticipation: false, allowRenegotiation: false, vacationPolicy: 'no_charge', lateFeePercent: 2, interestRatePerDay: 0.033, reminderDaysBefore: 5 },
+  billing: { toleranceDays: 0, autoChargeInterest: false, autoChargeLateFee: false, allowExemption: true, allowPartialPayment: false, allowAnticipation: false, allowRenegotiation: false, vacationPolicy: 'no_charge', lateFeePercent: 2, interestRatePerDay: 0.033, reminderDaysBefore: 5 },
   communication: { autoMessages: false, language: 'pt-BR', defaultTemplates: true, signature: '' },
   security: { sessionTimeoutMinutes: 30, forcePasswordChangeDays: 90, maxLoginAttempts: 5, autoBlockMinutes: 15, logRetentionDays: 90 },
   appearance: { logo: '', systemName: 'Transporte André Luis', theme: 'system', primaryColor: '#13679C', secondaryColor: '#F8F8F6' },

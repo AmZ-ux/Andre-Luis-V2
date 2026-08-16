@@ -20,9 +20,11 @@ import communicationRoutes from './routes/communication.js'
 import settingsRoutes from './routes/settings.js'
 import reportsRoutes from './routes/reports.js'
 import clientErrorRoutes from './routes/clientError.js'
+import receiptsRoutes from './routes/receipts.js'
 import { paymentsRouter, paymentsWebhookRouter } from './routes/payments.js'
 import adminRoutes from './routes/admin.js'
 import { startScheduler } from './services/scheduler.js'
+import { markOverdueFees } from './services/feeAutomation.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -85,6 +87,7 @@ if (process.env.SEED === 'true') {
 // Public routes
 app.use('/api/auth', authRoutes)
 app.use('/api/client-error', clientErrorRoutes)
+app.use('/api/receipts', authMiddleware, receiptsRoutes)
 
 // Protected routes
 app.use('/api/passengers', authMiddleware, passengerRoutes)
@@ -126,6 +129,7 @@ app.use(errorHandler)
 const start = async () => {
   try {
     await runMigrations()
+    markOverdueFees()
     startScheduler()
     app.listen(PORT, () => {
       logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'Server started')

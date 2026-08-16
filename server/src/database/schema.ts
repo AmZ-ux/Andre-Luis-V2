@@ -233,8 +233,23 @@ export async function runMigrations(): Promise<void> {
   try { db.exec('ALTER TABLE passengers ADD COLUMN contract_start_date TEXT DEFAULT \'\'') } catch {}
   try { db.exec('ALTER TABLE payments ADD COLUMN late_fee REAL NOT NULL DEFAULT 0') } catch {}
   try { db.exec('ALTER TABLE payments ADD COLUMN interest REAL NOT NULL DEFAULT 0') } catch {}
+  try { db.exec("ALTER TABLE payments ADD COLUMN receipt TEXT DEFAULT ''") } catch {}
+  try { db.exec("ALTER TABLE payments ADD COLUMN receipt_status TEXT NOT NULL DEFAULT 'none'") } catch {}
   try {
     db.exec("UPDATE monthly_fees SET due_date = printf('%02d/%02d/%04d', due_day, month, year) WHERE length(due_date) <= 7")
+  } catch {}
+
+  // Bump default billing tolerance from 5 to 0 days (fees flip to overdue right after the due date)
+  try {
+    const billing = db.prepare("SELECT * FROM settings WHERE category = 'billing'").get() as any
+    if (billing) {
+      const data = JSON.parse(billing.data)
+      if (data && typeof data.toleranceDays === 'number' && data.toleranceDays === 5) {
+        data.toleranceDays = 0
+        db.prepare("UPDATE settings SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(data), billing.id)
+        logger.info('Billing toleranceDays updated from 5 to 0 (new default)')
+      }
+    }
   } catch {}
 
   logger.info('Migrations executed successfully')

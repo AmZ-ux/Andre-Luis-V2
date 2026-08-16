@@ -121,7 +121,12 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
               Cancelar
             </button>
           </div>
-          <AvailabilityForm onSubmit={handleSubmit} loading={submitting} onCancel={() => setShowForm(false)} />
+          <AvailabilityForm
+            onSubmit={handleSubmit}
+            loading={submitting}
+            onCancel={() => setShowForm(false)}
+            existing={availabilities.map((a) => ({ id: a.id, startDate: a.startDate, endDate: a.endDate }))}
+          />
         </Card>
       )}
 

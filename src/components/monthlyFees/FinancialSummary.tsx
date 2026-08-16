@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
 import { cn } from '../../utils/cn'
-import type { MonthlyFee } from '../../types/monthlyFee'
+import type { MonthlyFee, MonthlyFeeSummary } from '../../types/monthlyFee'
 
 interface FinancialSummaryProps {
   fees: MonthlyFee[]
+  summary?: MonthlyFeeSummary | null
 }
 
 interface SummaryItem {
@@ -13,21 +14,34 @@ interface SummaryItem {
   variant: 'primary' | 'success' | 'warning' | 'error' | 'neutral'
 }
 
-export function FinancialSummary({ fees }: FinancialSummaryProps) {
-  const totalPrevisto = fees.reduce((s, f) => s + f.amount, 0)
-  const totalPago = fees.filter((f) => f.status === 'paid').reduce((s, f) => s + f.amount, 0)
-  const totalPendente = fees.filter((f) => f.status === 'pending').reduce((s, f) => s + f.amount, 0)
-  const totalAtrasado = fees.filter((f) => f.status === 'overdue').reduce((s, f) => s + f.amount, 0)
+export function FinancialSummary({ fees, summary }: FinancialSummaryProps) {
+  const computed = {
+    totalPrevisto: fees.reduce((s, f) => s + f.amount, 0),
+    totalPago: fees.filter((f) => f.status === 'paid').reduce((s, f) => s + f.amount, 0),
+    totalPendente: fees.filter((f) => f.status === 'pending').reduce((s, f) => s + f.amount, 0),
+    totalAtrasado: fees.filter((f) => f.status === 'overdue').reduce((s, f) => s + f.amount, 0),
+    qtdPaga: fees.filter((f) => f.status === 'paid').length,
+    qtdPendente: fees.filter((f) => f.status === 'pending').length,
+    qtdAtrasada: fees.filter((f) => f.status === 'overdue').length,
+  }
 
-  const qtdPaga = fees.filter((f) => f.status === 'paid').length
-  const qtdPendente = fees.filter((f) => f.status === 'pending').length
-  const qtdAtrasada = fees.filter((f) => f.status === 'overdue').length
+  const totals = summary
+    ? {
+        totalPrevisto: summary.expected,
+        totalPago: summary.received,
+        totalPendente: summary.pending,
+        totalAtrasado: summary.overdue,
+        qtdPaga: summary.paidCount,
+        qtdPendente: summary.pendingCount,
+        qtdAtrasada: summary.overdueCount,
+      }
+    : computed
 
   const items: SummaryItem[] = [
-    { label: 'Previsto', value: `R$ ${totalPrevisto.toFixed(2).replace('.', ',')}`, variant: 'primary' },
-    { label: 'Recebido', value: `R$ ${totalPago.toFixed(2).replace('.', ',')}`, subValue: `${qtdPaga} pagas`, variant: 'success' },
-    { label: 'Pendente', value: `R$ ${totalPendente.toFixed(2).replace('.', ',')}`, subValue: `${qtdPendente} pendentes`, variant: 'warning' },
-    { label: 'Atrasado', value: `R$ ${totalAtrasado.toFixed(2).replace('.', ',')}`, subValue: `${qtdAtrasada} atrasadas`, variant: 'error' },
+    { label: 'Previsto', value: `R$ ${totals.totalPrevisto.toFixed(2).replace('.', ',')}`, variant: 'primary' },
+    { label: 'Recebido', value: `R$ ${totals.totalPago.toFixed(2).replace('.', ',')}`, subValue: `${totals.qtdPaga} pagas`, variant: 'success' },
+    { label: 'Pendente', value: `R$ ${totals.totalPendente.toFixed(2).replace('.', ',')}`, subValue: `${totals.qtdPendente} pendentes`, variant: 'warning' },
+    { label: 'Atrasado', value: `R$ ${totals.totalAtrasado.toFixed(2).replace('.', ',')}`, subValue: `${totals.qtdAtrasada} atrasadas`, variant: 'error' },
   ]
 
   const variantStyles = {

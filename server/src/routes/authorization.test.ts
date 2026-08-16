@@ -134,7 +134,7 @@ describe('Autorização — passageiro não acessa áreas administrativas', () =
     const res = await request(app)
       .post('/api/availabilities')
       .set('Authorization', `Bearer ${passengerToken}`)
-      .send({ passengerId: otherId, passengerName: 'Outro', cpf: '222.222.222-22', startDate: '01/07/2026', endDate: '15/07/2026' })
+      .send({ passengerId: otherId, passengerName: 'Outro', cpf: '222.222.222-22', startDate: '01/09/2026', endDate: '15/09/2026' })
     expect(res.status).toBe(201)
     expect(res.body.passenger_id).toBe(passengerId)
 

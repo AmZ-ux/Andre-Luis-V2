@@ -17,6 +17,7 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3001}
       - DATA_DIR=/app/data
       - DATABASE_PATH=/app/data/database.sqlite
+      - UPLOADS_DIR=/app/data/uploads
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@transporte.com}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD is required}
       - MERCADO_PAGO_ACCESS_TOKEN=${MERCADO_PAGO_ACCESS_TOKEN:-}

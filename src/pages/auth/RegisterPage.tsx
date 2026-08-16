@@ -38,7 +38,7 @@ interface RegisterErrors {
 }
 
 export function RegisterPage() {
-  const { register, isAuthenticated, isLoading, error } = useAuth()
+  const { register, isAuthenticated, isLoading, error, clearError } = useAuth()
   const { addToast } = useToast()
   const navigate = useNavigate()
 
@@ -69,6 +69,7 @@ export function RegisterPage() {
     if (errors[field as keyof RegisterErrors]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }))
     }
+    clearError()
   }
 
   const validateStep1 = (): boolean => {
@@ -119,8 +120,11 @@ export function RegisterPage() {
       await register(form)
       addToast('success', 'Conta criada com sucesso!')
       navigate('/', { replace: true })
-    } catch {
-      addToast('error', 'Não foi possível criar a conta')
+    } catch (err) {
+      addToast(
+        'error',
+        err instanceof Error ? err.message : 'Não foi possível criar a conta'
+      )
     }
   }
 

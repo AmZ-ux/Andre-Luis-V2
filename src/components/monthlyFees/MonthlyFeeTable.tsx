@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronUp, ChevronDown, Pencil, XCircle, CheckCircle } from 'lucide-react'
+import { ChevronUp, ChevronDown, Pencil, XCircle, CheckCircle, CircleDollarSign } from 'lucide-react'
 import { MonthlyFeeStatus } from './MonthlyFeeStatus'
 import { cn } from '../../utils/cn'
 import { useIsMobile } from '../../hooks/useBreakpoint'
@@ -13,6 +13,7 @@ interface MonthlyFeeTableProps {
   onCancel: (fee: MonthlyFee) => void
   onExempt: (fee: MonthlyFee) => void
   onEdit: (fee: MonthlyFee) => void
+  onPay: (fee: MonthlyFee) => void
 }
 
 interface SortHeaderProps {
@@ -57,6 +58,7 @@ export function MonthlyFeeTable({
   onCancel,
   onExempt,
   onEdit,
+  onPay,
 }: MonthlyFeeTableProps) {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -75,6 +77,7 @@ export function MonthlyFeeTable({
         {fees.map((fee, i) => {
           const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
           const canExempt = fee.status !== 'paid' && fee.status !== 'exempt'
+          const canPay = fee.status === 'pending' || fee.status === 'overdue'
 
           return (
             <motion.div
@@ -114,6 +117,12 @@ export function MonthlyFeeTable({
                 <div>
                   <p className="text-gray-400">Pagamento</p>
                   <p className="text-sm text-text">{fee.payment?.paymentDate || '-'}</p>
+                  {fee.payment?.receiptStatus === 'pending' && (
+                    <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">Comprovante pendente</p>
+                  )}
+                  {fee.payment?.receiptStatus === 'rejected' && (
+                    <p className="text-[11px] font-medium text-error">Comprovante rejeitado</p>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <p className="text-gray-400">Forma de pagamento</p>
@@ -124,6 +133,16 @@ export function MonthlyFeeTable({
               </div>
 
               <div className="flex items-center justify-end gap-1 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+                {canPay && (
+                  <button
+                    onClick={() => onPay(fee)}
+                    className={cn(actionButtonClass, 'text-success hover:text-green-600')}
+                    aria-label="Registrar pagamento"
+                    title="Registrar pagamento"
+                  >
+                    <CircleDollarSign className="h-4 w-4" />
+                  </button>
+                )}
                 {canExempt && (
                   <button
                     onClick={() => onExempt(fee)}
@@ -187,6 +206,7 @@ export function MonthlyFeeTable({
           {fees.map((fee) => {
             const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
             const canExempt = fee.status !== 'paid' && fee.status !== 'exempt'
+            const canPay = fee.status === 'pending' || fee.status === 'overdue'
 
             return (
               <tr
@@ -210,6 +230,12 @@ export function MonthlyFeeTable({
                 <td className="px-4 py-3 text-center text-sm text-text">{fee.dueDate}</td>
                 <td className="px-4 py-3 text-center text-sm text-text">
                   {fee.payment?.paymentDate || '-'}
+                  {fee.payment?.receiptStatus === 'pending' && (
+                    <span className="block mt-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">Comprovante pendente</span>
+                  )}
+                  {fee.payment?.receiptStatus === 'rejected' && (
+                    <span className="block mt-1 text-[11px] font-medium text-error">Comprovante rejeitado</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <MonthlyFeeStatus status={fee.status} />
@@ -219,6 +245,16 @@ export function MonthlyFeeTable({
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex items-center gap-1">
+                    {canPay && (
+                      <button
+                        onClick={() => onPay(fee)}
+                        className={cn(actionButtonClass, 'text-success hover:text-green-600')}
+                        aria-label="Registrar pagamento"
+                        title="Registrar pagamento"
+                      >
+                        <CircleDollarSign className="h-4 w-4" />
+                      </button>
+                    )}
                     {canExempt && (
                       <button
                         onClick={() => onExempt(fee)}

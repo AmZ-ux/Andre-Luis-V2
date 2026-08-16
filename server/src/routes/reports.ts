@@ -1,19 +1,24 @@
 import { Router } from 'express'
 import { getDb } from '../database/connection.js'
 import { requireAdmin } from '../middleware/roles.js'
+import { markOverdueFees } from '../services/feeAutomation.js'
 
 const router = Router()
 router.use(requireAdmin)
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
-function todayBR(): string {
-  const now = new Date()
-  return `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+function toDate(value: string): Date | null {
+  let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value)
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]))
+  return null
 }
 
 router.get('/overview', (_req, res) => {
   const db = getDb()
+  markOverdueFees(db)
 
   // ===== Financeiro =====
   const fees = db.prepare('SELECT * FROM monthly_fees').all() as any[]
@@ -112,23 +117,29 @@ router.get('/overview', (_req, res) => {
 
   // ===== Disponibilidade =====
   const availabilities = db.prepare('SELECT * FROM availabilities').all() as any[]
-  const today = todayBR()
-  const activeAv = availabilities.filter((a) => a.status !== 'cancelled' && a.start_date <= today && a.end_date >= today)
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const avParsed = availabilities.map((a) => {
+    const start = toDate(a.start_date)
+    const end = toDate(a.end_date)
+    return { ...a, start, end }
+  })
+  const withDates = avParsed.filter((a) => a.start && a.end)
+  const activeAv = withDates.filter((a) => a.status !== 'cancelled' && a.start! <= todayStart && a.end! >= todayStart)
   const avMonthMap = new Map<string, number>()
-  availabilities.filter((a) => a.status !== 'cancelled').forEach((a) => {
-    const month = Number(String(a.start_date || '').split('/')[1])
-    const key = MONTH_NAMES[month - 1]
+  withDates.filter((a) => a.status !== 'cancelled').forEach((a) => {
+    const key = MONTH_NAMES[a.start!.getMonth()]
     if (key) avMonthMap.set(key, (avMonthMap.get(key) || 0) + 1)
   })
   const byMonthAv = Array.from(avMonthMap.entries()).map(([month, count]) => ({ month, count }))
 
   const availabilityData = {
     active: activeAv.length,
-    scheduled: availabilities.filter((a) => a.status !== 'cancelled' && a.start_date > today).length,
-    finished: availabilities.filter((a) => a.status === 'finished' || (a.status !== 'cancelled' && a.end_date < today)).length,
+    scheduled: withDates.filter((a) => a.status !== 'cancelled' && a.start! > todayStart).length,
+    finished: withDates.filter((a) => a.status === 'finished' || (a.status !== 'cancelled' && a.end! < todayStart)).length,
     cancelled: availabilities.filter((a) => a.status === 'cancelled').length,
     total: availabilities.length,
-    returningToday: availabilities.filter((a) => a.end_date === today && a.status !== 'cancelled').length,
+    returningToday: withDates.filter((a) => a.end!.getTime() === todayStart.getTime() && a.status !== 'cancelled').length,
     byMonth: byMonthAv,
   }
 

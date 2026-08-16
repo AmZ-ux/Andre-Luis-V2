@@ -26,6 +26,8 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
 
   const user = db.prepare('SELECT * FROM users WHERE email = ? OR cpf = ?').get(login, login) as any
   if (!user) {
+    db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(uuid(), 'login_failed', `Tentativa de login com usuário inexistente (${String(login).slice(0, 60)})${req.ip ? ` — IP ${req.ip}` : ''}`, 'Desconhecido', 'unknown', 'security')
     res.status(401).json({ error: 'Credenciais inválidas' })
     return
   }
@@ -46,10 +48,12 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
       db.prepare('UPDATE users SET failed_login_attempts = 0, locked_until = ? WHERE id = ?')
         .run(String(now + lockMinutes * 60000), user.id)
       db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(uuid(), 'login_blocked', `Conta bloqueada por ${lockMinutes} min após ${maxAttempts} tentativas de login falhas`, user.email, user.role, 'security')
+        .run(uuid(), 'login_blocked', `Conta bloqueada por ${lockMinutes} min após ${maxAttempts} tentativas de login falhas${req.ip ? ` — IP ${req.ip}` : ''}`, user.email, user.role, 'security')
       res.status(423).json({ error: `Muitas tentativas com credenciais inválidas. Conta bloqueada por ${lockMinutes} minutos.` })
     } else {
       db.prepare('UPDATE users SET failed_login_attempts = ? WHERE id = ?').run(attempts, user.id)
+      db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(uuid(), 'login_failed', `Senha incorreta na tentativa ${attempts}/${maxAttempts}${req.ip ? ` — IP ${req.ip}` : ''}`, user.name, user.role, 'security')
       res.status(401).json({ error: 'Credenciais inválidas' })
     }
     return
@@ -129,11 +133,18 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
     pickupPoint || '', destination || '', contractStartDate || '', dueDay, feeValue
   )
 
-  // Primeira mensalidade: competencia do mes ATUAL (mes do cadastro),
-  // vencendo no dia do contrato. Aparece pendente no dashboard logo apos o cadastro.
-  const now = new Date()
-  const feeMonth = now.getMonth() + 1
-  const feeYear = now.getFullYear()
+  // Primeira mensalidade: competencia derivada do inicio do contrato (1 mes
+  // apos a data informada, como o preview do cadastro promete). Sem data
+  // informada, usa o mes atual. Assim datas retroativas/futuras sao respeitadas.
+  let feeMonth = new Date().getMonth() + 1
+  let feeYear = new Date().getFullYear()
+  if (contractStartDate && /^\d{4}-\d{2}-\d{2}$/.test(contractStartDate)) {
+    const y = Number(contractStartDate.slice(0, 4))
+    const m = Number(contractStartDate.slice(5, 7))
+    feeMonth = m + 1
+    feeYear = y
+    if (feeMonth > 12) { feeMonth = 1; feeYear++ }
+  }
 
   db.prepare(`
     INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)
@@ -386,8 +397,9 @@ router.post('/refresh', authMiddleware, (req, res) => {
 
 router.post('/logout', authMiddleware, (req, res) => {
   const db = getDb()
+  const user = db.prepare('SELECT name, role FROM users WHERE id = ?').get(req.user!.userId) as any
   db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(uuid(), 'logout', 'Logout realizado', req.user!.role === 'admin' ? 'Administrador' : 'Passageiro', req.user!.role, 'logout')
+    .run(uuid(), 'logout', 'Logout realizado', user?.name || req.user!.role, user?.role || req.user!.role, 'logout')
   res.json({ success: true })
 })
 

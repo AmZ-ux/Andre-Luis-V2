@@ -9,6 +9,7 @@ interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>
   register: (credentials: RegisterCredentials) => Promise<void>
   logout: () => Promise<void>
+  clearError: () => void
   refreshProfile: () => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   updateProfile: (data: { name?: string; phone?: string; email?: string }) => Promise<User>
@@ -114,6 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ user: null, isAuthenticated: false, isLoading: false, error: null })
   }, [])
 
+  const clearError = useCallback(() => {
+    setState((prev) => (prev.error ? { ...prev, error: null } : prev))
+  }, [])
+
   const changePassword = useCallback(
     async (currentPassword: string, newPassword: string) => {
       if (!state.user) throw new Error('Usuário não autenticado')
@@ -180,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        clearError,
         refreshProfile,
         changePassword,
         updateProfile,

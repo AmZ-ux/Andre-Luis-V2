@@ -4,7 +4,7 @@ import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
 import { ensureContractFees } from '../services/monthlyFeeGenerator.js'
 import { calculateDueFromFee } from '../services/billingRules.js'
-import { notifyPaymentReceived } from '../services/feeAutomation.js'
+import { markOverdueFees, notifyPaymentReceived } from '../services/feeAutomation.js'
 import { requireAdmin as requireAdminRole } from '../middleware/roles.js'
 
 const router = Router()
@@ -44,9 +44,20 @@ router.post('/ensure-current', (req, res) => {
 
 router.get('/', requireAdminRole, (req, res) => {
   const db = getDb()
+  // Sincroniza status pendente -> vencida antes de ler, para a listagem e os
+  // filtros nunca mostrarem mensalidade atrasada como "Pendente".
+  markOverdueFees(db)
   const { search = '', month = '', year = '', status = '', transportType = '', page = '1', pageSize = '15', sortField = 'created_at', sortDirection = 'desc' } = req.query
 
-  let sql = 'SELECT mf.*, p.city FROM monthly_fees mf LEFT JOIN passengers p ON p.id = mf.passenger_id WHERE 1=1'
+  let sql = `SELECT mf.*, p.city,
+      pay.id AS payment_id, pay.amount AS payment_amount,
+      pay.payment_date AS payment_payment_date, pay.payment_method AS payment_payment_method,
+      pay.notes AS payment_notes, pay.created_at AS payment_created_at,
+      pay.receipt AS payment_receipt, pay.receipt_status AS payment_receipt_status, pay.late_fee AS payment_late_fee, pay.interest AS payment_interest
+    FROM monthly_fees mf
+    LEFT JOIN passengers p ON p.id = mf.passenger_id
+    LEFT JOIN payments pay ON pay.monthly_fee_id = mf.id
+    WHERE 1=1`
   const params: any[] = []
 
   if (search) { sql += ' AND (mf.passenger_name LIKE ? OR mf.cpf LIKE ?)'; params.push(`%${search}%`, `%${search}%`) }
@@ -56,7 +67,18 @@ router.get('/', requireAdminRole, (req, res) => {
   if (transportType) { sql += ' AND mf.transport_type = ?'; params.push(transportType) }
 
   const wherePart = sql.includes('AND') ? sql.slice(sql.indexOf('AND')) : ''
-  const countResult = db.prepare(`SELECT COUNT(*) as total FROM monthly_fees mf WHERE 1=1 ${wherePart}`).get(...params) as any
+  const summarySql = `SELECT
+      COUNT(*) as total,
+      COALESCE(SUM(amount), 0) as expected,
+      COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as received,
+      COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending,
+      COALESCE(SUM(CASE WHEN status = 'overdue' THEN amount ELSE 0 END), 0) as overdue,
+      COALESCE(SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END), 0) as paidCount,
+      COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pendingCount,
+      COALESCE(SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END), 0) as overdueCount
+    FROM monthly_fees mf WHERE 1=1 ${wherePart}`
+  const summary = db.prepare(summarySql).get(...params) as any
+  const countResult = summary
   const total = countResult?.total || 0
 
   const allowedSorts = ['passenger_name', 'amount', 'due_day', 'payment_date', 'created_at']
@@ -67,8 +89,42 @@ router.get('/', requireAdminRole, (req, res) => {
   sql += ` ORDER BY ${field} ${dir} LIMIT ? OFFSET ?`
   params.push(Number(pageSize), offset)
 
-  const data = db.prepare(sql).all(...params)
-  res.json({ data, total })
+  const rows = db.prepare(sql).all(...params) as any[]
+  const data = rows.map((r) => {
+    const {
+      payment_id, payment_amount, payment_payment_date, payment_payment_method,
+      payment_notes, payment_created_at, payment_receipt, payment_receipt_status, payment_late_fee, payment_interest,
+      ...rest
+    } = r
+    const payment = payment_id
+      ? {
+          id: payment_id,
+          amount: payment_amount,
+          payment_date: payment_payment_date,
+          payment_method: payment_payment_method,
+          notes: payment_notes || '',
+          created_at: payment_created_at,
+          receipt: payment_receipt || '',
+          receipt_status: payment_receipt_status || 'none',
+          late_fee: payment_late_fee,
+          interest: payment_interest,
+        }
+      : null
+    return { ...rest, payment }
+  })
+  res.json({
+    data,
+    total,
+    summary: {
+      expected: summary?.expected || 0,
+      received: summary?.received || 0,
+      pending: summary?.pending || 0,
+      overdue: summary?.overdue || 0,
+      paidCount: summary?.paidCount || 0,
+      pendingCount: summary?.pendingCount || 0,
+      overdueCount: summary?.overdueCount || 0,
+    },
+  })
 })
 
 router.get('/:id', (req, res) => {
@@ -145,7 +201,7 @@ router.put('/:id', (req, res) => {
 router.post('/:id/pay', (req, res) => {
   if (!requireAdmin(req, res)) return
   const db = getDb()
-  const { amount, paymentDate, paymentMethod, notes } = req.body
+  const { amount, paymentDate, paymentMethod, notes, receipt } = req.body
   const existing = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id) as any
   if (!existing) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
 
@@ -162,10 +218,21 @@ router.post('/:id/pay', (req, res) => {
     return
   }
 
+  // Comprovante opcional: URL do upload (/api/receipts/...) ou data URL legado (máx. ~3MB)
+  let receiptValue = ''
+  if (receipt !== undefined && receipt !== null && receipt !== '') {
+    const raw = String(receipt)
+    if (raw.length > 3 * 1024 * 1024) {
+      res.status(400).json({ error: 'Comprovante muito grande (máximo 3MB)' })
+      return
+    }
+    receiptValue = raw
+  }
+
   const payId = uuid()
   db.prepare(`
-    INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest, receipt, receipt_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     payId,
     req.params.id,
@@ -174,7 +241,9 @@ router.post('/:id/pay', (req, res) => {
     paymentMethod,
     notes || '',
     breakdown.lateFee,
-    breakdown.interest
+    breakdown.interest,
+    receiptValue,
+    receiptValue ? 'pending' : 'none'
   )
 
   db.prepare('UPDATE monthly_fees SET status = \'paid\', updated_at = datetime(\'now\') WHERE id = ?').run(req.params.id)
@@ -182,8 +251,9 @@ router.post('/:id/pay', (req, res) => {
   const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id) as any
   const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(req.params.id)
 
+  const payer = req.user ? db.prepare('SELECT name, role FROM users WHERE id = ?').get(req.user.userId) as any : null
   db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(uuid(), 'payment', `Pagamento de R$ ${Number(payAmount).toFixed(2)} registrado`, 'Administrador', 'admin', 'payment')
+    .run(uuid(), 'payment', `Pagamento de R$ ${Number(payAmount).toFixed(2)} registrado`, payer?.name || 'Administrador', payer?.role || 'admin', 'payment')
 
   notifyPaymentReceived(db, fee, payment)
 
@@ -195,6 +265,7 @@ router.get('/passenger/:passengerId', (req, res) => {
   const isAdmin = req.user.role === 'admin'
   const passengerId = isAdmin ? req.params.passengerId : req.user.userId
   const db = getDb()
+  markOverdueFees(db)
   const data = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? ORDER BY year DESC, month DESC').all(passengerId)
   res.json(data)
 })

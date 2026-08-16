@@ -12,9 +12,10 @@ interface AvailabilityFormProps {
   onCancel: () => void
   loading?: boolean
   submitLabel?: string
+  existing?: { startDate: string; endDate: string; id: string }[]
 }
 
-export function AvailabilityForm({ onSubmit, onCancel, loading = false, submitLabel = 'Confirmar' }: AvailabilityFormProps) {
+export function AvailabilityForm({ onSubmit, onCancel, loading = false, submitLabel = 'Confirmar', existing = [] }: AvailabilityFormProps) {
   const [type, setType] = useState<string>('vacation')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -22,11 +23,28 @@ export function AvailabilityForm({ onSubmit, onCancel, loading = false, submitLa
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const clearError = (field: string) => {
+    setErrors((prev) => {
+      if (!prev[field]) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
   const validate = (): boolean => {
     const errs: Record<string, string> = {}
+    if (!startDate) errs.startDate = 'Data inicial é obrigatória'
+    if (!endDate) errs.endDate = 'Data final é obrigatória'
     const dateResult = availabilityValidation.validateDates(startDate, endDate)
     if (!dateResult.valid) {
-      errs.dates = dateResult.error || ''
+      errs.startDate = errs.startDate || dateResult.error || ''
+      errs.endDate = errs.endDate || dateResult.error || ''
+    }
+    const overlapResult = availabilityValidation.validateNoOverlap(startDate, endDate, existing)
+    if (!overlapResult.valid) {
+      errs.startDate = overlapResult.error || ''
+      errs.endDate = overlapResult.error || ''
     }
     const reasonResult = availabilityValidation.validateReason(reason)
     if (!reasonResult.valid) {
@@ -67,21 +85,22 @@ export function AvailabilityForm({ onSubmit, onCancel, loading = false, submitLa
           label="Data inicial"
           type="date"
           value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          error={errors.dates}
+          onChange={(e) => { setStartDate(e.target.value); clearError('startDate') }}
+          error={errors.startDate}
         />
         <Input
           label="Data final"
           type="date"
           value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
+          onChange={(e) => { setEndDate(e.target.value); clearError('endDate') }}
+          error={errors.endDate}
         />
       </div>
 
       <Textarea
         label="Motivo"
         value={reason}
-        onChange={(e) => setReason(e.target.value)}
+        onChange={(e) => { setReason(e.target.value); clearError('reason') }}
         error={errors.reason}
         placeholder="Descreva o motivo..."
         rows={3}

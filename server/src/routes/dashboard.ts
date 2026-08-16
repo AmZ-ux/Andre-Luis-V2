@@ -1,6 +1,7 @@
 ﻿import { Router } from 'express'
 import { getDb } from '../database/connection.js'
 import { requireAdmin } from '../middleware/roles.js'
+import { markOverdueFees } from '../services/feeAutomation.js'
 
 const router = Router()
 
@@ -121,6 +122,7 @@ function buildChartData(db: any, period: string) {
 
 router.get('/', (_req, res) => {
   const db = getDb()
+  markOverdueFees(db)
 
   const totalPassengers = (db.prepare('SELECT COUNT(*) as c FROM passengers').get() as any).c
   const activePassengers = (db.prepare("SELECT COUNT(*) as c FROM passengers WHERE status = 'active'").get() as any).c
@@ -166,15 +168,19 @@ router.get('/', (_req, res) => {
   `).all() as any[]
 
   const now = new Date()
-  const today = now.getDate()
-  const upcomingPayments = rawUpcoming.map((fee: any) => ({
-    id: fee.id,
-    name: fee.passenger_name,
-    initials: initials(fee.passenger_name),
-    dueDate: `${String(fee.due_day).padStart(2, '0')}/${String(fee.month).padStart(2, '0')}`,
-    value: fee.amount,
-    daysRemaining: fee.due_day - today,
-  }))
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const upcomingPayments = rawUpcoming.map((fee: any) => {
+    const due = new Date(Number(fee.year), Number(fee.month) - 1, Number(fee.due_day))
+    return {
+      id: fee.id,
+      name: fee.passenger_name,
+      initials: initials(fee.passenger_name),
+      dueDate: `${String(fee.due_day).padStart(2, '0')}/${String(fee.month).padStart(2, '0')}`,
+      value: fee.amount,
+      daysRemaining: Math.round((due.getTime() - todayStart.getTime()) / DAY_MS),
+    }
+  })
 
   // Notifications
   const rawNotifs = db.prepare(`

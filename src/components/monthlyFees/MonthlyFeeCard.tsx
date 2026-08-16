@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { MonthlyFeeStatus } from './MonthlyFeeStatus'
-import { XCircle, CheckCircle, Pencil, Calendar } from 'lucide-react'
+import { XCircle, CheckCircle, Pencil, Calendar, CircleDollarSign } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import type { MonthlyFee } from '../../types/monthlyFee'
 
@@ -10,6 +10,7 @@ interface MonthlyFeeCardProps {
   onCancel: (fee: MonthlyFee) => void
   onExempt: (fee: MonthlyFee) => void
   onEdit: (fee: MonthlyFee) => void
+  onPay: (fee: MonthlyFee) => void
   index: number
 }
 
@@ -18,10 +19,11 @@ const monthNames = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ]
 
-export function MonthlyFeeCard({ fee, onCancel, onExempt, onEdit, index }: MonthlyFeeCardProps) {
+export function MonthlyFeeCard({ fee, onCancel, onExempt, onEdit, onPay, index }: MonthlyFeeCardProps) {
   const navigate = useNavigate()
   const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
   const canExempt = fee.status !== 'paid' && fee.status !== 'exempt'
+  const canPay = fee.status === 'pending' || fee.status === 'overdue'
 
   const btnClass =
     'h-11 w-11 rounded-xl flex items-center justify-center transition-all hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -60,6 +62,16 @@ export function MonthlyFeeCard({ fee, onCancel, onExempt, onEdit, index }: Month
           )}
         </div>
         <div className="flex items-center gap-1">
+          {canPay && (
+            <button
+              onClick={() => onPay(fee)}
+              className={cn(btnClass, 'text-success')}
+              aria-label="Registrar pagamento"
+              title="Registrar pagamento"
+            >
+              <CircleDollarSign className="h-4 w-4" />
+            </button>
+          )}
           {canExempt && (
             <button
               onClick={() => onExempt(fee)}

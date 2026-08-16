@@ -11,7 +11,7 @@ import { validateLogin, validatePassword } from '../../validators/authValidators
 import type { LoginCredentials } from '../../types/auth'
 
 export function LoginForm() {
-  const { login, isLoading, error } = useAuth()
+  const { login, isLoading, error, clearError } = useAuth()
   const { addToast } = useToast()
 
   const [credentials, setCredentials] = useState<LoginCredentials>({
@@ -26,6 +26,7 @@ export function LoginForm() {
     if (errors[field as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }))
     }
+    clearError()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

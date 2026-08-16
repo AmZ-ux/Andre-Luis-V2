@@ -44,19 +44,31 @@ function seedFee(passengerId: string, overrides: Record<string, any> = {}): stri
 describe('markOverdueFees', () => {
   const today = new Date(2026, 7, 15)
 
-  it('marks pending fees past due beyond tolerance as overdue', () => {
+  it('marks pending fees past due as overdue with zero tolerance', () => {
     const pid = seedPassenger()
-    seedFee(pid, { month: 6, year: 2026, dueDay: 5 }) // due 05/06 => 41 days late
+    seedFee(pid, { month: 8, year: 2026, dueDay: 10 }) // due 10/08 => 5 days late
     const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
     expect(updated).toBe(1)
     const fee = getDb().prepare('SELECT status FROM monthly_fees').get() as any
     expect(fee.status).toBe('overdue')
   })
 
-  it('keeps fees within tolerance as pending', () => {
+  it('keeps fees due on or after today as pending', () => {
     const pid = seedPassenger()
-    seedFee(pid, { month: 8, year: 2026, dueDay: 10 }) // due 10/08 => 5 days late = tolerance
+    seedFee(pid, { month: 8, year: 2026, dueDay: 15 }) // due 15/08 => 0 days late
+    seedFee(pid, { month: 9, year: 2026, dueDay: 5, cpf: '111.111.111-22' })
     const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
+    expect(updated).toBe(0)
+    const fees = getDb().prepare('SELECT status FROM monthly_fees').all()
+    expect(fees.every((f: any) => f.status === 'pending')).toBe(true)
+  })
+
+  it('respects a custom tolerance setting', () => {
+    const pid = seedPassenger()
+    seedFee(pid, { month: 8, year: 2026, dueDay: 10 }) // due 10/08 => 5 days late
+    const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
+    settings.billing.toleranceDays = 5
+    const updated = markOverdueFees(getDb(), settings, today)
     expect(updated).toBe(0)
     const fee = getDb().prepare('SELECT status FROM monthly_fees').get() as any
     expect(fee.status).toBe('pending')

@@ -2,6 +2,8 @@ import type { TransportType, PaymentMethod } from './passenger'
 
 export type MonthlyFeeStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'exempt'
 
+export type ReceiptStatus = 'none' | 'pending' | 'approved' | 'rejected'
+
 export interface Payment {
   id: string
   monthlyFeeId: string
@@ -9,7 +11,25 @@ export interface Payment {
   paymentDate: string
   paymentMethod: PaymentMethod
   notes?: string
+  receipt?: string
+  receiptStatus?: ReceiptStatus
   createdAt: string
+}
+
+export interface MonthlyFeeSummary {
+  expected: number
+  received: number
+  pending: number
+  overdue: number
+  paidCount: number
+  pendingCount: number
+  overdueCount: number
+}
+
+export interface MonthlyFeeListResult {
+  data: MonthlyFee[]
+  total: number
+  summary?: MonthlyFeeSummary
 }
 
 export interface MonthlyFee {
@@ -62,6 +82,7 @@ export interface PaymentFormData {
   paymentDate: string
   paymentMethod: PaymentMethod
   notes: string
+  receipt?: string
 }
 
 export interface MonthlyFeeEditData {

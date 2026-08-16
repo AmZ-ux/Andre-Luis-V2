@@ -9,8 +9,16 @@ interface ApiError {
   errors?: Record<string, string[]>
 }
 
+function toError(status: number, message: string, code?: string, errors?: Record<string, string[]>): Error & ApiError {
+  const error = new Error(message) as Error & ApiError
+  error.status = status
+  error.code = code
+  error.errors = errors
+  return error
+}
+
 function getBaseUrl(): string {
-  return config.apiUrl || 'http://localhost:3001/api'
+  return config.apiUrl || '/api'
 }
 
 function buildQueryString(params?: Record<string, any>): string {
@@ -45,18 +53,20 @@ async function request<T>(
   if (res.status === 401 && !options?.noAuth) {
     sessionManager.destroy()
     window.location.href = '/login'
-    throw { status: 401, message: 'Sessão expirada' }
+    throw toError(401, 'Sessão expirada')
   }
 
   if (!res.ok) {
-    const error: ApiError = { status: res.status, message: `HTTP ${res.status}` }
+    let message = `HTTP ${res.status}`
+    let code: string | undefined
+    let errors: Record<string, string[]> | undefined
     try {
       const data = await res.json()
-      error.message = data.error || error.message
-      error.code = data.code
-      error.errors = data.errors
+      if (typeof data?.error === 'string') message = data.error
+      if (typeof data?.code === 'string') code = data.code
+      if (data?.errors) errors = data.errors
     } catch {}
-    throw error
+    throw toError(res.status, message, code, errors)
   }
 
   if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T
@@ -96,7 +106,7 @@ export const api = {
     if (!res.ok) {
       let message = `HTTP ${res.status}`
       try { const d = await res.json(); message = d.error || message } catch {}
-      throw { status: res.status, message }
+      throw toError(res.status, message)
     }
     const json = await res.json()
     return transformKeys<T>(json)
@@ -112,7 +122,7 @@ export const api = {
     if (!res.ok) {
       let message = `HTTP ${res.status}`
       try { const d = await res.json(); message = d.error || message } catch {}
-      throw { status: res.status, message }
+      throw toError(res.status, message)
     }
     return res.blob()
   },

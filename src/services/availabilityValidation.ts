@@ -10,11 +10,11 @@ export const availabilityValidation = {
     if (!startDate) return { valid: false, error: 'Data inicial é obrigatória' }
     if (!endDate) return { valid: false, error: 'Data final é obrigatória' }
 
-    const start = new Date(startDate)
-    const end = new Date(endDate)
+    const start = parseDateBR(startDate)
+    const end = parseDateBR(endDate)
 
-    if (isNaN(start.getTime())) return { valid: false, error: 'Data inicial inválida' }
-    if (isNaN(end.getTime())) return { valid: false, error: 'Data final inválida' }
+    if (!start || isNaN(start.getTime())) return { valid: false, error: 'Data inicial inválida' }
+    if (!end || isNaN(end.getTime())) return { valid: false, error: 'Data final inválida' }
 
     if (end < start) return { valid: false, error: 'Data final deve ser maior que a data inicial' }
 
