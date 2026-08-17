@@ -26,7 +26,8 @@ FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app/server
 COPY server/package.json server/package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts
+# Sem --ignore-scripts: necessario para o install do better-sqlite3 baixar o prebuild nativo (ABI node-v127, linuxmusl-x64)
+RUN npm ci --omit=dev --no-audit --no-fund
 COPY --from=server-build /app/server/dist ./dist
 COPY --from=frontend-build /app/dist /app/dist
 EXPOSE 3001
