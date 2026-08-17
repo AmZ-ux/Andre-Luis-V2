@@ -53,7 +53,7 @@ router.get('/', requireAdminRole, (req, res) => {
       pay.id AS payment_id, pay.amount AS payment_amount,
       pay.payment_date AS payment_payment_date, pay.payment_method AS payment_payment_method,
       pay.notes AS payment_notes, pay.created_at AS payment_created_at,
-      pay.receipt AS payment_receipt, pay.receipt_status AS payment_receipt_status, pay.late_fee AS payment_late_fee, pay.interest AS payment_interest
+      pay.late_fee AS payment_late_fee, pay.interest AS payment_interest
     FROM monthly_fees mf
     LEFT JOIN passengers p ON p.id = mf.passenger_id
     LEFT JOIN payments pay ON pay.monthly_fee_id = mf.id
@@ -93,7 +93,7 @@ router.get('/', requireAdminRole, (req, res) => {
   const data = rows.map((r) => {
     const {
       payment_id, payment_amount, payment_payment_date, payment_payment_method,
-      payment_notes, payment_created_at, payment_receipt, payment_receipt_status, payment_late_fee, payment_interest,
+      payment_notes, payment_created_at, payment_late_fee, payment_interest,
       ...rest
     } = r
     const payment = payment_id
@@ -104,8 +104,6 @@ router.get('/', requireAdminRole, (req, res) => {
           payment_method: payment_payment_method,
           notes: payment_notes || '',
           created_at: payment_created_at,
-          receipt: payment_receipt || '',
-          receipt_status: payment_receipt_status || 'none',
           late_fee: payment_late_fee,
           interest: payment_interest,
         }
@@ -201,7 +199,7 @@ router.put('/:id', (req, res) => {
 router.post('/:id/pay', (req, res) => {
   if (!requireAdmin(req, res)) return
   const db = getDb()
-  const { amount, paymentDate, paymentMethod, notes, receipt } = req.body
+  const { amount, paymentDate, paymentMethod, notes } = req.body
   const existing = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id) as any
   if (!existing) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
 
@@ -218,21 +216,10 @@ router.post('/:id/pay', (req, res) => {
     return
   }
 
-  // Comprovante opcional: URL do upload (/api/receipts/...) ou data URL legado (máx. ~3MB)
-  let receiptValue = ''
-  if (receipt !== undefined && receipt !== null && receipt !== '') {
-    const raw = String(receipt)
-    if (raw.length > 3 * 1024 * 1024) {
-      res.status(400).json({ error: 'Comprovante muito grande (máximo 3MB)' })
-      return
-    }
-    receiptValue = raw
-  }
-
   const payId = uuid()
   db.prepare(`
-    INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest, receipt, receipt_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     payId,
     req.params.id,
@@ -241,9 +228,7 @@ router.post('/:id/pay', (req, res) => {
     paymentMethod,
     notes || '',
     breakdown.lateFee,
-    breakdown.interest,
-    receiptValue,
-    receiptValue ? 'pending' : 'none'
+    breakdown.interest
   )
 
   db.prepare('UPDATE monthly_fees SET status = \'paid\', updated_at = datetime(\'now\') WHERE id = ?').run(req.params.id)

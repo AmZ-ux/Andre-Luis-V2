@@ -154,29 +154,11 @@ export const realMonthlyFees = {
   update: (id: string, data: any) =>
     api.put<MonthlyFee>(`/monthly-fees/${id}`, data),
 
-  pay: (id: string, data: { paymentMethod: string; amount: number; paymentDate: string; notes?: string; receipt?: string }) =>
+  pay: (id: string, data: { paymentMethod: string; amount: number; paymentDate: string; notes?: string }) =>
     api.post<MonthlyFee & { payment?: Payment; breakdown?: any }>(`/monthly-fees/${id}/pay`, data),
 
   remove: (id: string) =>
     api.delete<void>(`/monthly-fees/${id}`),
-}
-
-// --- Receipts (comprovantes) ---
-export const realReceipts = {
-  upload: (file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    return api.upload<{ url: string; filename: string }>('/receipts', form)
-  },
-
-  approve: (paymentId: string) =>
-    api.post<{ success: boolean; receiptStatus: string }>(`/receipts/${paymentId}/approve`),
-
-  reject: (paymentId: string) =>
-    api.post<{ success: boolean; receiptStatus: string }>(`/receipts/${paymentId}/reject`),
-
-  download: (url: string) =>
-    api.download(url),
 }
 
 // --- Availability ---

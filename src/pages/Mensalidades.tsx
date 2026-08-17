@@ -58,7 +58,7 @@ export function Mensalidades() {
   }, [])
 
   const handlePayConfirm = useCallback(
-    async (data: { amount: number; paymentDate: string; paymentMethod: string; notes?: string; receipt?: string }) => {
+    async (data: { amount: number; paymentDate: string; paymentMethod: string; notes?: string }) => {
       if (!selectedFee) return
       await registerPayment(selectedFee.id, {
         ...data,

@@ -86,7 +86,7 @@ export function useMonthlyFees(pageSize = 15) {
   const registerPayment = useCallback(
     async (
       feeId: string,
-      data: { amount: number; paymentDate: string; paymentMethod: PaymentMethod; notes?: string; receipt?: string }
+      data: { amount: number; paymentDate: string; paymentMethod: PaymentMethod; notes?: string }
     ) => {
       const result = await paymentService.register(feeId, data)
       setFees((prev) =>

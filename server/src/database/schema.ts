@@ -233,8 +233,6 @@ export async function runMigrations(): Promise<void> {
   try { db.exec('ALTER TABLE passengers ADD COLUMN contract_start_date TEXT DEFAULT \'\'') } catch {}
   try { db.exec('ALTER TABLE payments ADD COLUMN late_fee REAL NOT NULL DEFAULT 0') } catch {}
   try { db.exec('ALTER TABLE payments ADD COLUMN interest REAL NOT NULL DEFAULT 0') } catch {}
-  try { db.exec("ALTER TABLE payments ADD COLUMN receipt TEXT DEFAULT ''") } catch {}
-  try { db.exec("ALTER TABLE payments ADD COLUMN receipt_status TEXT NOT NULL DEFAULT 'none'") } catch {}
   try {
     db.exec("UPDATE monthly_fees SET due_date = printf('%02d/%02d/%04d', due_day, month, year) WHERE length(due_date) <= 7")
   } catch {}

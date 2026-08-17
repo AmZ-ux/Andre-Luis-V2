@@ -117,12 +117,6 @@ export function MonthlyFeeTable({
                 <div>
                   <p className="text-gray-400">Pagamento</p>
                   <p className="text-sm text-text">{fee.payment?.paymentDate || '-'}</p>
-                  {fee.payment?.receiptStatus === 'pending' && (
-                    <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">Comprovante pendente</p>
-                  )}
-                  {fee.payment?.receiptStatus === 'rejected' && (
-                    <p className="text-[11px] font-medium text-error">Comprovante rejeitado</p>
-                  )}
                 </div>
                 <div className="col-span-2">
                   <p className="text-gray-400">Forma de pagamento</p>
@@ -230,12 +224,6 @@ export function MonthlyFeeTable({
                 <td className="px-4 py-3 text-center text-sm text-text">{fee.dueDate}</td>
                 <td className="px-4 py-3 text-center text-sm text-text">
                   {fee.payment?.paymentDate || '-'}
-                  {fee.payment?.receiptStatus === 'pending' && (
-                    <span className="block mt-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">Comprovante pendente</span>
-                  )}
-                  {fee.payment?.receiptStatus === 'rejected' && (
-                    <span className="block mt-1 text-[11px] font-medium text-error">Comprovante rejeitado</span>
-                  )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <MonthlyFeeStatus status={fee.status} />

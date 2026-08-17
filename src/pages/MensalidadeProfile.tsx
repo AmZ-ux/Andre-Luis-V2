@@ -3,13 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { monthlyFeeService } from '../services/monthlyFeeService'
 import { MonthlyFeeStatus } from '../components/monthlyFees/MonthlyFeeStatus'
-import { ReceiptViewer } from '../components/monthlyFees/ReceiptViewer'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { PageSpinner } from '../components/ui/Spinner'
-import { useAuth } from '../auth/AuthContext'
 import { ArrowLeft, DollarSign, Calendar, User, Building2, FileText, CreditCard, Clock } from 'lucide-react'
-import type { MonthlyFee, ReceiptStatus } from '../types/monthlyFee'
+import type { MonthlyFee } from '../types/monthlyFee'
 
 const monthNames = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -26,8 +24,6 @@ export function MensalidadeProfile() {
   const [fee, setFee] = useState<MonthlyFee | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     if (!id) return
@@ -174,22 +170,6 @@ export function MensalidadeProfile() {
                   <p className="text-xs text-gray-400">Observação</p>
                   <p className="text-sm text-text">{fee.payment.notes}</p>
                 </div>
-              </div>
-            )}
-            {fee.payment?.receipt && (
-              <div className="sm:col-span-2">
-                <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                  <FileText className="h-3.5 w-3.5" /> Comprovante
-                </p>
-                <ReceiptViewer
-                  receipt={fee.payment.receipt}
-                  receiptStatus={fee.payment.receiptStatus}
-                  isAdmin={isAdmin}
-                  paymentId={fee.payment.id}
-                  onApproved={(status: ReceiptStatus) => {
-                    setFee((prev) => prev && prev.payment ? { ...prev, payment: { ...prev.payment, receiptStatus: status } } : prev)
-                  }}
-                />
               </div>
             )}
           </div>

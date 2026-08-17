@@ -26,7 +26,6 @@ export const paymentService = {
       paymentDate: string
       paymentMethod: PaymentMethod
       notes?: string
-      receipt?: string
     }
   ): Promise<{ payment: Payment; feeStatus: MonthlyFeeStatus }> {
     if (config.realApi) {
@@ -35,7 +34,6 @@ export const paymentService = {
         paymentDate: data.paymentDate,
         paymentMethod: data.paymentMethod,
         notes: data.notes || '',
-        receipt: data.receipt || '',
       })
       const payment = (res as any).payment as Payment
       return { payment, feeStatus: 'paid' }
@@ -62,7 +60,6 @@ export const paymentService = {
       paymentDate: data.paymentDate,
       paymentMethod: data.paymentMethod,
       notes: data.notes || '',
-      receipt: data.receipt || '',
       createdAt: new Date().toLocaleDateString('pt-BR'),
     }
 
