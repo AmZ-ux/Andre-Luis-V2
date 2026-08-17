@@ -11,9 +11,11 @@ export function AppLayout() {
   const location = useLocation()
 
   const showGreeting = user?.role === 'passenger' && location.pathname === '/'
+  const bellInContent = user?.role === 'admin' && location.pathname === '/'
   const hideBell =
-    user?.role === 'passenger' &&
-    (location.pathname === '/minhas-mensalidades' || location.pathname === '/perfil')
+    bellInContent ||
+    (user?.role === 'passenger' &&
+      (location.pathname === '/minhas-mensalidades' || location.pathname === '/perfil'))
   const hasHeaderContent = showGreeting || !hideBell
   const firstName = showGreeting ? (user?.name?.split(' ')[0] ?? '') : ''
   const todayLabel = showGreeting
