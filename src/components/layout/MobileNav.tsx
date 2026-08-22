@@ -82,8 +82,8 @@ export function MobileNav() {
   }
 
   return (
-    <nav className="lg:hidden fixed bottom-1 left-0 right-0 z-40 bg-white dark:bg-gray-900 shadow-pop safe-area-bottom">
-      <div className="flex items-center justify-around h-16 px-2">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 shadow-pop safe-area-bottom">
+      <div className="flex items-center justify-around px-2 pt-2.5 pb-4">
         {primaryItems.map((item) => renderItem(item))}
         {moreItems.length > 0 && (
           <button
