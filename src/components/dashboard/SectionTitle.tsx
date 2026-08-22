@@ -10,13 +10,13 @@ interface SectionTitleProps {
 
 export function SectionTitle({ title, subtitle, action, className }: SectionTitleProps) {
   return (
-    <div className={cn('flex items-end justify-between mb-4', className)}>
-      <div>
-        <h2 className="text-base sm:text-lg font-bold text-text">{title}</h2>
+    <div className={cn('flex items-center justify-between gap-4 mb-4', className)}>
+      <div className="min-w-0">
+        <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text">
+          {title}
+        </h2>
         {subtitle && (
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {subtitle}
-          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{subtitle}</p>
         )}
       </div>
       {action && <div className="shrink-0">{action}</div>}

@@ -11,12 +11,17 @@ interface PageTabsProps {
   tabs: PageTab[]
   value: string
   onChange: (key: string) => void
+  className?: string
 }
 
-export function PageTabs({ tabs, value, onChange }: PageTabsProps) {
+export function PageTabs({ tabs, value, onChange, className }: PageTabsProps) {
   return (
     <div
-      className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide"
+      className={cn(
+        'inline-flex self-start bg-gray-100 dark:bg-gray-800 rounded-full p-1 gap-1 max-w-full overflow-x-auto scrollbar-hide',
+        className
+      )}
+      role="tablist"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
       {tabs.map((tab) => {
@@ -25,15 +30,17 @@ export function PageTabs({ tabs, value, onChange }: PageTabsProps) {
         return (
           <button
             key={tab.key}
+            role="tab"
+            aria-selected={isActive}
             onClick={() => onChange(tab.key)}
             className={cn(
-              'flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-200',
+              'flex items-center justify-center gap-1.5 px-5 sm:px-6 h-10 text-sm font-semibold whitespace-nowrap rounded-full transition-all duration-150 min-w-fit flex-1 sm:flex-none',
               isActive
-                ? 'bg-primary text-white shadow-sm'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                ? 'bg-white dark:bg-gray-700 text-text shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-text'
             )}
           >
-            {Icon && <Icon className="h-3.5 w-3.5" />}
+            {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
             {tab.label}
           </button>
         )

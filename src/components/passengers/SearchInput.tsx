@@ -11,17 +11,17 @@ interface SearchInputProps {
 export function SearchInput({ value, onChange, placeholder = 'Buscar passageiro...', className }: SearchInputProps) {
   return (
     <div className={cn('relative', className)}>
-      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          'w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700',
-          'bg-white dark:bg-gray-800 pl-10 pr-10',
+          'w-full h-12 rounded-full border border-transparent',
+          'bg-white dark:bg-gray-800 pl-11 pr-10 shadow-card',
           'text-sm text-text dark:text-gray-100 placeholder:text-gray-400',
-          'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
+          'focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary',
           'transition-all duration-200'
         )}
       />

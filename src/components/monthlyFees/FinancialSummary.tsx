@@ -1,5 +1,4 @@
-import { motion } from 'framer-motion'
-import { cn } from '../../utils/cn'
+﻿import { cn } from '../../utils/cn'
 import type { MonthlyFee, MonthlyFeeSummary } from '../../types/monthlyFee'
 
 interface FinancialSummaryProps {
@@ -44,43 +43,50 @@ export function FinancialSummary({ fees, summary }: FinancialSummaryProps) {
     { label: 'Atrasado', value: `R$ ${totals.totalAtrasado.toFixed(2).replace('.', ',')}`, subValue: `${totals.qtdAtrasada} atrasadas`, variant: 'error' },
   ]
 
-  const variantStyles = {
-    primary: 'from-primary/5 to-primary/10 border-primary/20',
-    success: 'from-success/5 to-success/10 border-success/20',
-    warning: 'from-warning/5 to-warning/10 border-warning/20',
-    error: 'from-error/5 to-error/10 border-error/20',
-    neutral: 'from-gray-50 to-gray-100 border-gray-200',
-  }
-
-  const iconColors = {
-    primary: 'text-primary',
+  const valueColors = {
+    primary: 'text-text',
     success: 'text-success',
     warning: 'text-warning',
     error: 'text-error',
-    neutral: 'text-gray-400',
+    neutral: 'text-text',
+  }
+
+  const chipStyles: Record<SummaryItem['variant'], string> = {
+    primary: 'bg-primary-dark text-white',
+    success: 'bg-white dark:bg-gray-900 text-text',
+    warning: 'bg-white dark:bg-gray-900 text-text',
+    error: 'bg-error-soft text-error',
+    neutral: 'bg-white dark:bg-gray-900 text-text',
+  }
+
+  const labelStyles: Record<SummaryItem['variant'], string> = {
+    primary: 'text-white/70',
+    success: 'text-gray-500 dark:text-gray-400',
+    warning: 'text-gray-500 dark:text-gray-400',
+    error: 'text-error/70',
+    neutral: 'text-gray-500 dark:text-gray-400',
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-      {items.map((item, i) => (
-        <motion.div
+    <div className="flex gap-2.5 sm:gap-3 overflow-x-auto scrollbar-hide pb-1 -mb-1">
+      {items.map((item) => (
+        <div
           key={item.label}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.08 }}
           className={cn(
-            'rounded-2xl border bg-gradient-to-br p-4 sm:p-5',
-            variantStyles[item.variant]
+            'rounded-2xl px-4 sm:px-5 py-3.5 min-w-[132px] shrink-0 shadow-card',
+            chipStyles[item.variant]
           )}
         >
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{item.label}</p>
-          <p className={cn('text-lg sm:text-2xl font-bold mt-1', iconColors[item.variant])}>
+          <p className={cn('text-[10px] font-semibold uppercase tracking-[0.12em]', labelStyles[item.variant])}>
+            {item.label}
+          </p>
+          <p className={cn('text-lg font-bold tracking-tight mt-1 tabular-nums whitespace-nowrap', valueColors[item.variant])}>
             {item.value}
           </p>
           {item.subValue && (
-            <p className="text-xs text-gray-400 mt-0.5">{item.subValue}</p>
+            <p className={cn('text-[11px] mt-0.5', labelStyles[item.variant])}>{item.subValue}</p>
           )}
-        </motion.div>
+        </div>
       ))}
     </div>
   )

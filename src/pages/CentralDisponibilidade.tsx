@@ -11,8 +11,10 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useToast } from '../contexts/ToastContext'
 import { useIsMobile } from '../hooks/useBreakpoint'
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
-import { cn } from '../utils/cn'
+import { Search } from 'lucide-react'
+import { Pagination } from '../components/ui/Pagination'
+import { PageHeader } from '../components/ui/PageHeader'
+import { SkeletonTable } from '../components/ui/Skeleton'
 import type { Availability } from '../types/availability'
 import type { ViewMode } from '../types/passenger'
 
@@ -45,12 +47,8 @@ export function DisponibilidadeSection({ embedded = false }: { embedded?: boolea
   if (loading && availabilities.length === 0) {
     return (
       <div className="space-y-6">
-        {!embedded && <div><h1 className="text-xl sm:text-2xl font-bold text-text">Disponibilidade</h1></div>}
-        <div className="space-y-3">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />
-          ))}
-        </div>
+        {!embedded && <PageHeader eyebrow="Operação" title="Disponibilidade" subtitle="Acompanhe os períodos de ausência dos passageiros" />}
+        <SkeletonTable />
       </div>
     )
   }
@@ -67,10 +65,7 @@ export function DisponibilidadeSection({ embedded = false }: { embedded?: boolea
   return (
     <div className="space-y-6 sm:space-y-8">
       {!embedded && (
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-text">Disponibilidade</h1>
-          <p className="text-sm text-gray-500 mt-1">Acompanhe os períodos de ausência dos passageiros</p>
-        </div>
+        <PageHeader eyebrow="Operação" title="Disponibilidade" subtitle="Acompanhe os períodos de ausência dos passageiros" />
       )}
 
       <AvailabilitySummary summary={summary} />
@@ -110,38 +105,11 @@ export function DisponibilidadeSection({ embedded = false }: { embedded?: boolea
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage(pagination.page - 1)}
-            disabled={pagination.page <= 1}
-            className="h-11 w-11 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            aria-label="Página anterior"
-          >
-            <ChevronLeft className="h-5 w-5 text-text" />
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => setPage(page)}
-              className={cn(
-                'min-w-[44px] h-11 rounded-xl text-sm font-medium transition-all',
-                page === pagination.page
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'border border-gray-200 dark:border-gray-700 text-text hover:bg-gray-50 dark:hover:bg-gray-800'
-              )}
-            >
-              {page}
-            </button>
-          ))}
-          <button
-            onClick={() => setPage(pagination.page + 1)}
-            disabled={pagination.page >= totalPages}
-            className="h-11 w-11 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            aria-label="Próxima página"
-          >
-            <ChevronRight className="h-5 w-5 text-text" />
-          </button>
-        </div>
+        <Pagination
+          page={pagination.page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
       )}
 
       <CancelAvailabilityModal

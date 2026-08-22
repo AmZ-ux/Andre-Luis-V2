@@ -41,7 +41,7 @@ export function SessionTimeoutModal() {
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 50 }}
-          className="fixed bottom-24 sm:bottom-4 right-4 z-[100] bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 p-4 w-full max-w-sm"
+          className="fixed bottom-24 sm:bottom-4 right-4 z-[100] bg-white dark:bg-gray-900 rounded-xl shadow-pop border border-gray-200 dark:border-gray-800 p-4 w-full max-w-sm"
           role="alert"
         >
           <div className="flex items-start gap-3">

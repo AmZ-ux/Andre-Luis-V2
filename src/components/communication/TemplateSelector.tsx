@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+﻿import { motion } from 'framer-motion'
 import { templateService } from '../../services/templateService'
 import { useState } from 'react'
 import { Search, FileText } from 'lucide-react'

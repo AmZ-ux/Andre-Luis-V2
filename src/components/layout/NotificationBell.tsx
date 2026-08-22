@@ -36,7 +36,7 @@ export function NotificationBell({ className }: { className?: string }) {
       </button>
 
       {open && (
-        <div className="fixed sm:absolute inset-x-0 sm:inset-x-auto sm:right-0 top-[68px] sm:top-[calc(100%+8px)] sm:w-[380px] mx-2 sm:mx-0 max-h-[70vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-2xl z-50 p-4">
+        <div className="fixed sm:absolute inset-x-0 sm:inset-x-auto sm:right-0 top-[68px] sm:top-[calc(100%+8px)] sm:w-[380px] mx-2 sm:mx-0 max-h-[70vh] overflow-y-auto rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-pop z-50 p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <BellRing className="h-4 w-4 text-primary" />

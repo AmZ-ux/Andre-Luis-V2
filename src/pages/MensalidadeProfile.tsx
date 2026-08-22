@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { monthlyFeeService } from '../services/monthlyFeeService'
@@ -10,12 +10,12 @@ import { ArrowLeft, DollarSign, Calendar, User, Building2, FileText, CreditCard,
 import type { MonthlyFee } from '../types/monthlyFee'
 
 const monthNames = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Janeiro', 'Fevereiro', 'MarÃ§o', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ]
 
 const paymentLabels: Record<string, string> = {
-  pix: 'PIX', cash: 'Dinheiro', transfer: 'Transferência', card: 'Cartão',
+  pix: 'PIX', cash: 'Dinheiro', transfer: 'TransferÃªncia', card: 'CartÃ£o',
 }
 
 export function MensalidadeProfile() {
@@ -42,7 +42,7 @@ export function MensalidadeProfile() {
   if (error || !fee) {
     return (
       <div className="text-center py-16">
-        <h2 className="text-lg font-semibold text-text">Mensalidade não encontrada</h2>
+        <h2 className="text-lg font-semibold text-text">Mensalidade nÃ£o encontrada</h2>
         <Button onClick={() => navigate('/mensalidades')} className="mt-4">
           Voltar para lista
         </Button>
@@ -53,14 +53,14 @@ export function MensalidadeProfile() {
   const infoItems = [
     { icon: User, label: 'Passageiro', value: fee.passengerName },
     { icon: Building2, label: 'CPF', value: fee.cpf },
-    { icon: Building2, label: 'Tipo', value: fee.transportType === 'university' ? 'Universitário' : fee.transportType === 'school' ? 'Escolar' : 'Contrato' },
-    ...(fee.institution ? [{ icon: Building2, label: 'Instituição/Empresa', value: fee.institution }] : []),
+    { icon: Building2, label: 'Tipo', value: fee.transportType === 'university' ? 'UniversitÃ¡rio' : fee.transportType === 'school' ? 'Escolar' : 'Contrato' },
+    ...(fee.institution ? [{ icon: Building2, label: 'InstituiÃ§Ã£o/Empresa', value: fee.institution }] : []),
     ...(fee.company ? [{ icon: Building2, label: 'Empresa', value: fee.company }] : []),
   ]
 
   const feeInfo = [
     { icon: DollarSign, label: 'Valor', value: `R$ ${fee.amount.toFixed(2).replace('.', ',')}` },
-    { icon: Calendar, label: 'Competência', value: `${monthNames[fee.month - 1]} ${fee.year}` },
+    { icon: Calendar, label: 'CompetÃªncia', value: `${monthNames[fee.month - 1]} ${fee.year}` },
     { icon: Calendar, label: 'Vencimento', value: fee.dueDate },
     { icon: Clock, label: 'Status', value: '' },
   ]
@@ -81,7 +81,8 @@ export function MensalidadeProfile() {
       <Card>
         <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-text">Detalhes da Mensalidade</h1>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent mb-1.5">Financeiro</p>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text">Detalhes da Mensalidade</h1>
             <p className="text-sm text-gray-500 mt-1">
               {monthNames[fee.month - 1]} {fee.year}
             </p>
@@ -92,7 +93,7 @@ export function MensalidadeProfile() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
         <Card>
-          <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
             <User className="h-4 w-4 text-primary" /> Dados do Passageiro
           </h2>
           <div className="space-y-3">
@@ -112,8 +113,8 @@ export function MensalidadeProfile() {
         </Card>
 
         <Card>
-          <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-primary" /> Informações Financeiras
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-primary" /> InformaÃ§Ãµes Financeiras
           </h2>
           <div className="space-y-3">
             {feeInfo.map((item) => {
@@ -138,7 +139,7 @@ export function MensalidadeProfile() {
 
       {fee.payment && (
         <Card>
-          <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-success" /> Pagamento
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -167,7 +168,7 @@ export function MensalidadeProfile() {
               <div className="flex items-start gap-3 sm:col-span-2">
                 <FileText className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-400">Observação</p>
+                  <p className="text-xs text-gray-400">ObservaÃ§Ã£o</p>
                   <p className="text-sm text-text">{fee.payment.notes}</p>
                 </div>
               </div>
@@ -188,7 +189,7 @@ export function MensalidadeProfile() {
       {fee.exemptionReason && (
         <Card>
           <h2 className="text-sm font-bold text-text mb-2 flex items-center gap-2">
-            <FileText className="h-4 w-4 text-blue-500" /> Motivo da Isenção
+            <FileText className="h-4 w-4 text-blue-500" /> Motivo da IsenÃ§Ã£o
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-300">{fee.exemptionReason}</p>
         </Card>
@@ -196,14 +197,14 @@ export function MensalidadeProfile() {
 
       {fee.notes && !fee.cancellationReason && !fee.exemptionReason && (
         <Card>
-          <h2 className="text-sm font-bold text-text mb-2">Observações</h2>
+          <h2 className="text-sm font-bold text-text mb-2">ObservaÃ§Ãµes</h2>
           <p className="text-sm text-gray-600 dark:text-gray-300">{fee.notes}</p>
         </Card>
       )}
 
       <Card>
-        <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary" /> Histórico
+        <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" /> HistÃ³rico
         </h2>
         <div className="space-y-3">
           <div className="flex items-start gap-3">
@@ -235,7 +236,7 @@ export function MensalidadeProfile() {
             <div className="flex items-start gap-3">
               <div className="h-2 w-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
               <div>
-                <p className="text-sm text-text">Isenção concedida</p>
+                <p className="text-sm text-text">IsenÃ§Ã£o concedida</p>
                 <p className="text-xs text-gray-400">{fee.updatedAt}</p>
               </div>
             </div>

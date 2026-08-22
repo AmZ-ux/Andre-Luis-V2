@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
@@ -11,7 +11,6 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { PageSpinner } from '../components/ui/Spinner'
 import {
-  Calendar,
   CheckCircle2,
   Clock,
   Wallet,
@@ -121,81 +120,76 @@ export function PassengerDashboard() {
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card className="h-full">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                <h2 className="text-sm font-bold text-text">Fatura atual</h2>
-              </div>
+          <div className="rounded-3xl bg-primary-dark text-white p-6 sm:p-7 shadow-pop h-full flex flex-col">
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                Fatura atual{currentFee ? ` · ${MONTH_NAMES[currentFee.month - 1]} ${currentFee.year}` : ''}
+              </p>
               {currentFee && feeStatus && (
-                <Badge variant={feeStatusVariant[feeStatus]}>{feeStatusLabel[feeStatus]}</Badge>
+                <Badge variant={feeStatusVariant[feeStatus]} dot>{feeStatusLabel[feeStatus]}</Badge>
               )}
             </div>
 
             {currentFee ? (
-              <div className="space-y-4">
+              <div className="space-y-5 flex-1">
                 <div>
-                  <p className="text-3xl font-bold text-text">{formatBR(currentFee.amount)}</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {MONTH_NAMES[currentFee.month - 1]} de {currentFee.year}
+                  <p className="text-[42px] leading-none font-bold tracking-tight">{formatBR(currentFee.amount)}</p>
+                  <p className="text-sm text-white/70 mt-3">
+                    Vencimento: {currentFee.dueDate}
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                  <span className="flex items-center gap-1.5 text-text">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    Vencimento: {currentFee.dueDate}
+                {feeStatus === 'paid' ? (
+                  <span className="inline-flex items-center gap-1.5 text-emerald-200 text-sm font-semibold">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Paga em {currentFee.payment?.paymentDate || '-'}
                   </span>
-                  {feeStatus === 'paid' ? (
-                    <span className="flex items-center gap-1.5 text-success font-medium">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Paga em {currentFee.payment?.paymentDate || '-'}
-                    </span>
-                  ) : feeStatus === 'overdue' ? (
-                    <span className="flex items-center gap-1.5 text-error font-medium">
-                      <Clock className="h-4 w-4" />
-                      Vencida há {Math.abs(daysUntil(currentFee.dueDate))} {Math.abs(daysUntil(currentFee.dueDate)) === 1 ? 'dia' : 'dias'}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1.5 text-warning font-medium">
-                      <Clock className="h-4 w-4" />
-                      Vence em {daysUntil(currentFee.dueDate)} {daysUntil(currentFee.dueDate) === 1 ? 'dia' : 'dias'}
-                    </span>
-                  )}
-                </div>
+                ) : feeStatus === 'overdue' ? (
+                  <span className="inline-flex items-center gap-1.5 text-red-200 text-sm font-semibold">
+                    <Clock className="h-4 w-4" />
+                    Vencida há {Math.abs(daysUntil(currentFee.dueDate))} {Math.abs(daysUntil(currentFee.dueDate)) === 1 ? 'dia' : 'dias'}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-amber-200 text-sm font-semibold">
+                    <Clock className="h-4 w-4" />
+                    Vence em {daysUntil(currentFee.dueDate)} {daysUntil(currentFee.dueDate) === 1 ? 'dia' : 'dias'}
+                  </span>
+                )}
 
                 {(feeStatus === 'pending' || feeStatus === 'overdue') && (
-                  <div className="pt-2 flex flex-wrap items-center gap-3">
-                    <Button onClick={() => setCheckoutFee(currentFee)}>
+                  <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <Button
+                      onClick={() => setCheckoutFee(currentFee)}
+                      className="bg-white text-primary-dark hover:bg-blue-50 active:bg-blue-100 w-full sm:w-auto"
+                    >
                       Efetuar pagamento
                     </Button>
-              <button
-                onClick={() => navigate('/minhas-mensalidades')}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Ver tudo
-              </button>
+                    <button
+                      onClick={() => navigate('/minhas-mensalidades')}
+                      className="text-sm font-semibold text-white/80 hover:text-white transition-colors"
+                    >
+                      Ver tudo
+                    </button>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Wallet className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500">Nenhuma mensalidade lançada ainda</p>
+              <div className="text-center py-8 flex-1 flex flex-col items-center justify-center">
+                <Wallet className="h-10 w-10 text-white/40 mx-auto mb-3" />
+                <p className="text-sm text-white/80">Nenhuma mensalidade lançada ainda</p>
                 {expectedFee !== null && passenger?.dueDay && (
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-white/60 mt-1">
                     Mensalidade prevista: {formatBR(expectedFee)} · vence no dia {passenger.dueDay}
                   </p>
                 )}
               </div>
             )}
-          </Card>
+          </div>
         </div>
 
         <Card>
           <div className="flex items-center gap-2 mb-4">
-            <Calendar className="h-5 w-5 text-primary" />
-            <h2 className="text-sm font-bold text-text">Meu contrato</h2>
+            <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text">Meu contrato</h2>
           </div>
           <dl className="space-y-3 text-sm">
             <div>
@@ -244,13 +238,10 @@ export function PassengerDashboard() {
 
       <Card>
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-primary" />
-            <h2 className="text-sm font-bold text-text">Minhas mensalidades</h2>
-          </div>
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text">Minhas mensalidades</h2>
           <button
             onClick={() => navigate('/minhas-mensalidades')}
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-semibold text-primary hover:underline"
           >
             Ver tudo
           </button>

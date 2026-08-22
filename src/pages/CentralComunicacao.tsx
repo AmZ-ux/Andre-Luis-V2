@@ -3,6 +3,7 @@ import { MessageSquare, Settings } from 'lucide-react'
 import { CommunicationCenter } from '../components/communication/CommunicationCenter'
 import { CommunicationSettingsForm } from '../components/settings/CommunicationSettings'
 import { PageTabs } from '../components/ui/PageTabs'
+import { PageHeader } from '../components/ui/PageHeader'
 import { Card } from '../components/ui/Card'
 import { useSettings } from '../hooks/useSettings'
 
@@ -23,14 +24,16 @@ export function CentralComunicacao() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-text">Comunicação</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {tab === 'configuracoes'
+      <PageHeader
+        className="hidden sm:block"
+        eyebrow="Operação"
+        title="Comunicação"
+        subtitle={
+          tab === 'configuracoes'
             ? 'Configurações de mensagens e templates'
-            : 'Envie mensagens e notificações para os passageiros'}
-        </p>
-      </div>
+            : 'Envie mensagens e notificações para os passageiros'
+        }
+      />
 
       <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
 

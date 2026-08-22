@@ -1,4 +1,5 @@
-import { SlidersHorizontal, RotateCcw } from 'lucide-react'
+﻿import { SlidersHorizontal, RotateCcw } from 'lucide-react'
+import { cn } from '../../utils/cn'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Select } from '../ui/Select'
 import { Input } from '../ui/Input'
@@ -18,7 +19,7 @@ const monthOptions = [
   { value: '', label: 'Todos os meses' },
   { value: '1', label: 'Janeiro' },
   { value: '2', label: 'Fevereiro' },
-  { value: '3', label: 'Março' },
+  { value: '3', label: 'MarÃ§o' },
   { value: '4', label: 'Abril' },
   { value: '5', label: 'Maio' },
   { value: '6', label: 'Junho' },
@@ -41,7 +42,7 @@ const yearOptions = [
 
 const transportOptions: { value: TransportType | ''; label: string }[] = [
   { value: '', label: 'Todos os tipos' },
-  { value: 'university', label: 'Universitário' },
+  { value: 'university', label: 'UniversitÃ¡rio' },
   { value: 'school', label: 'Escolar' },
   { value: 'contract', label: 'Contrato' },
 ]
@@ -49,16 +50,32 @@ const transportOptions: { value: TransportType | ''; label: string }[] = [
 export function MonthlyFilters({ filters, onChange, onReset }: MonthlyFiltersProps) {
   const [open, setOpen] = useState(false)
 
+  const activeCount = [
+    filters.month, filters.year, filters.status,
+    filters.transportType, filters.passenger, filters.dueDayStart,
+  ].filter((v) => v !== '' && v != null).length
+
   return (
     <div>
-      <Button
-        variant="secondary"
-        size="sm"
-        icon={<SlidersHorizontal className="h-4 w-4" />}
+      <button
+        type="button"
         onClick={() => setOpen(!open)}
+        aria-label="Filtros"
+        aria-expanded={open}
+        className={cn(
+          'relative h-12 w-12 rounded-full flex items-center justify-center shrink-0 transition-colors',
+          activeCount > 0 || open
+            ? 'bg-primary text-white shadow-lg shadow-primary/30'
+            : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 shadow-card'
+        )}
       >
-        Filtros
-      </Button>
+        <SlidersHorizontal className="h-5 w-5" />
+        {activeCount > 0 && (
+          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-error text-white text-[10px] font-bold border-2 border-secondary dark:border-gray-950">
+            {activeCount}
+          </span>
+        )}
+      </button>
 
       <AnimatePresence>
         {open && (
@@ -69,13 +86,13 @@ export function MonthlyFilters({ filters, onChange, onReset }: MonthlyFiltersPro
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="mt-4 p-5 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <div className="mt-4 p-5 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-800">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Select
                   options={monthOptions}
                   value={filters.month}
                   onChange={(e) => onChange({ month: e.target.value })}
-                  placeholder="Mês"
+                  placeholder="MÃªs"
                 />
                 <Select
                   options={yearOptions}
@@ -101,7 +118,7 @@ export function MonthlyFilters({ filters, onChange, onReset }: MonthlyFiltersPro
                   onChange={(e) => onChange({ passenger: e.target.value })}
                 />
                 <Input
-                  placeholder="Dia vencimento início"
+                  placeholder="Dia vencimento inÃ­cio"
                   value={filters.dueDayStart}
                   onChange={(e) => onChange({ dueDayStart: e.target.value })}
                   type="number"

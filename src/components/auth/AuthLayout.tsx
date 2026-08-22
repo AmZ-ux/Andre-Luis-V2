@@ -17,12 +17,12 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         <Container maxWidth="sm">
           <div className="text-center mb-8">
             <Link to="/" className="inline-flex items-center gap-3 mb-6">
-              <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-accent flex items-center justify-center">
                 <Bus className="h-5 w-5 text-white" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-bold text-text leading-tight">Transporte</p>
-                <p className="text-xs text-primary font-medium">André Luis</p>
+                <p className="text-sm font-bold text-text leading-tight">Transportes</p>
+                <p className="text-xs text-primary font-semibold">André Luis</p>
               </div>
             </Link>
             <h1 className="text-xl sm:text-2xl font-bold text-text">{title}</h1>
@@ -33,7 +33,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
 
           <div
             className={cn(
-              'bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800',
+              'bg-white dark:bg-gray-900 rounded-xl shadow-card border border-gray-200 dark:border-gray-800',
               'p-6 sm:p-8'
             )}
           >

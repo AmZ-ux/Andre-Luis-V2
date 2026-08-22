@@ -7,10 +7,10 @@ interface AvailabilitySummaryProps {
 
 export function AvailabilitySummary({ summary }: AvailabilitySummaryProps) {
   const items = [
-    { label: 'Em férias', value: summary.onVacation, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/20' },
-    { label: 'Retornam hoje', value: summary.returningToday, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-900/20' },
-    { label: 'Iniciam hoje', value: summary.startingToday, color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-900/20' },
-    { label: 'Futuros', value: summary.future, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700' },
+    { label: 'Em férias', value: summary.onVacation, color: 'text-success', bg: 'bg-success-soft border-success/20' },
+    { label: 'Retornam hoje', value: summary.returningToday, color: 'text-primary', bg: 'bg-primary-soft border-primary/20' },
+    { label: 'Iniciam hoje', value: summary.startingToday, color: 'text-warning', bg: 'bg-warning-soft border-warning/20' },
+    { label: 'Futuros', value: summary.future, color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700' },
   ]
 
   return (
@@ -18,13 +18,13 @@ export function AvailabilitySummary({ summary }: AvailabilitySummaryProps) {
       {items.map((item, i) => (
         <motion.div
           key={item.label}
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.06 }}
-          className={`rounded-2xl border p-4 ${item.bg}`}
+          className={`rounded-xl border p-4 ${item.bg}`}
         >
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{item.label}</p>
-          <p className={`text-2xl font-bold mt-1 ${item.color}`}>{item.value}</p>
+          <p className={`text-2xl font-bold mt-1 tabular-nums ${item.color}`}>{item.value}</p>
         </motion.div>
       ))}
     </div>

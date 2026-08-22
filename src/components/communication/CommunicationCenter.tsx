@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card } from '../ui/Card'
 import { Grid } from '../ui/Grid'
@@ -26,10 +26,10 @@ const tabs = [
   { key: 'overview', label: 'Resumo', icon: BarChart3 },
   { key: 'messages', label: 'Mensagens', icon: MessageSquare },
   { key: 'templates', label: 'Modelos', icon: FileText },
-  { key: 'history', label: 'Histórico', icon: History },
-  { key: 'notifications', label: 'Notificações', icon: Bell },
+  { key: 'history', label: 'HistÃ³rico', icon: History },
+  { key: 'notifications', label: 'NotificaÃ§Ãµes', icon: Bell },
   { key: 'channels', label: 'Canais', icon: Smartphone },
-  { key: 'preferences', label: 'Preferências', icon: Settings },
+  { key: 'preferences', label: 'PreferÃªncias', icon: Settings },
 ]
 
 export function CommunicationCenter({ embedded = false }: { embedded?: boolean }) {
@@ -73,8 +73,8 @@ export function CommunicationCenter({ embedded = false }: { embedded?: boolean }
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {!embedded && (
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text">Central de Comunicação</h1>
-            <p className="text-sm text-gray-500 mt-1">Gerencie mensagens, notificações e comunicações do sistema</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-text">Central de ComunicaÃ§Ã£o</h1>
+            <p className="text-sm text-gray-500 mt-1">Gerencie mensagens, notificaÃ§Ãµes e comunicaÃ§Ãµes do sistema</p>
           </div>
         )}
         <div className={embedded ? 'flex gap-2 ml-auto' : 'flex gap-2'}>
@@ -130,7 +130,7 @@ export function CommunicationCenter({ embedded = false }: { embedded?: boolean }
           </Grid>
           {summary.lastCommunication && (
             <p className="text-xs text-gray-400 text-center sm:text-left">
-              Última comunicação: {new Date(summary.lastCommunication).toLocaleString('pt-BR')}
+              Ãšltima comunicaÃ§Ã£o: {new Date(summary.lastCommunication).toLocaleString('pt-BR')}
             </p>
           )}
 
@@ -162,7 +162,7 @@ export function CommunicationCenter({ embedded = false }: { embedded?: boolean }
                       <div key={s.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                         <div className="min-w-0">
                           <p className="text-xs font-medium text-text truncate">{msg?.title || 'Mensagem'}</p>
-                          <p className="text-[10px] text-gray-500">{s.scheduledDate} às {s.scheduledTime}</p>
+                          <p className="text-[10px] text-gray-500">{s.scheduledDate} Ã s {s.scheduledTime}</p>
                         </div>
                         <button
                           onClick={() => cancelScheduling(s.id, s.messageId)}
@@ -281,8 +281,8 @@ export function CommunicationCenter({ embedded = false }: { embedded?: boolean }
         >
           <Card>
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-text">Histórico de Comunicações</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Registro de todas as ações realizadas na central</p>
+              <h3 className="text-sm font-semibold text-text">HistÃ³rico de ComunicaÃ§Ãµes</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Registro de todas as aÃ§Ãµes realizadas na central</p>
             </div>
             <CommunicationHistory />
           </Card>
@@ -314,8 +314,8 @@ export function CommunicationCenter({ embedded = false }: { embedded?: boolean }
         >
           <Card>
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-text">Canais de Comunicação</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Configure os canais disponíveis para envio de mensagens</p>
+              <h3 className="text-sm font-semibold text-text">Canais de ComunicaÃ§Ã£o</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Configure os canais disponÃ­veis para envio de mensagens</p>
             </div>
             <ChannelStatus channels={channels} onToggle={toggleChannel} />
           </Card>
@@ -349,7 +349,7 @@ function SummaryCard({
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4"
+      className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"
     >
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs text-gray-500 font-medium">{label}</p>

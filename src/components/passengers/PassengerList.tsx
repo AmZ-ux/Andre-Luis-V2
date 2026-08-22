@@ -54,13 +54,13 @@ export function PassengerList({ passengers, viewMode, sort, onSort, onEdit, onDe
     <div className="w-full overflow-x-auto scrollbar-hide">
       <table className="w-full min-w-[800px]">
         <thead>
-          <tr className="border-b border-gray-100 dark:border-gray-800">
-            <th className="px-4 py-3 text-left w-12" />
+          <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40">
+            <th className="px-4 py-2.5 text-left w-12" />
             {columns.map((col) => (
               <th
                 key={col.key}
                 className={cn(
-                  'px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap',
+                  'px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap',
                   col.sortable && 'cursor-pointer hover:text-text select-none'
                 )}
                 onClick={() => col.sortable && col.field && onSort(col.field)}
@@ -82,7 +82,7 @@ export function PassengerList({ passengers, viewMode, sort, onSort, onEdit, onDe
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.2, delay: i * 0.02 }}
-              className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
+              className="border-b border-gray-100 dark:border-gray-800/60 hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors"
             >
               <td className="px-4 py-3">
                 <PassengerAvatar name={p.name} size="sm" />
@@ -95,16 +95,16 @@ export function PassengerList({ passengers, viewMode, sort, onSort, onEdit, onDe
                   {p.name}
                 </button>
               </td>
-              <td className="px-4 py-3 text-sm text-gray-500">{p.cpf}</td>
-              <td className="px-4 py-3 text-sm text-gray-500">{p.phone}</td>
+              <td className="px-4 py-3 text-sm text-gray-500 tabular-nums">{p.cpf}</td>
+              <td className="px-4 py-3 text-sm text-gray-500 tabular-nums">{p.phone}</td>
               <td className="px-4 py-3 text-sm text-gray-500">
                 {p.address.city}/{p.address.state}
               </td>
               <td className="px-4 py-3 text-sm text-gray-500">{typeLabel[p.transportType]}</td>
-              <td className="px-4 py-3 text-sm font-semibold text-text">
+              <td className="px-4 py-3 text-sm font-semibold text-text tabular-nums">
                 R$ {p.monthlyFee.toFixed(2).replace('.', ',')}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-500">Dia {p.dueDay}</td>
+              <td className="px-4 py-3 text-sm text-gray-500 tabular-nums">Dia {p.dueDay}</td>
               <td className="px-4 py-3">
                 <PassengerStatusBadge status={p.status} />
               </td>
@@ -112,21 +112,21 @@ export function PassengerList({ passengers, viewMode, sort, onSort, onEdit, onDe
                 <div className="flex gap-1">
                   <button
                     onClick={() => navigate(`/passageiros/${p.id}`)}
-                    className="h-11 w-11 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                    className="h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
                     aria-label="Visualizar"
                   >
                     <Eye className="h-4 w-4 text-gray-400" />
                   </button>
                   <button
                     onClick={() => onEdit(p)}
-                    className="h-11 w-11 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                    className="h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
                     aria-label="Editar"
                   >
                     <Pencil className="h-4 w-4 text-gray-400" />
                   </button>
                   <button
                     onClick={() => onDelete(p)}
-                    className="h-11 w-11 rounded-lg hover:bg-error/10 flex items-center justify-center transition-colors"
+                    className="h-9 w-9 rounded-lg hover:bg-error-soft flex items-center justify-center transition-colors"
                     aria-label="Excluir"
                   >
                     <Trash2 className="h-4 w-4 text-error" />

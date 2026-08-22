@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import {
   ResponsiveContainer,
   BarChart,
@@ -22,6 +21,12 @@ const periods: { value: ChartPeriod; label: string }[] = [
   { value: '12m', label: '12 meses' },
 ]
 
+const BAR_COLORS: Record<string, string> = {
+  receita: '#1F4E5F',
+  pagamentos: '#1E7A4E',
+  inadimplencia: '#BE3128',
+}
+
 export function DashboardChart() {
   const [period, setPeriod] = useState<ChartPeriod>('30d')
   const [data, setData] = useState<ChartDataPoint[]>([])
@@ -36,102 +41,86 @@ export function DashboardChart() {
   }, [period])
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.1 }}
-    >
-      <Card>
-        <SectionTitle
-          title="Visão Financeira"
-          subtitle="Acompanhamento de receitas e inadimplência"
-          action={
-            <div className="inline-flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 gap-0.5">
-              {periods.map((p) => (
-                <button
-                  key={p.value}
-                  onClick={() => setPeriod(p.value)}
-                  className={cn(
-                    'px-3 py-1 rounded-md text-xs font-medium transition-all duration-200',
-                    period === p.value
-                      ? 'bg-white dark:bg-gray-700 text-primary shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-text'
-                  )}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          }
-        />
+    <Card>
+      <SectionTitle
+        title="Visão financeira"
+        subtitle="Receitas, pagamentos e inadimplência"
+        action={
+          <div className="inline-flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 gap-0.5">
+            {periods.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setPeriod(p.value)}
+                className={cn(
+                  'px-3 py-1 rounded-md text-xs font-medium transition-colors',
+                  period === p.value
+                    ? 'bg-white dark:bg-gray-700 text-primary shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-text'
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
-        {loading ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-          </div>
-        ) : (
-          <div className="h-64 sm:h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} barGap={4} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 12, fill: '#9ca3af' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: '#9ca3af' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) =>
-                    v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
-                  }
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: '1px solid #e5e7eb',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                    fontSize: 13,
-                  }}
-                  formatter={(value: any) => [
-                    `R$ ${Number(value ?? 0).toLocaleString('pt-BR')}`,
-                  ]}
-                />
-                <Legend
-                  iconType="circle"
-                  iconSize={8}
-                  formatter={(value: string) => (
-                    <span className="text-xs text-gray-500">{value}</span>
-                  )}
-                />
+      {loading ? (
+        <div className="h-64 flex items-center justify-center">
+          <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+        </div>
+      ) : (
+        <div className="h-64 sm:h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} barGap={4} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EFEDE6" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 12, fill: '#8A8A85' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 12, fill: '#8A8A85' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v: number) =>
+                  v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
+                }
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: 8,
+                  border: '1px solid #E2DFD8',
+                  boxShadow: '0 2px 8px rgba(16,20,26,0.08)',
+                  fontSize: 13,
+                  fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+                }}
+                formatter={(value: any) => [
+                  `R$ ${Number(value ?? 0).toLocaleString('pt-BR')}`,
+                ]}
+              />
+              <Legend
+                iconType="circle"
+                iconSize={8}
+                formatter={(value: string) => (
+                  <span className="text-xs text-gray-500">{value}</span>
+                )}
+              />
+              {Object.entries(BAR_COLORS).map(([key, color]) => (
                 <Bar
-                  dataKey="receita"
-                  name="Receita"
-                  fill="#2563EB"
+                  key={key}
+                  dataKey={key}
+                  name={key === 'receita' ? 'Receita' : key === 'pagamentos' ? 'Pagamentos' : 'Inadimplência'}
+                  fill={color}
                   radius={[4, 4, 0, 0]}
                   maxBarSize={32}
                 />
-                <Bar
-                  dataKey="pagamentos"
-                  name="Pagamentos"
-                  fill="#22C55E"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={32}
-                />
-                <Bar
-                  dataKey="inadimplencia"
-                  name="Inadimplência"
-                  fill="#EF4444"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={32}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </Card>
-    </motion.div>
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </Card>
   )
 }

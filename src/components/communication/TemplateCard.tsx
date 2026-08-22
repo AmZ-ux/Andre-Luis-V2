@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+﻿import { motion } from 'framer-motion'
 import { FileText, Edit2, Trash2 } from 'lucide-react'
 import type { MessageTemplate } from '../../types/communication'
 
@@ -10,7 +10,7 @@ interface TemplateCardProps {
 }
 
 const categoryLabels: Record<string, string> = {
-  reminder: 'Lembrete', payment: 'Pagamento', vacation_return: 'Retorno Férias', welcome: 'Boas-vindas', custom: 'Personalizado',
+  reminder: 'Lembrete', payment: 'Pagamento', vacation_return: 'Retorno FÃ©rias', welcome: 'Boas-vindas', custom: 'Personalizado',
 }
 
 const categoryColors: Record<string, string> = {
@@ -23,7 +23,7 @@ export function TemplateCard({ template, onEdit, onDelete, onUse }: TemplateCard
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 hover:shadow-sm transition-all duration-200"
+      className="group bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0" onClick={() => onUse?.(template.id)}>

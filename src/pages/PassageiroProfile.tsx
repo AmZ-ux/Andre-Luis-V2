@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { passengerService } from '../services/passengerService'
@@ -11,13 +11,13 @@ import { ArrowLeft, Pencil, Phone, Mail, MapPin, Calendar, DollarSign, CreditCar
 import type { Passenger } from '../types/passenger'
 
 const typeLabel: Record<string, string> = {
-  university: 'Universitário',
+  university: 'UniversitÃ¡rio',
   school: 'Escolar',
   contract: 'Contrato',
 }
 
 const paymentLabel: Record<string, string> = {
-  pix: 'PIX', cash: 'Dinheiro', transfer: 'Transferência', card: 'Cartão',
+  pix: 'PIX', cash: 'Dinheiro', transfer: 'TransferÃªncia', card: 'CartÃ£o',
 }
 
 export function PassageiroProfile() {
@@ -44,7 +44,7 @@ export function PassageiroProfile() {
   if (error || !passenger) {
     return (
       <div className="text-center py-16">
-        <h2 className="text-lg font-semibold text-text">Passageiro não encontrado</h2>
+        <h2 className="text-lg font-semibold text-text">Passageiro nÃ£o encontrado</h2>
         <Button onClick={() => navigate('/passageiros')} className="mt-4">
           Voltar para lista
         </Button>
@@ -56,7 +56,7 @@ export function PassageiroProfile() {
     { icon: Phone, label: 'Telefone', value: passenger.phone },
     { icon: Phone, label: 'WhatsApp', value: passenger.whatsapp || '-' },
     { icon: Mail, label: 'Email', value: passenger.email },
-    { icon: MapPin, label: 'Endereço', value: `${passenger.address.street}, ${passenger.address.number}${passenger.address.complement ? ` - ${passenger.address.complement}` : ''} - ${passenger.address.neighborhood}, ${passenger.address.city}/${passenger.address.state} - CEP ${passenger.address.zipCode}` },
+    { icon: MapPin, label: 'EndereÃ§o', value: `${passenger.address.street}, ${passenger.address.number}${passenger.address.complement ? ` - ${passenger.address.complement}` : ''} - ${passenger.address.neighborhood}, ${passenger.address.city}/${passenger.address.state} - CEP ${passenger.address.zipCode}` },
     { icon: Calendar, label: 'CPF', value: passenger.cpf },
     { icon: Calendar, label: 'RG', value: passenger.rg || '-' },
     { icon: Calendar, label: 'Nascimento', value: passenger.birthDate },
@@ -65,7 +65,7 @@ export function PassageiroProfile() {
 
   const transportInfo = [
     { icon: Building2, label: 'Tipo', value: typeLabel[passenger.transportType] },
-    ...(passenger.institution ? [{ icon: BookOpen, label: passenger.transportType === 'school' ? 'Escola' : 'Instituição', value: passenger.institution }] : []),
+    ...(passenger.institution ? [{ icon: BookOpen, label: passenger.transportType === 'school' ? 'Escola' : 'InstituiÃ§Ã£o', value: passenger.institution }] : []),
     ...(passenger.course ? [{ icon: BookOpen, label: 'Curso', value: passenger.course }] : []),
     ...(passenger.class ? [{ icon: BookOpen, label: 'Turma', value: passenger.class }] : []),
     ...(passenger.company ? [{ icon: Briefcase, label: 'Empresa', value: passenger.company }] : []),
@@ -94,9 +94,9 @@ export function PassageiroProfile() {
       <Card>
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
           <PassengerAvatar name={passenger.name} size="lg" />
-          <div className="flex-1 text-center sm:text-left">
+          <div className="flex-1 text-center sm:text-left min-w-0">
             <div className="flex items-center gap-3 justify-center sm:justify-start">
-              <h1 className="text-xl font-bold text-text">{passenger.name}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text truncate">{passenger.name}</h1>
               <PassengerStatusBadge status={passenger.status} />
             </div>
             <p className="text-sm text-gray-500 mt-1">{typeLabel[passenger.transportType]}</p>
@@ -114,7 +114,7 @@ export function PassageiroProfile() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
         <Card>
-          <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
             <FileText className="h-4 w-4 text-primary" /> Dados Pessoais
           </h2>
           <div className="space-y-3">
@@ -135,7 +135,7 @@ export function PassageiroProfile() {
 
         <div className="space-y-6">
           <Card>
-            <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
+            <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
               <Building2 className="h-4 w-4 text-primary" /> Transporte
             </h2>
             <div className="space-y-3">
@@ -155,7 +155,7 @@ export function PassageiroProfile() {
           </Card>
 
           <Card>
-            <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
+            <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-primary" /> Financeiro
             </h2>
             <div className="space-y-3">
@@ -178,7 +178,7 @@ export function PassageiroProfile() {
 
       {passenger.notes && (
         <Card>
-          <h2 className="text-sm font-bold text-text mb-2">Observações</h2>
+          <h2 className="text-sm font-bold text-text mb-2">ObservaÃ§Ãµes</h2>
           <p className="text-sm text-gray-600 dark:text-gray-300">{passenger.notes}</p>
         </Card>
       )}

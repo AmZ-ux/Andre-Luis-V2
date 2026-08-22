@@ -29,14 +29,14 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-72 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-          <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+        <div className="space-y-4">
+          <div className="h-8 w-72 bg-gray-200 dark:bg-gray-700 rounded-lg animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
+          <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
         </div>
-        <div className="h-52 bg-gray-200 dark:bg-gray-700 rounded-2xl" />
+        <div className="h-52 bg-gray-200 dark:bg-gray-700 rounded-xl animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded-2xl" />
+            <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
           ))}
         </div>
       </div>
@@ -56,7 +56,7 @@ export function Dashboard() {
   if (error || !data) {
     return (
       <div className="flex flex-col items-center justify-center text-center py-16">
-        <div className="h-16 w-16 rounded-2xl bg-error/10 flex items-center justify-center mb-4">
+        <div className="h-16 w-16 rounded-lg bg-error-soft flex items-center justify-center mb-4">
           <span className="text-2xl">!</span>
         </div>
         <h2 className="text-lg font-semibold text-text mb-1">Erro ao carregar</h2>
@@ -77,10 +77,12 @@ export function Dashboard() {
 
       <FinancialSummary data={data.financialSummary} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {data.statistics.map((stat, i) => (
-          <StatisticCard key={stat.id} data={stat} index={i} />
-        ))}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 divide-gray-100 dark:divide-gray-800 sm:divide-x">
+          {data.statistics.map((stat, i) => (
+            <StatisticCard key={stat.id} data={stat} index={i} />
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Card } from '../components/ui/Card'
 import { Grid } from '../components/ui/Grid'
 import { Button } from '../components/ui/Button'
+import { PageHeader } from '../components/ui/PageHeader'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import { ReportCardItem } from '../components/reports/ReportCard'
 import { ReportFilters } from '../components/reports/ReportFilters'
@@ -67,12 +68,7 @@ export function Relatorios({ embedded = false }: { embedded?: boolean }) {
     return (
       <div className="space-y-6 sm:space-y-8">
         {!embedded && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-text">Relatórios</h1>
-              <p className="text-sm text-gray-500 mt-1">Análise de dados e métricas</p>
-            </div>
-          </div>
+          <PageHeader eyebrow="Operação" title="Relatórios" subtitle="Análise de dados e métricas" />
         )}
         <Card>
           <div className="flex flex-col items-center justify-center py-12 gap-4">
@@ -89,28 +85,27 @@ export function Relatorios({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         {!embedded && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3">
             {!sidebarVisible && (
               <button
                 onClick={handleBack}
-                className="h-9 w-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                className="h-9 w-9 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors mt-1"
+                aria-label="Voltar"
               >
                 <ChevronLeft className="h-4 w-4 text-text" />
               </button>
             )}
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-text">
-                {activeReport && reportData ? reportData.title : 'Relatórios'}
-              </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                {activeReport && reportData
+            <PageHeader
+              eyebrow="Operação"
+              title={activeReport && reportData ? reportData.title : 'Relatórios'}
+              subtitle={
+                activeReport && reportData
                   ? 'Análise detalhada do relatório selecionado'
                   : 'Análise de dados e métricas'
-                }
-              </p>
-            </div>
+              }
+            />
           </div>
         )}
         {embedded && !sidebarVisible && (

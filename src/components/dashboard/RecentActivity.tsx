@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { Card } from '../ui/Card'
 import { SectionTitle } from './SectionTitle'
 import { Button } from '../ui/Button'
@@ -18,56 +17,45 @@ const activityIcon = {
 }
 
 const activityColor = {
-  payment: 'bg-success/10 text-success',
-  document: 'bg-primary/10 text-primary',
-  vacation: 'bg-warning/10 text-warning',
-  register: 'bg-primary/10 text-primary',
+  payment: 'bg-success-soft text-success',
+  document: 'bg-primary-soft text-primary',
+  vacation: 'bg-warning-soft text-warning',
+  register: 'bg-primary-soft text-primary',
 }
 
 export function RecentActivity({ activities }: RecentActivityProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.2 }}
-    >
-      <Card>
-        <SectionTitle
-          title="Atividades Recentes"
-          action={
-            <Button variant="ghost" size="sm">
-              Ver todas
-            </Button>
-          }
-        />
-        <div className="space-y-1">
-          {activities.map((activity) => {
-            const Icon = activityIcon[activity.type] || FileText
-            return (
+    <Card>
+      <SectionTitle
+        title="Atividades recentes"
+        action={
+          <Button variant="ghost" size="sm">
+            Ver todas
+          </Button>
+        }
+      />
+      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        {activities.map((activity) => {
+          const Icon = activityIcon[activity.type] || FileText
+          return (
+            <li key={activity.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
               <div
-                key={activity.id}
-                className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                className={cn(
+                  'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
+                  activityColor[activity.type]
+                )}
               >
-                <div
-                  className={cn(
-                    'h-9 w-9 rounded-xl flex items-center justify-center shrink-0',
-                    activityColor[activity.type]
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-text">
-                    <span className="font-semibold">{activity.person}</span>{' '}
-                    {activity.description}
-                  </p>
-                </div>
-                <span className="text-xs text-gray-400 shrink-0">{activity.time}</span>
+                <Icon className="h-4 w-4" />
               </div>
-            )
-          })}
-        </div>
-      </Card>
-    </motion.div>
+              <p className="flex-1 min-w-0 text-sm text-text leading-snug">
+                <span className="font-semibold">{activity.person}</span>{' '}
+                {activity.description}
+              </p>
+              <span className="text-xs text-gray-400 shrink-0 tabular-nums">{activity.time}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
   )
 }

@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { cn } from '../../utils/cn'
 import type { FinancialSummary as FinancialSummaryType } from '../../types/dashboard'
 
@@ -7,64 +6,52 @@ interface FinancialSummaryProps {
 }
 
 export function FinancialSummary({ data }: FinancialSummaryProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary-dark text-white p-6 sm:p-8"
-    >
-      <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+  const metrics = [
+    { label: 'Previsto', value: data.expectedRevenue },
+    { label: 'Pendente', value: data.pendingAmount },
+    { label: 'Atrasado', value: data.overdueAmount },
+    { label: 'Recebido', value: data.receivedRevenue },
+  ]
 
-      <div className="relative">
-        <p className="text-sm font-medium text-white/80 mb-1">
-          Resumo Financeiro • {data.month}
+  return (
+    <section className="rounded-3xl bg-primary-dark text-white overflow-hidden shadow-pop">
+      <div className="px-6 py-6 sm:px-8 sm:py-7">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-soft/90">
+          Resumo financeiro · {data.month}
         </p>
-        <p className="text-3xl sm:text-4xl font-bold tracking-tight">
+        <p className="text-4xl sm:text-5xl font-bold tracking-tight mt-2.5">
           R$ {data.receivedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </p>
-        <p className="text-sm text-white/70 mt-1">
-          Receita Prevista: R$ {data.expectedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        <p className="text-sm text-white/70 mt-2">
+          de R$ {data.expectedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} previstos
         </p>
 
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          <div className="bg-white/10 rounded-xl p-3 sm:p-4">
-            <p className="text-[10px] sm:text-xs text-white/70 uppercase tracking-wide">Previsto</p>
-            <p className="text-sm sm:text-base font-bold mt-1">
-              R$ {data.expectedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-          <div className="bg-white/10 rounded-xl p-3 sm:p-4">
-            <p className="text-[10px] sm:text-xs text-white/70 uppercase tracking-wide">Pendente</p>
-            <p className="text-sm sm:text-base font-bold mt-1">
-              R$ {data.pendingAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-          <div className="bg-white/10 rounded-xl p-3 sm:p-4">
-            <p className="text-[10px] sm:text-xs text-white/70 uppercase tracking-wide">Atrasado</p>
-            <p className="text-sm sm:text-base font-bold mt-1">
-              R$ {data.overdueAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <div className="flex items-center justify-between text-sm mb-1.5">
-            <span className="text-white/80">Recebido</span>
-            <span className="font-semibold">{data.receivedPercentage}%</span>
-          </div>
-          <div className="w-full h-2.5 bg-white/20 rounded-full overflow-hidden">
-            <div
-              className={cn(
-                'h-full rounded-full transition-all duration-1000 ease-out',
-                data.receivedPercentage > 80 ? 'bg-success' : data.receivedPercentage > 50 ? 'bg-warning' : 'bg-error'
-              )}
-              style={{ width: `${data.receivedPercentage}%` }}
-            />
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-white/15 rounded-2xl overflow-hidden mt-6 p-1">
+          {metrics.map((m) => (
+            <div key={m.label} className="bg-white/10 rounded-xl px-4 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-white/60 font-semibold">
+                {m.label}
+              </p>
+              <p className="text-base sm:text-lg font-bold mt-1 tabular-nums">
+                R$ {m.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
-    </motion.div>
+
+      <div className="flex items-center gap-4 px-6 sm:px-8 pb-6">
+        <div className="h-1.5 flex-1 bg-white/20 rounded-full overflow-hidden">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all duration-1000 ease-out',
+              data.receivedPercentage > 80 ? 'bg-success' : data.receivedPercentage > 50 ? 'bg-warning' : 'bg-error'
+            )}
+            style={{ width: `${Math.min(100, Math.max(0, data.receivedPercentage))}%` }}
+          />
+        </div>
+        <p className="text-sm font-bold tabular-nums shrink-0">{data.receivedPercentage}% recebido</p>
+      </div>
+    </section>
   )
 }

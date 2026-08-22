@@ -31,7 +31,7 @@ export function EmptyPassengers({ type, onAction, actionLabel }: EmptyPassengers
 
   return (
     <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-      <div className="h-16 w-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+      <div className="h-16 w-16 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 bg-transparent flex items-center justify-center mb-4">
         <Icon className="h-8 w-8 text-gray-400" />
       </div>
       <h3 className="text-lg font-semibold text-text mb-1">{c.title}</h3>

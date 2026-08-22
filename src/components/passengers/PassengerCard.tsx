@@ -26,7 +26,7 @@ export function PassengerCard({ passenger, onEdit, onDelete, index }: PassengerC
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: index * 0.03 }}
-      className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 hover:shadow-md transition-all duration-300"
+      className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card p-5"
     >
       <div className="flex items-start gap-4">
         <PassengerAvatar name={passenger.name} size="lg" />
@@ -61,21 +61,21 @@ export function PassengerCard({ passenger, onEdit, onDelete, index }: PassengerC
               <div className="flex gap-1">
               <button
                 onClick={() => navigate(`/passageiros/${passenger.id}`)}
-                className="h-11 w-11 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                className="h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
                 aria-label="Visualizar"
               >
                 <Eye className="h-4 w-4 text-gray-400" />
               </button>
               <button
                 onClick={() => onEdit(passenger)}
-                className="h-11 w-11 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+                className="h-9 w-9 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
                 aria-label="Editar"
               >
                 <Pencil className="h-4 w-4 text-gray-400" />
               </button>
               <button
                 onClick={() => onDelete(passenger)}
-                className="h-11 w-11 rounded-lg hover:bg-error/10 flex items-center justify-center transition-colors"
+                className="h-9 w-9 rounded-lg hover:bg-error-soft flex items-center justify-center transition-colors"
                 aria-label="Excluir"
               >
                 <Trash2 className="h-4 w-4 text-error" />

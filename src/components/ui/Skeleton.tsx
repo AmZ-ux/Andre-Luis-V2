@@ -48,7 +48,7 @@ export function Skeleton({ variant = 'text', width, height, className }: Skeleto
 
 export function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-100 space-y-4">
+    <div className="bg-white dark:bg-gray-900 rounded-xl p-5 sm:p-6 border border-gray-200 dark:border-gray-800 space-y-4">
       <Skeleton variant="rect" height={20} width="40%" />
       <Skeleton variant="text" width="100%" />
       <Skeleton variant="text" width="80%" />
@@ -59,7 +59,7 @@ export function SkeletonCard() {
 
 export function SkeletonTable() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 space-y-4">
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 space-y-4">
       <div className="flex gap-4">
         <Skeleton variant="text" width="25%" />
         <Skeleton variant="text" width="25%" />

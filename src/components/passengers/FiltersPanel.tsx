@@ -1,11 +1,11 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SlidersHorizontal, X } from 'lucide-react'
-import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { statusOptions, transportTypeOptions } from '../../validators/passengerValidators'
 import type { PassengerFilters } from '../../types/passenger'
+import { cn } from '../../utils/cn'
 
 interface FiltersPanelProps {
   filters: PassengerFilters
@@ -21,19 +21,25 @@ export function FiltersPanel({ filters, onChange, onReset }: FiltersPanelProps) 
   return (
     <div>
       <div className="flex items-center gap-3">
-        <Button
-          variant={hasActiveFilters ? 'primary' : 'secondary'}
-          size="sm"
-          icon={<SlidersHorizontal className="h-4 w-4" />}
+        <button
+          type="button"
           onClick={() => setOpen(!open)}
+          aria-label="Filtros"
+          aria-expanded={open}
+          className={cn(
+            'relative h-12 w-12 rounded-full flex items-center justify-center shrink-0 transition-colors',
+            hasActiveFilters || open
+              ? 'bg-primary text-white shadow-lg shadow-primary/30'
+              : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 shadow-card'
+          )}
         >
-          Filtros
+          <SlidersHorizontal className="h-5 w-5" />
           {hasActiveFilters && (
-            <span className="h-5 w-5 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center ml-1">
+            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-error text-white text-[10px] font-bold border-2 border-secondary dark:border-gray-950">
               {Object.values(filters).filter((v) => v !== '').length}
             </span>
           )}
-        </Button>
+        </button>
         {hasActiveFilters && (
           <button
             onClick={onReset}
@@ -53,7 +59,7 @@ export function FiltersPanel({ filters, onChange, onReset }: FiltersPanelProps) 
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 mt-3 space-y-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card p-5 mt-3 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-text">Filtros</p>
                 <button
@@ -93,8 +99,8 @@ export function FiltersPanel({ filters, onChange, onReset }: FiltersPanelProps) 
                   onChange={(e) => onChange({ dueDay: e.target.value.replace(/\D/g, '').slice(0, 2) })}
                 />
                 <Input
-                  label="Instituição"
-                  placeholder="Filtrar por instituição"
+                  label="InstituiÃ§Ã£o"
+                  placeholder="Filtrar por instituiÃ§Ã£o"
                   value={filters.institution}
                   onChange={(e) => onChange({ institution: e.target.value })}
                 />

@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { PasswordInput } from '../../components/auth/PasswordInput'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
+import { PageHeader } from '../../components/ui/PageHeader'
 import { PageSpinner } from '../../components/ui/Spinner'
 import { useToast } from '../../contexts/ToastContext'
 import { ArrowLeft, Save, AlertCircle } from 'lucide-react'
@@ -82,8 +83,7 @@ export function ChangePasswordPage() {
           <ArrowLeft className="h-4 w-4" />
           Voltar ao perfil
         </button>
-        <h1 className="text-xl sm:text-2xl font-bold text-text">Alterar Senha</h1>
-        <p className="text-sm text-gray-500 mt-1">Defina uma nova senha para sua conta</p>
+        <PageHeader eyebrow="Minha conta" title="Alterar Senha" subtitle="Defina uma nova senha para sua conta" />
       </div>
 
       <Card>

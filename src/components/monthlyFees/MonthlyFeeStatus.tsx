@@ -6,12 +6,12 @@ interface MonthlyFeeStatusProps {
   className?: string
 }
 
-const variants: Record<Status, { label: string; classes: string }> = {
-  pending: { label: 'Pendente', classes: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400' },
-  paid: { label: 'Pago', classes: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
-  overdue: { label: 'Atrasado', classes: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
-  cancelled: { label: 'Cancelado', classes: 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400' },
-  exempt: { label: 'Isento', classes: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' },
+const variants: Record<Status, { label: string; classes: string; dot: string }> = {
+  pending: { label: 'Pendente', classes: 'bg-warning-soft text-warning border-warning/20', dot: 'bg-warning' },
+  paid: { label: 'Pago', classes: 'bg-success-soft text-success border-success/20', dot: 'bg-success' },
+  overdue: { label: 'Atrasado', classes: 'bg-error-soft text-error border-error/20', dot: 'bg-error' },
+  cancelled: { label: 'Cancelado', classes: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700', dot: 'bg-gray-400' },
+  exempt: { label: 'Isento', classes: 'bg-primary-soft text-primary border-primary/20', dot: 'bg-primary' },
 }
 
 export function MonthlyFeeStatus({ status, className }: MonthlyFeeStatusProps) {
@@ -19,11 +19,12 @@ export function MonthlyFeeStatus({ status, className }: MonthlyFeeStatusProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium border whitespace-nowrap',
         v.classes,
         className
       )}
     >
+      <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', v.dot)} aria-hidden="true" />
       {v.label}
     </span>
   )

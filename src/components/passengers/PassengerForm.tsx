@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
@@ -101,16 +101,16 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
 
   const validate = (): boolean => {
     const errs: typeof errors = {}
-    if (!form.name.trim()) errs.name = 'Nome obrigatório'
-    if (!form.cpf.trim()) errs.cpf = 'CPF obrigatório'
-    else if (!isValidCPF(form.cpf)) errs.cpf = 'CPF inválido'
-    if (!form.phone.trim()) errs.phone = 'Telefone obrigatório'
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email inválido'
+    if (!form.name.trim()) errs.name = 'Nome obrigatÃ³rio'
+    if (!form.cpf.trim()) errs.cpf = 'CPF obrigatÃ³rio'
+    else if (!isValidCPF(form.cpf)) errs.cpf = 'CPF invÃ¡lido'
+    if (!form.phone.trim()) errs.phone = 'Telefone obrigatÃ³rio'
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email invÃ¡lido'
     const fee = parseFloat(form.monthlyFee)
     if (!form.monthlyFee || isNaN(fee) || fee <= 0) errs.monthlyFee = 'Valor deve ser maior que zero'
     const day = parseInt(form.dueDay)
     if (!form.dueDay || isNaN(day) || day < 1 || day > 31) errs.dueDay = 'Informe um dia entre 1 e 31'
-    if (!form.city.trim()) errs.city = 'Cidade obrigatória'
+    if (!form.city.trim()) errs.city = 'Cidade obrigatÃ³ria'
 
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -119,7 +119,7 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) {
-      addToast('error', 'Verifique os campos obrigatórios')
+      addToast('error', 'Verifique os campos obrigatÃ³rios')
       return
     }
 
@@ -177,11 +177,11 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
           </div>
         </FormSection>
 
-        <FormSection title="Endereço">
+        <FormSection title="EndereÃ§o">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input label="CEP" value={form.zipCode} onChange={(e) => handleChange('zipCode', e.target.value)} placeholder="00000-000" maxLength={9} />
             <Input label="Rua" value={form.street} onChange={(e) => handleChange('street', e.target.value)} className="sm:col-span-2" />
-            <Input label="Número" value={form.number} onChange={(e) => handleChange('number', e.target.value)} />
+            <Input label="NÃºmero" value={form.number} onChange={(e) => handleChange('number', e.target.value)} />
             <Input label="Complemento" value={form.complement} onChange={(e) => handleChange('complement', e.target.value)} />
             <Input label="Bairro" value={form.neighborhood} onChange={(e) => handleChange('neighborhood', e.target.value)} />
             <Input label="Cidade *" value={form.city} onChange={(e) => handleChange('city', e.target.value)} error={errors.city} />
@@ -189,7 +189,7 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
           </div>
         </FormSection>
 
-        <FormSection title="Informações do Transporte">
+        <FormSection title="InformaÃ§Ãµes do Transporte">
           <Select label="Tipo" options={transportTypeOptions} value={form.transportType} onChange={(e) => handleChange('transportType', e.target.value)} />
           {form.transportType === 'university' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -213,13 +213,13 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
 
         <FormSection title="Trajeto do Contrato">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Ponto de saída" value={form.pickupPoint} onChange={(e) => handleChange('pickupPoint', e.target.value)} placeholder="Ex.: Terminal Central" />
-            <Input label="Destino" value={form.destination} onChange={(e) => handleChange('destination', e.target.value)} placeholder="Ex.: USP - Cidade Universitária" />
-            <Input label="Data de início do contrato" type="date" value={form.contractStartDate} onChange={(e) => handleChange('contractStartDate', e.target.value)} className="sm:col-span-2" />
+            <Input label="Ponto de saÃ­da" value={form.pickupPoint} onChange={(e) => handleChange('pickupPoint', e.target.value)} placeholder="Ex.: Terminal Central" />
+            <Input label="Destino" value={form.destination} onChange={(e) => handleChange('destination', e.target.value)} placeholder="Ex.: USP - Cidade UniversitÃ¡ria" />
+            <Input label="Data de inÃ­cio do contrato" type="date" value={form.contractStartDate} onChange={(e) => handleChange('contractStartDate', e.target.value)} className="sm:col-span-2" />
           </div>
         </FormSection>
 
-        <FormSection title="Informações Financeiras">
+        <FormSection title="InformaÃ§Ãµes Financeiras">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input label="Valor da mensalidade *" value={form.monthlyFee} onChange={(e) => handleChange('monthlyFee', e.target.value)} error={errors.monthlyFee} placeholder="0,00" />
             <Input label="Dia do vencimento *" value={form.dueDay} onChange={(e) => handleChange('dueDay', e.target.value)} error={errors.dueDay} placeholder="1-31" maxLength={2} />
@@ -233,8 +233,8 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
           </div>
         </FormSection>
 
-        <FormSection title="Observações" defaultOpen={false}>
-          <Textarea value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} placeholder="Observações sobre o passageiro..." />
+        <FormSection title="ObservaÃ§Ãµes" defaultOpen={false}>
+          <Textarea value={form.notes} onChange={(e) => handleChange('notes', e.target.value)} placeholder="ObservaÃ§Ãµes sobre o passageiro..." />
         </FormSection>
 
         <div className="flex justify-end gap-3 pt-2">
@@ -242,7 +242,7 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
             Cancelar
           </Button>
           <Button type="submit" loading={saving}>
-            {editPassenger ? 'Salvar alterações' : 'Cadastrar passageiro'}
+            {editPassenger ? 'Salvar alteraÃ§Ãµes' : 'Cadastrar passageiro'}
           </Button>
         </div>
       </form>

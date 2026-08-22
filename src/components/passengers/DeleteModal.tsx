@@ -14,7 +14,7 @@ export function DeleteModal({ isOpen, onClose, onConfirm, passengerName, loading
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-sm">
       <div className="text-center">
-        <div className="h-14 w-14 rounded-2xl bg-error/10 flex items-center justify-center mx-auto mb-4">
+        <div className="h-14 w-14 rounded-lg bg-error-soft flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="h-7 w-7 text-error" />
         </div>
         <h3 className="text-lg font-semibold text-text mb-1">Excluir passageiro</h3>

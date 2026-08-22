@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { motion } from 'framer-motion'
 import { availabilityService } from '../services/availabilityService'
 import { AvailabilityStatusBadge } from '../components/availability/AvailabilityStatusBadge'
 import { AvailabilityForm } from '../components/availability/AvailabilityForm'
@@ -9,6 +8,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useToast } from '../contexts/ToastContext'
+import { PageHeader } from '../components/ui/PageHeader'
 import { Plus, Calendar, Clock } from 'lucide-react'
 import { availabilityRules } from '../services/availabilityRules'
 import type { Availability, AvailabilityFormData } from '../types/availability'
@@ -55,11 +55,11 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
         submittedBy: user.name,
         submittedById: user.id,
       })
-      addToast('success', 'Período cadastrado com sucesso!')
+      addToast('success', 'PerÃ­odo cadastrado com sucesso!')
       setShowForm(false)
       await load()
     } catch (err) {
-      addToast('error', err instanceof Error ? err.message : 'Erro ao cadastrar período')
+      addToast('error', err instanceof Error ? err.message : 'Erro ao cadastrar perÃ­odo')
     } finally {
       setSubmitting(false)
     }
@@ -69,11 +69,11 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
     if (!cancelling || !user) return
     try {
       await availabilityService.cancel(cancelling.id, reason, user.name, user.id)
-      addToast('success', 'Período cancelado com sucesso!')
+      addToast('success', 'PerÃ­odo cancelado com sucesso!')
       setCancelling(null)
       await load()
     } catch {
-      addToast('error', 'Erro ao cancelar período')
+      addToast('error', 'Erro ao cancelar perÃ­odo')
     }
   }
 
@@ -95,17 +95,14 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`space-y-6 ${embedded ? '' : 'max-w-3xl mx-auto'}`}>
+    <div className={`space-y-6 ${embedded ? '' : 'max-w-3xl mx-auto'}`}>
       {!embedded && (
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-text">Minha Disponibilidade</h1>
-          <p className="text-sm text-gray-500 mt-1">Gerencie seus períodos de ausência</p>
-        </div>
+        <PageHeader eyebrow="Minha conta" title="Minha Disponibilidade" subtitle="Gerencie seus períodos de ausência" />
       )}
       {!showForm && (
         <div className="flex justify-end">
           <Button icon={<Plus className="h-4 w-4" />} onClick={() => setShowForm(true)}>
-            Novo Período
+            Novo PerÃ­odo
           </Button>
         </div>
       )}
@@ -113,7 +110,7 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
       {showForm && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-text">Cadastrar Período de Ausência</h2>
+            <h2 className="text-sm font-bold text-text">Cadastrar PerÃ­odo de AusÃªncia</h2>
             <button
               onClick={() => setShowForm(false)}
               className="text-sm text-gray-400 hover:text-text transition-colors"
@@ -134,35 +131,32 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
         <Card>
           <div className="text-center py-12">
             <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">Nenhum período de ausência cadastrado</p>
+            <p className="text-sm text-gray-500">Nenhum perÃ­odo de ausÃªncia cadastrado</p>
             <Button variant="secondary" className="mt-4" onClick={() => setShowForm(true)}>
-              Cadastrar Período
+              Cadastrar PerÃ­odo
             </Button>
           </div>
         </Card>
       ) : (
         <div className="space-y-4">
-          {availabilities.map((av, i) => {
+          {availabilities.map((av) => {
             const days = availabilityRules.calculateDays(av.startDate, av.endDate)
             const canCancel = availabilityRules.canCancel(av)
             return (
-              <motion.div
+              <div
                 key={av.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5"
+                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-3 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-primary bg-primary/10 rounded-full px-2.5 py-0.5">Férias</span>
+                      <span className="text-xs font-medium text-primary bg-primary/10 rounded-full px-2.5 py-0.5">FÃ©rias</span>
                       <AvailabilityStatusBadge status={av.status} />
                     </div>
                     <div className="flex items-center gap-4 text-sm text-text">
                       <span className="flex items-center gap-1.5">
                         <Calendar className="h-4 w-4 text-gray-400" />
-                        {av.startDate} — {av.endDate}
+                        {av.startDate} â€” {av.endDate}
                       </span>
                       <span className="flex items-center gap-1.5">
                         <Clock className="h-4 w-4 text-gray-400" />
@@ -181,7 +175,7 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
                     </button>
                   )}
                 </div>
-              </motion.div>
+              </div>
             )
           })}
         </div>
@@ -193,6 +187,6 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
         onConfirm={handleCancel}
         availability={cancelling}
       />
-    </motion.div>
+    </div>
   )
 }

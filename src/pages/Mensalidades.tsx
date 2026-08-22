@@ -13,13 +13,15 @@ import { EditFeeModal } from '../components/monthlyFees/EditFeeModal'
 import { ManualPaymentModal } from '../components/monthlyFees/ManualPaymentModal'
 import { BillingSettingsForm } from '../components/settings/BillingSettings'
 import { PageTabs } from '../components/ui/PageTabs'
+import { PageHeader } from '../components/ui/PageHeader'
 import { ViewToggle } from '../components/passengers/ViewToggle'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { Pagination } from '../components/ui/Pagination'
+import { SkeletonTable } from '../components/ui/Skeleton'
 import { useToast } from '../contexts/ToastContext'
 import { useIsMobile } from '../hooks/useBreakpoint'
-import { ChevronLeft, ChevronRight, Wallet, SlidersHorizontal } from 'lucide-react'
-import { cn } from '../utils/cn'
+import { Wallet, SlidersHorizontal } from 'lucide-react'
 import type { MonthlyFee } from '../types/monthlyFee'
 import type { ViewMode } from '../types/passenger'
 
@@ -114,18 +116,9 @@ export function Mensalidades() {
   if (loading && fees.length === 0) {
     return (
       <div className="space-y-6 sm:space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text">Mensalidades</h1>
-            <p className="text-sm text-gray-500 mt-1">Controle de pagamentos mensais</p>
-          </div>
-        </div>
+        <PageHeader className="hidden sm:block" eyebrow="Financeiro" title="Mensalidades" subtitle="Controle de pagamentos mensais" />
         <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
-        <div className="space-y-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />
-          ))}
-        </div>
+        <SkeletonTable />
       </div>
     )
   }
@@ -133,12 +126,7 @@ export function Mensalidades() {
   if (error) {
     return (
       <div className="space-y-6 sm:space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text">Mensalidades</h1>
-            <p className="text-sm text-gray-500 mt-1">Controle de pagamentos mensais</p>
-          </div>
-        </div>
+        <PageHeader className="hidden sm:block" eyebrow="Financeiro" title="Mensalidades" subtitle="Controle de pagamentos mensais" />
         <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
         <div className="text-center py-16">
           <p className="text-sm text-gray-500 mb-4">{error}</p>
@@ -150,14 +138,16 @@ export function Mensalidades() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-text">Mensalidades</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {tab === 'regras'
+      <PageHeader
+        className="hidden sm:block"
+        eyebrow="Financeiro"
+        title="Mensalidades"
+        subtitle={
+          tab === 'regras'
             ? 'Regras de cobrança e férias'
-            : 'Controle de pagamentos mensais'}
-        </p>
-      </div>
+            : 'Controle de pagamentos mensais'
+        }
+      />
 
       <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
 
@@ -207,7 +197,7 @@ export function Mensalidades() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {fees.map((fee, i) => (
+          {fees.map((fee) => (
             <MonthlyFeeCard
               key={fee.id}
               fee={fee}
@@ -215,47 +205,17 @@ export function Mensalidades() {
               onExempt={handleExempt}
               onEdit={handleEdit}
               onPay={handlePay}
-              index={i}
             />
           ))}
         </div>
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage(pagination.page - 1)}
-            disabled={pagination.page <= 1}
-            className="h-11 w-11 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            aria-label="Página anterior"
-          >
-            <ChevronLeft className="h-5 w-5 text-text" />
-          </button>
-
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => setPage(page)}
-              className={cn(
-                'min-w-[44px] h-11 rounded-xl text-sm font-medium transition-all',
-                page === pagination.page
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'border border-gray-200 dark:border-gray-700 text-text hover:bg-gray-50 dark:hover:bg-gray-800'
-              )}
-            >
-              {page}
-            </button>
-          ))}
-
-          <button
-            onClick={() => setPage(pagination.page + 1)}
-            disabled={pagination.page >= totalPages}
-            className="h-11 w-11 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            aria-label="Próxima página"
-          >
-            <ChevronRight className="h-5 w-5 text-text" />
-          </button>
-        </div>
+        <Pagination
+          page={pagination.page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
       )}
 
       <CancelModal

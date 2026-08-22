@@ -64,7 +64,7 @@ export function ResetPasswordPage() {
     return (
       <AuthLayout title="Senha redefinida!" subtitle="Sua senha foi alterada com sucesso">
         <div className="text-center space-y-6">
-          <div className="h-16 w-16 rounded-2xl bg-success/10 flex items-center justify-center mx-auto">
+          <div className="h-16 w-16 rounded-lg bg-success-soft flex items-center justify-center mx-auto">
             <CheckCircle className="h-8 w-8 text-success" />
           </div>
           <Link to="/login">

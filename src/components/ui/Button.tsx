@@ -1,4 +1,4 @@
-import { useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { cn } from '../../utils/cn'
 import type { ButtonVariant, ButtonSize } from '../../types'
 
@@ -13,21 +13,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-primary text-white hover:bg-primary-light active:bg-primary-dark shadow-sm',
+    'bg-primary text-white hover:bg-primary-light active:bg-primary-dark disabled:hover:bg-primary',
   secondary:
-    'bg-secondary dark:bg-gray-800 text-text border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200',
+    'bg-white dark:bg-gray-800 text-text border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100',
   outline:
-    'border-2 border-primary text-primary bg-transparent hover:bg-primary/5 active:bg-primary/10',
+    'border border-primary text-primary bg-transparent hover:bg-primary-soft active:bg-primary/10 dark:hover:bg-primary/10',
   ghost:
     'text-text bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 active:bg-gray-200',
   danger:
-    'bg-error text-white hover:bg-red-500 active:bg-red-700 shadow-sm',
+    'bg-error text-white hover:bg-red-600 active:bg-red-700 disabled:hover:bg-error',
 }
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'h-11 px-4 text-sm gap-1.5',
-  md: 'h-11 px-5 text-sm gap-2',
-  lg: 'h-13 px-7 text-base gap-2.5',
+  sm: 'h-9 px-3.5 text-sm gap-1.5',
+  md: 'h-10 px-4 text-sm gap-2',
+  lg: 'h-12 px-6 text-base gap-2.5',
 }
 
 export function Button({
@@ -41,43 +41,25 @@ export function Button({
   className,
   ...props
 }: ButtonProps) {
-  const btnRef = useRef<HTMLButtonElement>(null)
-
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const btn = btnRef.current
-    if (!btn) return
-    const rect = btn.getBoundingClientRect()
-    const ripple = document.createElement('span')
-    const size = Math.max(rect.width, rect.height)
-    ripple.style.width = ripple.style.height = `${size}px`
-    ripple.style.left = `${e.clientX - rect.left - size / 2}px`
-    ripple.style.top = `${e.clientY - rect.top - size / 2}px`
-    ripple.className = 'absolute rounded-full bg-white/30 animate-[ripple_0.6s_ease-out]'
-    btn.appendChild(ripple)
-    setTimeout(() => ripple.remove(), 600)
-    props.onClick?.(e)
-  }
-
   return (
     <button
-      ref={btnRef}
       disabled={disabled || loading}
       className={cn(
-        'relative inline-flex items-center justify-center font-medium rounded-xl',
-        'transition-all duration-200 ease-out',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-        'disabled:opacity-50 disabled:cursor-not-allowed select-none overflow-hidden',
+        'relative inline-flex items-center justify-center font-semibold rounded-full',
+        'transition-all duration-150 ease-out',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1',
+        'disabled:opacity-50 disabled:cursor-not-allowed select-none',
+        'active:scale-[0.98]',
         variantStyles[variant],
         sizeStyles[size],
         fullWidth && 'w-full',
         className
       )}
       {...props}
-      onClick={handleClick}
     >
       {loading ? (
         <svg
-          className="animate-spin h-5 w-5"
+          className="animate-spin h-4 w-4"
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden="true"

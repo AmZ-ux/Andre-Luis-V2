@@ -4,10 +4,10 @@ import { useToast } from '../../contexts/ToastContext'
 import { cn } from '../../utils/cn'
 
 const toastMap = {
-  success: { icon: CheckCircle, chip: 'bg-success/15 text-success' },
-  error: { icon: XCircle, chip: 'bg-error/15 text-error' },
-  warning: { icon: AlertTriangle, chip: 'bg-warning/15 text-warning' },
-  info: { icon: Info, chip: 'bg-primary/15 text-primary' },
+  success: { icon: CheckCircle, chip: 'bg-success-soft text-success' },
+  error: { icon: XCircle, chip: 'bg-error-soft text-error' },
+  warning: { icon: AlertTriangle, chip: 'bg-warning-soft text-warning' },
+  info: { icon: Info, chip: 'bg-primary-soft text-primary' },
 }
 
 export function ToastContainer() {
@@ -27,15 +27,15 @@ export function ToastContainer() {
               exit={{ opacity: 0, y: -8, scale: 0.96 }}
               transition={{ type: 'spring', damping: 28, stiffness: 380 }}
               className={cn(
-                'pointer-events-auto w-full bg-white dark:bg-gray-900 rounded-2xl shadow-xl shadow-gray-900/10 dark:shadow-black/40',
-                'border border-gray-100 dark:border-gray-800 p-3 pl-4 flex items-start gap-3'
+                'pointer-events-auto w-full bg-white dark:bg-gray-900 rounded-xl shadow-pop',
+                'border border-gray-200 dark:border-gray-800 p-3 pl-4 flex items-start gap-3'
               )}
               role="status"
             >
-              <span className={cn('h-9 w-9 rounded-xl flex items-center justify-center shrink-0', chip)}>
+              <span className={cn('h-9 w-9 rounded-lg flex items-center justify-center shrink-0', chip)}>
                 <Icon className="h-5 w-5" />
               </span>
-              <div className="flex-1 min-w-0 pt-1">
+              <div className="flex-1 min-w-0 pt-0.5">
                 <p className="text-sm font-semibold text-text leading-snug">{toast.title}</p>
                 {toast.message && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 leading-snug">{toast.message}</p>

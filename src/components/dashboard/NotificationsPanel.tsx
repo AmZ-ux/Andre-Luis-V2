@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { Card } from '../ui/Card'
 import { SectionTitle } from './SectionTitle'
 import { Button } from '../ui/Button'
@@ -18,62 +17,56 @@ const notifIcon = {
 }
 
 const notifColor = {
-  payment: 'bg-success/10 text-success',
-  due: 'bg-warning/10 text-warning',
-  document: 'bg-primary/10 text-primary',
+  payment: 'bg-success-soft text-success',
+  due: 'bg-warning-soft text-warning',
+  document: 'bg-primary-soft text-primary',
   system: 'bg-gray-100 dark:bg-gray-800 text-gray-500',
 }
 
 export function NotificationsPanel({ notifications }: NotificationsPanelProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.3 }}
-    >
-      <Card>
-        <SectionTitle
-          title="Notificações"
-          action={
-            <Button variant="ghost" size="sm">
-              Ver todas
-            </Button>
-          }
-        />
-        <div className="space-y-1">
-          {notifications.map((notif) => {
-            const Icon = notifIcon[notif.type] || Info
-            return (
+    <Card>
+      <SectionTitle
+        title="Notificações"
+        action={
+          <Button variant="ghost" size="sm">
+            Ver todas
+          </Button>
+        }
+      />
+      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        {notifications.map((notif) => {
+          const Icon = notifIcon[notif.type] || Info
+          return (
+            <li
+              key={notif.id}
+              className={cn(
+                'flex items-start gap-3 py-2.5 first:pt-0 last:pb-0 rounded-lg',
+                !notif.read && 'px-2 -mx-2 bg-primary-soft/60'
+              )}
+            >
               <div
-                key={notif.id}
                 className={cn(
-                  'flex items-start gap-3 p-3 rounded-xl transition-colors',
-                  !notif.read && 'bg-primary/5 dark:bg-primary/10'
+                  'h-7 w-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5',
+                  notifColor[notif.type]
                 )}
               >
-                <div
-                  className={cn(
-                    'h-8 w-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5',
-                    notifColor[notif.type]
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-text">{notif.title}</p>
-                    {!notif.read && (
-                      <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">{notif.message}</p>
-                </div>
-                <span className="text-xs text-gray-400 shrink-0">{notif.time}</span>
+                <Icon className="h-3.5 w-3.5" />
               </div>
-            )
-          })}
-        </div>
-      </Card>
-    </motion.div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-text">{notif.title}</p>
+                  {!notif.read && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-label="Não lida" />
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5 leading-snug">{notif.message}</p>
+              </div>
+              <span className="text-xs text-gray-400 shrink-0 tabular-nums">{notif.time}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
   )
 }

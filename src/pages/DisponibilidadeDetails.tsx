@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { motion } from 'framer-motion'
@@ -14,13 +14,13 @@ import { useToast } from '../contexts/ToastContext'
 import { ArrowLeft, User, Calendar, Clock, FileText, Building2, AlertCircle } from 'lucide-react'
 import type { Availability, AvailabilityHistoryEntry } from '../types/availability'
 
-const typeLabels: Record<string, string> = { vacation: 'Férias' }
+const typeLabels: Record<string, string> = { vacation: 'FÃ©rias' }
 
 const actionLabels: Record<string, string> = {
-  created: 'Período cadastrado',
-  updated: 'Período editado',
-  cancelled: 'Período cancelado',
-  finished: 'Período finalizado',
+  created: 'PerÃ­odo cadastrado',
+  updated: 'PerÃ­odo editado',
+  cancelled: 'PerÃ­odo cancelado',
+  finished: 'PerÃ­odo finalizado',
 }
 
 export function DisponibilidadeDetails() {
@@ -57,9 +57,9 @@ export function DisponibilidadeDetails() {
       setShowCancel(false)
       const h = await availabilityHistory.getByAvailabilityId(av.id)
       setHistory(h)
-      addToast('success', 'Período cancelado com sucesso!')
+      addToast('success', 'PerÃ­odo cancelado com sucesso!')
     } catch {
-      addToast('error', 'Erro ao cancelar período')
+      addToast('error', 'Erro ao cancelar perÃ­odo')
     }
   }
 
@@ -67,7 +67,7 @@ export function DisponibilidadeDetails() {
   if (error || !av) {
     return (
       <div className="text-center py-16">
-        <h2 className="text-lg font-semibold text-text">Período não encontrado</h2>
+        <h2 className="text-lg font-semibold text-text">PerÃ­odo nÃ£o encontrado</h2>
         <Button onClick={() => navigate('/passageiros?tab=disponibilidade')} className="mt-4">Voltar</Button>
       </div>
     )
@@ -87,7 +87,8 @@ export function DisponibilidadeDetails() {
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-text">Detalhes do Período</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent mb-1.5">Operação</p>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text">Detalhes do Período</h1>
           <p className="text-sm text-gray-500 mt-1">{typeLabels[av.type] || av.type}</p>
         </div>
         <AvailabilityStatusBadge status={av.status} />
@@ -95,7 +96,7 @@ export function DisponibilidadeDetails() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
         <Card>
-          <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
             <User className="h-4 w-4 text-primary" /> Passageiro
           </h2>
           <div className="space-y-3">
@@ -110,15 +111,15 @@ export function DisponibilidadeDetails() {
             {av.institution && (
               <div className="flex items-start gap-3">
                 <Building2 className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-                <div><p className="text-xs text-gray-400">Instituição</p><p className="text-sm text-text">{av.institution}</p></div>
+                <div><p className="text-xs text-gray-400">InstituiÃ§Ã£o</p><p className="text-sm text-text">{av.institution}</p></div>
               </div>
             )}
           </div>
         </Card>
 
         <Card>
-          <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-primary" /> Período
+          <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" /> PerÃ­odo
           </h2>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
@@ -131,7 +132,7 @@ export function DisponibilidadeDetails() {
             </div>
             <div className="flex items-start gap-3">
               <Clock className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
-              <div><p className="text-xs text-gray-400">Duração</p><p className="text-sm text-text">{days} {days === 1 ? 'dia' : 'dias'}</p></div>
+              <div><p className="text-xs text-gray-400">DuraÃ§Ã£o</p><p className="text-sm text-text">{days} {days === 1 ? 'dia' : 'dias'}</p></div>
             </div>
             <div className="flex items-start gap-3">
               <AlertCircle className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
@@ -142,7 +143,7 @@ export function DisponibilidadeDetails() {
       </div>
 
       <Card>
-        <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
+        <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary" /> Motivo
         </h2>
         <p className="text-sm text-text">{av.reason}</p>
@@ -160,8 +161,8 @@ export function DisponibilidadeDetails() {
       )}
 
       <Card>
-        <h2 className="text-sm font-bold text-text mb-4 flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary" /> Histórico
+        <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text mb-4 flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" /> HistÃ³rico
         </h2>
         {history.length === 0 ? (
           <p className="text-sm text-gray-400">Nenhum registro</p>
@@ -177,7 +178,7 @@ export function DisponibilidadeDetails() {
                   <p className="text-sm font-medium text-text">{actionLabels[entry.action] || entry.action}</p>
                   {entry.notes && <p className="text-xs text-gray-500">{entry.notes}</p>}
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {entry.performedBy} — {entry.createdAt}
+                    {entry.performedBy} â€” {entry.createdAt}
                   </p>
                 </div>
               </div>
@@ -189,7 +190,7 @@ export function DisponibilidadeDetails() {
       {canCancel && (
         <div className="flex justify-center">
           <Button variant="danger" onClick={() => setShowCancel(true)}>
-            Cancelar Período
+            Cancelar PerÃ­odo
           </Button>
         </div>
       )}

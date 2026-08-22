@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
 import { monthlyFeeService } from '../services/monthlyFeeService'
 import { MonthlyFeeStatus } from '../components/monthlyFees/MonthlyFeeStatus'
 import { FeeCheckoutModal } from '../components/monthlyFees/FeeCheckoutModal'
 import { PageTabs } from '../components/ui/PageTabs'
+import { PageHeader } from '../components/ui/PageHeader'
 import { Button } from '../components/ui/Button'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useToast } from '../contexts/ToastContext'
@@ -90,31 +90,36 @@ export function MinhasMensalidades() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-text flex items-center gap-2">
-            {tab === 'ausencias' ? (
-              <>
-                <CalendarOff className="h-5 w-5 text-primary" />
-                Disponibilidade
-              </>
-            ) : (
-              <>
-                <Wallet className="h-5 w-5 text-primary" />
-                Minhas Mensalidades
-              </>
-            )}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {tab === 'ausencias'
-              ? 'Gerencie seus períodos de ausência e férias'
-              : 'Pague suas mensalidades com PIX ou cartão'}
-          </p>
-        </div>
+      <PageHeader
+        className="hidden sm:block"
+        eyebrow="Minha conta"
+        title={tab === 'ausencias' ? 'Disponibilidade' : 'Minhas Mensalidades'}
+        subtitle={
+          tab === 'ausencias'
+            ? 'Gerencie seus períodos de ausência e férias'
+            : 'Pague suas mensalidades com PIX ou cartão'
+        }
+        actions={
+          tab === 'faturas' ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className="h-4 w-4" />}
+              onClick={handleEnsureCurrent}
+            >
+              Atualizar
+            </Button>
+          ) : undefined
+        }
+      />
+
+      <div className="flex items-center justify-between gap-3">
+        <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} className="flex-1" />
         {tab === 'faturas' && (
           <Button
             variant="secondary"
             size="sm"
+            className="sm:hidden shrink-0"
             icon={<RefreshCw className="h-4 w-4" />}
             onClick={handleEnsureCurrent}
           >
@@ -122,8 +127,6 @@ export function MinhasMensalidades() {
           </Button>
         )}
       </div>
-
-      <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
 
       {tab === 'ausencias' ? (
         <MinhaDisponibilidade embedded />
@@ -144,15 +147,12 @@ export function MinhasMensalidades() {
         </div>
       ) : (
         <div className="space-y-3">
-          {fees.map((fee, i) => {
+          {fees.map((fee) => {
             const canPay = fee.status === 'pending' || fee.status === 'overdue'
             return (
-              <motion.div
+              <div
                 key={fee.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: i * 0.03 }}
-                className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5"
+                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card p-5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -176,7 +176,7 @@ export function MinhasMensalidades() {
                     <p className="text-sm text-success">Pago em {fee.payment.paymentDate}</p>
                   )}
                 </div>
-              </motion.div>
+              </div>
             )
           })}
         </div>

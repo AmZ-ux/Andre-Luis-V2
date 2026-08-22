@@ -54,16 +54,21 @@ export function MobileNav() {
         onClick={onClick}
         className={cn(
           'flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]',
-          onClick && 'flex-row justify-start gap-3 w-full px-2 min-h-[48px] rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'
+          onClick && 'flex-row justify-start gap-3 w-full px-2 min-h-[48px] rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'
         )}
       >
-        <DynamicIcon
-          name={item.icon}
-          className={cn(
-            'h-5 w-5 shrink-0 transition-colors',
-            isActive ? 'text-primary' : 'text-gray-400'
+        <span className="relative inline-flex items-center justify-center w-11 h-7">
+          {isActive && (
+            <span className="absolute inset-0 rounded-[14px] bg-primary-soft" aria-hidden="true" />
           )}
-        />
+          <DynamicIcon
+            name={item.icon}
+            className={cn(
+              'relative h-5 w-5 shrink-0 transition-colors',
+              isActive ? 'text-primary' : 'text-gray-400'
+            )}
+          />
+        </span>
         <span
           className={cn(
             'text-[10px] font-medium transition-colors',
@@ -78,7 +83,7 @@ export function MobileNav() {
   }
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 safe-area-bottom">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 rounded-t-3xl shadow-pop safe-area-bottom">
       <div className="flex items-center justify-around h-16 px-2">
         {primaryItems.map((item) => renderItem(item))}
         {moreItems.length > 0 && (
@@ -88,10 +93,15 @@ export function MobileNav() {
             aria-label="Mais opções"
             aria-expanded={moreOpen}
           >
-            <DynamicIcon
-              name="MoreHorizontal"
-              className={cn('h-5 w-5 transition-colors', moreActive ? 'text-primary' : 'text-gray-400')}
-            />
+            <span className="relative inline-flex items-center justify-center w-11 h-7">
+              {moreActive && (
+                <span className="absolute inset-0 rounded-[14px] bg-primary-soft" aria-hidden="true" />
+              )}
+              <DynamicIcon
+                name="MoreHorizontal"
+                className={cn('relative h-5 w-5 transition-colors', moreActive ? 'text-primary' : 'text-gray-400')}
+              />
+            </span>
             <span
               className={cn(
                 'text-[10px] font-medium transition-colors',

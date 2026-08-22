@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+﻿import { motion } from 'framer-motion'
 import { cn } from '../../utils/cn'
 import type { CommunicationMessage } from '../../types/communication'
 import { Clock, Send, AlertTriangle, XCircle, CheckCircle, MessageSquare } from 'lucide-react'
@@ -31,7 +31,7 @@ export function MessageCard({ message, onClick }: MessageCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
       onClick={onClick}
-      className="group bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+      className="group bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 hover:border-gray-300 dark:hover:border-gray-700 transition-colors cursor-pointer"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -47,7 +47,7 @@ export function MessageCard({ message, onClick }: MessageCardProps) {
             </span>
             <span className="text-[10px] text-gray-400">{formatDate(message.createdAt)}</span>
             {message.recipients.length > 0 && (
-              <span className="text-[10px] text-gray-400">{message.recipients.length} destinatário(s)</span>
+              <span className="text-[10px] text-gray-400">{message.recipients.length} destinatÃ¡rio(s)</span>
             )}
           </div>
         </div>

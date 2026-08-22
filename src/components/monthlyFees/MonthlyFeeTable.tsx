@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+﻿import { useNavigate } from 'react-router-dom'
 import { ChevronUp, ChevronDown, Pencil, XCircle, CheckCircle, CircleDollarSign } from 'lucide-react'
 import { MonthlyFeeStatus } from './MonthlyFeeStatus'
 import { cn } from '../../utils/cn'
@@ -29,26 +28,26 @@ function SortHeader({ label, field, current, onClick }: SortHeaderProps) {
     <button
       onClick={() => onClick(field)}
       className={cn(
-        'inline-flex items-center gap-1 text-sm font-medium whitespace-nowrap transition-colors',
-        active ? 'text-text' : 'text-gray-500 dark:text-gray-400 hover:text-text'
+        'inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide whitespace-nowrap transition-colors',
+        active ? 'text-text dark:text-gray-200' : 'text-gray-500 dark:text-gray-400 hover:text-text dark:hover:text-gray-200'
       )}
     >
       {label}
       <span className="inline-flex flex-col -space-y-1">
-        <ChevronUp className={cn('h-3 w-3', active && current.direction === 'asc' ? 'text-primary' : 'text-gray-300')} />
-        <ChevronDown className={cn('h-3 w-3', active && current.direction === 'desc' ? 'text-primary' : 'text-gray-300')} />
+        <ChevronUp className={cn('h-3 w-3', active && current.direction === 'asc' ? 'text-primary' : 'text-gray-300 dark:text-gray-600')} />
+        <ChevronDown className={cn('h-3 w-3', active && current.direction === 'desc' ? 'text-primary' : 'text-gray-300 dark:text-gray-600')} />
       </span>
     </button>
   )
 }
 
 const actionButtonClass =
-  'h-11 w-11 rounded-lg flex items-center justify-center transition-all hover:bg-gray-100 dark:hover:bg-gray-800'
+  'h-9 w-9 rounded-lg flex items-center justify-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-800'
 
 const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 const paymentLabels: Record<string, string> = {
-  pix: 'PIX', cash: 'Dinheiro', transfer: 'Transferência', card: 'Cartão',
+  pix: 'PIX', cash: 'Dinheiro', transfer: 'TransferÃªncia', card: 'CartÃ£o',
 }
 
 export function MonthlyFeeTable({
@@ -66,7 +65,7 @@ export function MonthlyFeeTable({
   if (fees.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-sm text-gray-400">Nenhuma mensalidade encontrada</p>
+        <p className="text-sm text-gray-500">Nenhuma mensalidade encontrada para estes filtros.</p>
       </div>
     )
   }
@@ -74,18 +73,15 @@ export function MonthlyFeeTable({
   if (isMobile) {
     return (
       <div className="space-y-3">
-        {fees.map((fee, i) => {
+        {fees.map((fee) => {
           const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
           const canExempt = fee.status !== 'paid' && fee.status !== 'exempt'
           const canPay = fee.status === 'pending' || fee.status === 'overdue'
 
           return (
-            <motion.div
+            <div
               key={fee.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: i * 0.03 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 hover:shadow-md transition-all duration-300"
+              className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4"
             >
               <div className="flex items-start justify-between gap-2">
                 <button
@@ -97,16 +93,16 @@ export function MonthlyFeeTable({
                 <MonthlyFeeStatus status={fee.status} />
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-500">
+              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-gray-500">
                 <div>
-                  <p className="text-gray-400">Competência</p>
+                  <p className="text-gray-400">CompetÃªncia</p>
                   <p className="text-sm font-semibold text-text">
                     {monthNames[fee.month - 1]} {fee.year}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-400">Valor</p>
-                  <p className="text-sm font-bold text-text">
+                  <p className="text-sm font-bold text-text tabular-nums">
                     R$ {fee.amount.toFixed(2).replace('.', ',')}
                   </p>
                 </div>
@@ -126,11 +122,11 @@ export function MonthlyFeeTable({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-1 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
                 {canPay && (
                   <button
                     onClick={() => onPay(fee)}
-                    className={cn(actionButtonClass, 'text-success hover:text-green-600')}
+                    className={cn(actionButtonClass, 'text-success hover:text-green-700')}
                     aria-label="Registrar pagamento"
                     title="Registrar pagamento"
                   >
@@ -140,7 +136,7 @@ export function MonthlyFeeTable({
                 {canExempt && (
                   <button
                     onClick={() => onExempt(fee)}
-                    className={cn(actionButtonClass, 'text-blue-500 hover:text-blue-600')}
+                    className={cn(actionButtonClass, 'text-primary hover:text-primary-light')}
                     aria-label="Isentar"
                     title="Isentar"
                   >
@@ -166,7 +162,7 @@ export function MonthlyFeeTable({
                   <Pencil className="h-4 w-4" />
                 </button>
               </div>
-            </motion.div>
+            </div>
           )
         })}
       </div>
@@ -177,23 +173,31 @@ export function MonthlyFeeTable({
     <div className="w-full overflow-x-auto scrollbar-hide">
       <table className="w-full min-w-[760px]">
         <thead>
-          <tr className="border-b border-gray-100 dark:border-gray-800">
-            <th className="px-4 py-3 text-left">
+          <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40">
+            <th className="px-4 py-2.5 text-left">
               <SortHeader label="Passageiro" field="passengerName" current={sort} onClick={onSort} />
             </th>
-            <th className="px-4 py-3 text-center">Mês</th>
-            <th className="px-4 py-3 text-right">
+            <th className="px-4 py-2.5 text-center">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">MÃªs</span>
+            </th>
+            <th className="px-4 py-2.5 text-right">
               <SortHeader label="Valor" field="amount" current={sort} onClick={onSort} />
             </th>
-            <th className="px-4 py-3 text-center">
+            <th className="px-4 py-2.5 text-center">
               <SortHeader label="Vencimento" field="dueDay" current={sort} onClick={onSort} />
             </th>
-            <th className="px-4 py-3 text-center">
+            <th className="px-4 py-2.5 text-center">
               <SortHeader label="Pagamento" field="paymentDate" current={sort} onClick={onSort} />
             </th>
-            <th className="px-4 py-3 text-center">Status</th>
-            <th className="px-4 py-3 text-center">Forma</th>
-            <th className="px-4 py-3 text-right">Ações</th>
+            <th className="px-4 py-2.5 text-center">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Status</span>
+            </th>
+            <th className="px-4 py-2.5 text-center">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Forma</span>
+            </th>
+            <th className="px-4 py-2.5 text-right">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">AÃ§Ãµes</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -205,7 +209,7 @@ export function MonthlyFeeTable({
             return (
               <tr
                 key={fee.id}
-                className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
+                className="border-b border-gray-100 dark:border-gray-800/60 hover:bg-gray-50/70 dark:hover:bg-gray-800/30 transition-colors"
               >
                 <td className="px-4 py-3">
                   <button
@@ -215,14 +219,14 @@ export function MonthlyFeeTable({
                     {fee.passengerName}
                   </button>
                 </td>
-                <td className="px-4 py-3 text-center text-sm text-text">
+                <td className="px-4 py-3 text-center text-sm text-text tabular-nums">
                   {monthNames[fee.month - 1]}/{fee.year}
                 </td>
-                <td className="px-4 py-3 text-right text-sm text-text font-medium">
+                <td className="px-4 py-3 text-right text-sm text-text font-medium tabular-nums">
                   R$ {fee.amount.toFixed(2).replace('.', ',')}
                 </td>
-                <td className="px-4 py-3 text-center text-sm text-text">{fee.dueDate}</td>
-                <td className="px-4 py-3 text-center text-sm text-text">
+                <td className="px-4 py-3 text-center text-sm text-text tabular-nums">{fee.dueDate}</td>
+                <td className="px-4 py-3 text-center text-sm text-text tabular-nums">
                   {fee.payment?.paymentDate || '-'}
                 </td>
                 <td className="px-4 py-3 text-center">
@@ -236,7 +240,7 @@ export function MonthlyFeeTable({
                     {canPay && (
                       <button
                         onClick={() => onPay(fee)}
-                        className={cn(actionButtonClass, 'text-success hover:text-green-600')}
+                        className={cn(actionButtonClass, 'text-success hover:text-green-700')}
                         aria-label="Registrar pagamento"
                         title="Registrar pagamento"
                       >
@@ -246,7 +250,7 @@ export function MonthlyFeeTable({
                     {canExempt && (
                       <button
                         onClick={() => onExempt(fee)}
-                        className={cn(actionButtonClass, 'text-blue-500 hover:text-blue-600')}
+                        className={cn(actionButtonClass, 'text-primary hover:text-primary-light')}
                         aria-label="Isentar"
                         title="Isentar"
                       >

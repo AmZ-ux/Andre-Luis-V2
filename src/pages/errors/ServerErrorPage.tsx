@@ -18,7 +18,7 @@ export function ServerErrorPage() {
 
   return (
     <div className="flex flex-col items-center justify-center text-center py-24 px-6">
-      <div className="h-24 w-24 rounded-3xl bg-error/10 flex items-center justify-center mb-6">
+      <div className="h-16 w-16 rounded-xl bg-error-soft flex items-center justify-center mb-6">
         <AlertTriangle className="h-12 w-12 text-error" />
       </div>
       <h1 className="text-2xl font-bold text-text mb-2">Erro interno do servidor</h1>

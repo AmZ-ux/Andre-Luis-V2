@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Button } from '../ui/Button'
 import { HardDrive, Upload, Trash2, RotateCcw, Download } from 'lucide-react'
 import type { BackupEntry } from '../../types/settings'
@@ -31,7 +31,7 @@ export function BackupCenter({ backups, onCreateBackup, onRestore, onDelete, onD
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-text">Backup manual</p>
-          <p className="text-xs text-gray-500 mt-0.5">Crie uma cópia de segurança dos dados do sistema</p>
+          <p className="text-xs text-gray-500 mt-0.5">Crie uma cÃ³pia de seguranÃ§a dos dados do sistema</p>
         </div>
         <Button icon={<HardDrive className="h-4 w-4" />} onClick={onCreateBackup}>
           Criar Backup
@@ -45,16 +45,16 @@ export function BackupCenter({ backups, onCreateBackup, onRestore, onDelete, onD
         </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-text">Histórico de Backups</p>
+          <p className="text-sm font-medium text-text">HistÃ³rico de Backups</p>
           {backups.map((b) => (
-            <div key={b.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+            <div key={b.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
               <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <HardDrive className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text truncate">{b.filename}</p>
                 <p className="text-xs text-gray-500">
-                  {b.size} &middot; {b.type === 'manual' ? 'Manual' : 'Automático'} &middot; {formatDate(b.createdAt)}
+                  {b.size} &middot; {b.type === 'manual' ? 'Manual' : 'AutomÃ¡tico'} &middot; {formatDate(b.createdAt)}
                 </p>
               </div>
               <div className="flex gap-1">

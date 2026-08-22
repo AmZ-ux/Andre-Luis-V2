@@ -34,7 +34,7 @@ function ModalDesktop({ onClose, title, children, className, containerRef }: Mod
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ duration: 0.2 }}
         className={cn(
-          'relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto',
+          'relative bg-white dark:bg-gray-900 rounded-xl shadow-pop w-full max-w-lg max-h-[90vh] overflow-y-auto',
           className
         )}
         role="dialog"

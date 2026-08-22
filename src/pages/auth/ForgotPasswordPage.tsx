@@ -42,7 +42,7 @@ export function ForgotPasswordPage() {
         subtitle="Verifique sua caixa de entrada e siga as instruções"
       >
         <div className="text-center space-y-6">
-          <div className="h-16 w-16 rounded-2xl bg-success/10 flex items-center justify-center mx-auto">
+          <div className="h-16 w-16 rounded-lg bg-success-soft flex items-center justify-center mx-auto">
             <CheckCircle className="h-8 w-8 text-success" />
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">

@@ -14,9 +14,9 @@ interface ConfirmDialogProps {
 }
 
 const variantConfig = {
-  danger: { icon: AlertTriangle, color: 'text-error', bg: 'bg-error/10', buttonVariant: 'danger' as const },
-  warning: { icon: AlertTriangle, color: 'text-warning', bg: 'bg-warning/10', buttonVariant: 'primary' as const },
-  info: { icon: Info, color: 'text-primary', bg: 'bg-primary/10', buttonVariant: 'primary' as const },
+  danger: { icon: AlertTriangle, color: 'text-error', bg: 'bg-error-soft', buttonVariant: 'danger' as const },
+  warning: { icon: AlertTriangle, color: 'text-warning', bg: 'bg-warning-soft', buttonVariant: 'primary' as const },
+  info: { icon: Info, color: 'text-primary', bg: 'bg-primary-soft', buttonVariant: 'primary' as const },
 }
 
 export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel = 'Confirmar', cancelLabel = 'Cancelar', variant = 'info' }: ConfirmDialogProps) {
@@ -26,7 +26,7 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, message, confir
   return (
     <Modal isOpen={open} onClose={onClose}>
       <div className="text-center">
-        <div className={`h-14 w-14 rounded-2xl ${cfg.bg} flex items-center justify-center mx-auto mb-4`}>
+        <div className={`h-14 w-14 rounded-lg ${cfg.bg} flex items-center justify-center mx-auto mb-4`}>
           <Icon className={`h-7 w-7 ${cfg.color}`} />
         </div>
         <h3 className="text-base font-semibold text-text mb-2">{title}</h3>

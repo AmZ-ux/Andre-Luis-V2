@@ -1,7 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { Card } from '../ui/Card'
-import { Button } from '../ui/Button'
 import { SectionTitle } from './SectionTitle'
 import { UserPlus, Wallet, BarChart3, Search } from 'lucide-react'
 
@@ -9,38 +7,37 @@ export function QuickActions() {
   const navigate = useNavigate()
 
   const actions = [
-    { label: 'Cadastrar Passageiro', icon: UserPlus, path: '/passageiros', variant: 'primary' as const },
-    { label: 'Nova Mensalidade', icon: Wallet, path: '/mensalidades', variant: 'secondary' as const },
-    { label: 'Relatórios', icon: BarChart3, path: '/?tab=relatorios', variant: 'secondary' as const },
-    { label: 'Pesquisar Passageiro', icon: Search, path: '/passageiros', variant: 'secondary' as const },
+    { label: 'Cadastrar Passageiro', icon: UserPlus, path: '/passageiros' },
+    { label: 'Nova Mensalidade', icon: Wallet, path: '/mensalidades' },
+    { label: 'Relatórios', icon: BarChart3, path: '/?tab=relatorios' },
+    { label: 'Pesquisar Passageiro', icon: Search, path: '/passageiros' },
   ]
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.15 }}
-    >
-      <Card>
-        <SectionTitle title="Ações Rápidas" />
-        <div className="grid grid-cols-2 gap-3">
-          {actions.map((action) => {
-            const Icon = action.icon
-            return (
-              <Button
-                key={action.label}
-                variant={action.variant}
+    <Card>
+      <SectionTitle title="Ações rápidas" />
+      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        {actions.map((action) => {
+          const Icon = action.icon
+          return (
+            <li key={action.label}>
+              <button
+                type="button"
                 onClick={() => navigate(action.path)}
-                icon={<Icon className="h-4 w-4 shrink-0" />}
-                className="justify-start"
-                size="sm"
+                className="w-full flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 text-sm font-medium text-text hover:text-primary transition-colors text-left"
               >
-                <span className="truncate">{action.label}</span>
-              </Button>
-            )
-          })}
-        </div>
-      </Card>
-    </motion.div>
+                <span className="h-7 w-7 rounded-lg bg-primary-soft text-primary flex items-center justify-center shrink-0">
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <span className="flex-1 truncate">{action.label}</span>
+                <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
   )
 }
