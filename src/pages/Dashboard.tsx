@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { DashboardHeader } from '../components/dashboard/DashboardHeader'
 import { FinancialSummary } from '../components/dashboard/FinancialSummary'
 import { StatisticCard } from '../components/dashboard/StatisticCard'
 import { DashboardChart } from '../components/dashboard/DashboardChart'
@@ -8,10 +7,9 @@ import { UpcomingPayments } from '../components/dashboard/UpcomingPayments'
 import { NotificationsPanel } from '../components/dashboard/NotificationsPanel'
 import { QuickActions } from '../components/dashboard/QuickActions'
 import { dashboardService } from '../services/dashboardService'
-import type { Period, DashboardData } from '../types/dashboard'
+import type { DashboardData } from '../types/dashboard'
 
 export function Dashboard() {
-  const [period, setPeriod] = useState<Period>('month')
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,15 +27,13 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="space-y-4">
-          <div className="h-8 w-72 bg-gray-200 dark:bg-gray-700 rounded-lg animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
-          <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
-        </div>
         <div className="h-52 bg-gray-200 dark:bg-gray-700 rounded-xl animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
-          ))}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 divide-gray-100 dark:divide-gray-800 sm:divide-x">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-[76px] bg-gray-100 dark:bg-gray-800 animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -63,7 +59,7 @@ export function Dashboard() {
         <p className="text-sm text-gray-500 mb-6">{error || 'Dados indisponíveis'}</p>
         <button
           onClick={handleRetry}
-          className="h-11 px-5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-light transition-colors"
+          className="h-11 px-5 rounded-full bg-primary text-white text-sm font-semibold hover:bg-primary-light transition-colors"
         >
           Tentar novamente
         </button>
@@ -73,8 +69,6 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <DashboardHeader period={period} onPeriodChange={setPeriod} />
-
       <FinancialSummary data={data.financialSummary} />
 
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card overflow-hidden">

@@ -53,25 +53,24 @@ export function MobileNav() {
         end={item.path === '/'}
         onClick={onClick}
         className={cn(
-          'flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]',
-          onClick && 'flex-row justify-start gap-3 w-full px-2 min-h-[48px] rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'
+          'flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px]',
+          !onClick && 'rounded-2xl px-2.5 py-1 transition-colors',
+          onClick && 'flex-row justify-start gap-3 w-full px-3 min-h-[48px] rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
+          isActive && 'bg-primary-soft'
         )}
       >
-        <span className="relative inline-flex items-center justify-center w-11 h-7">
-          {isActive && (
-            <span className="absolute inset-0 rounded-[14px] bg-primary-soft" aria-hidden="true" />
-          )}
+        <span className="inline-flex items-center justify-center h-6">
           <DynamicIcon
             name={item.icon}
             className={cn(
-              'relative h-5 w-5 shrink-0 transition-colors',
+              'h-5 w-5 shrink-0 transition-colors',
               isActive ? 'text-primary' : 'text-gray-400'
             )}
           />
         </span>
         <span
           className={cn(
-            'text-[10px] font-medium transition-colors',
+            'text-[10px] font-semibold transition-colors',
             onClick && 'text-sm',
             isActive ? 'text-primary' : 'text-gray-400'
           )}
@@ -89,22 +88,22 @@ export function MobileNav() {
         {moreItems.length > 0 && (
           <button
             onClick={() => setMoreOpen(true)}
-            className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px]"
+            className={cn(
+              'flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-2xl px-2.5 py-1 transition-colors',
+              moreActive && 'bg-primary-soft'
+            )}
             aria-label="Mais opções"
             aria-expanded={moreOpen}
           >
-            <span className="relative inline-flex items-center justify-center w-11 h-7">
-              {moreActive && (
-                <span className="absolute inset-0 rounded-[14px] bg-primary-soft" aria-hidden="true" />
-              )}
+            <span className="inline-flex items-center justify-center h-6">
               <DynamicIcon
                 name="MoreHorizontal"
-                className={cn('relative h-5 w-5 transition-colors', moreActive ? 'text-primary' : 'text-gray-400')}
+                className={cn('h-5 w-5 transition-colors', moreActive ? 'text-primary' : 'text-gray-400')}
               />
             </span>
             <span
               className={cn(
-                'text-[10px] font-medium transition-colors',
+                'text-[10px] font-semibold transition-colors',
                 moreActive ? 'text-primary' : 'text-gray-400'
               )}
             >

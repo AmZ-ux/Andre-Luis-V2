@@ -2,7 +2,6 @@ import { useSearchParams } from 'react-router-dom'
 import { LayoutDashboard, BarChart3 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { PageTabs } from '../components/ui/PageTabs'
-import { PageHeader } from '../components/ui/PageHeader'
 import { NotificationBell } from '../components/layout/NotificationBell'
 import { Dashboard } from './Dashboard'
 import { PassengerDashboard } from './PassengerDashboard'
@@ -29,15 +28,10 @@ export function HomePage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <PageHeader
-        className="hidden sm:block"
-        eyebrow="Operação"
-        title="Início"
-        subtitle={tab === 'relatorios' ? 'Análise de dados e métricas' : 'Visão geral do sistema'}
-        actions={<NotificationBell className="shrink-0" />}
-      />
-
-      <PageTabs tabs={adminTabs} value={tab} onChange={handleTabChange} />
+      <div className="flex items-center justify-between gap-3">
+        <PageTabs tabs={adminTabs} value={tab} onChange={handleTabChange} />
+        <NotificationBell className="shrink-0" />
+      </div>
 
       {tab === 'relatorios' ? <Relatorios embedded /> : <Dashboard />}
     </div>
