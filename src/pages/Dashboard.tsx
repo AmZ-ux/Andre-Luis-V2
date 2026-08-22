@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react'
 import { FinancialSummary } from '../components/dashboard/FinancialSummary'
 import { StatisticCard } from '../components/dashboard/StatisticCard'
 import { DashboardChart } from '../components/dashboard/DashboardChart'
-import { RecentActivity } from '../components/dashboard/RecentActivity'
 import { UpcomingPayments } from '../components/dashboard/UpcomingPayments'
-import { NotificationsPanel } from '../components/dashboard/NotificationsPanel'
-import { QuickActions } from '../components/dashboard/QuickActions'
 import { dashboardService } from '../services/dashboardService'
 import type { DashboardData } from '../types/dashboard'
 
@@ -79,16 +76,11 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
           <DashboardChart />
-          <RecentActivity activities={data.recentActivities} />
         </div>
-        <div className="space-y-6">
-          <QuickActions />
-          <UpcomingPayments payments={data.upcomingPayments} />
-          <NotificationsPanel notifications={data.notifications} />
-        </div>
+        <UpcomingPayments payments={data.upcomingPayments} />
       </div>
     </div>
   )

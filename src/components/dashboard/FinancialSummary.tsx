@@ -1,31 +1,7 @@
-import { cn } from '../../utils/cn'
 import type { FinancialSummary as FinancialSummaryType } from '../../types/dashboard'
 
 interface FinancialSummaryProps {
   data: FinancialSummaryType
-}
-
-const metricStyles: Record<string, { cell: string; label: string; value: string }> = {
-  Previsto: {
-    cell: 'bg-white/10',
-    label: 'text-white/60',
-    value: 'text-white',
-  },
-  Pendente: {
-    cell: 'bg-amber-400/20',
-    label: 'text-amber-200/90',
-    value: 'text-amber-200',
-  },
-  Atrasado: {
-    cell: 'bg-red-500/25',
-    label: 'text-red-200/90',
-    value: 'text-red-200',
-  },
-  Recebido: {
-    cell: 'bg-emerald-400/20',
-    label: 'text-emerald-200/90',
-    value: 'text-emerald-200',
-  },
 }
 
 export function FinancialSummary({ data }: FinancialSummaryProps) {
@@ -55,25 +31,26 @@ export function FinancialSummary({ data }: FinancialSummaryProps) {
           de R$ {data.expectedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} previstos
         </p>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 rounded-2xl overflow-hidden mt-6 p-1 bg-white/10">
-          {metrics.map((m) => {
-            const s = metricStyles[m.label]
-            return (
-              <div key={m.label} className={cn('rounded-xl px-4 py-3.5', s.cell)}>
-                <p className={cn('text-[10px] uppercase tracking-wider font-semibold', s.label)}>
-                  {m.label}
-                </p>
-                <p className={cn('text-base sm:text-lg font-bold mt-1 tabular-nums', s.value)}>
-                  R$ {m.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            )
-          })}
-        </div>
+        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5 mt-7 pt-6 border-t border-white/15">
+          {metrics.map((m) => (
+            <div key={m.label}>
+              <dt className="text-[11px] uppercase tracking-[0.12em] text-white/60 font-semibold">
+                {m.label}
+              </dt>
+              <dd className="text-lg sm:text-xl font-bold mt-1.5 tabular-nums whitespace-nowrap">
+                R$ {m.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </div>
 
       <div className="flex items-center gap-4 px-6 sm:px-8 pb-6">
-        <div className="h-2 flex-1 flex gap-0.5 rounded-full overflow-hidden bg-white/10" role="img" aria-label={`${data.receivedPercentage}% recebido`}>
+        <div
+          className="h-2 flex-1 flex gap-0.5 rounded-full overflow-hidden bg-white/10"
+          role="img"
+          aria-label={`${data.receivedPercentage}% recebido`}
+        >
           {receivedPct > 0 && (
             <span className="h-full bg-emerald-400 rounded-full transition-all duration-1000" style={{ width: `${receivedPct}%` }} />
           )}
