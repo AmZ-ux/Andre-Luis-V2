@@ -1,15 +1,16 @@
-import { useSearchParams } from 'react-router-dom'
+﻿import { useSearchParams } from 'react-router-dom'
 import { MessageSquare, Settings } from 'lucide-react'
 import { CommunicationCenter } from '../components/communication/CommunicationCenter'
 import { CommunicationSettingsForm } from '../components/settings/CommunicationSettings'
 import { PageTabs } from '../components/ui/PageTabs'
 import { PageHeader } from '../components/ui/PageHeader'
+import { NotificationBell } from '../components/layout/NotificationBell'
 import { Card } from '../components/ui/Card'
 import { useSettings } from '../hooks/useSettings'
 
 const tabs = [
   { key: 'mensagens', label: 'Mensagens', icon: MessageSquare },
-  { key: 'configuracoes', label: 'Configurações', icon: Settings },
+  { key: 'configuracoes', label: 'ConfiguraÃ§Ãµes', icon: Settings },
 ]
 
 export function CentralComunicacao() {
@@ -26,16 +27,19 @@ export function CentralComunicacao() {
     <div className="space-y-6 sm:space-y-8">
       <PageHeader
         className="hidden sm:block"
-        eyebrow="Operação"
-        title="Comunicação"
+        eyebrow="OperaÃ§Ã£o"
+        title="ComunicaÃ§Ã£o"
         subtitle={
           tab === 'configuracoes'
-            ? 'Configurações de mensagens e templates'
-            : 'Envie mensagens e notificações para os passageiros'
+            ? 'ConfiguraÃ§Ãµes de mensagens e templates'
+            : 'Envie mensagens e notificaÃ§Ãµes para os passageiros'
         }
       />
 
-      <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+      <div className="flex items-center justify-between gap-3">
+        <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+        <NotificationBell className="shrink-0" />
+      </div>
 
       {tab === 'configuracoes' ? (
         <Card>

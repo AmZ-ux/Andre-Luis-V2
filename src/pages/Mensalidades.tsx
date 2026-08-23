@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+﻿import { useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMonthlyFees } from '../hooks/useMonthlyFees'
 import { useSettings } from '../hooks/useSettings'
@@ -14,6 +14,7 @@ import { ManualPaymentModal } from '../components/monthlyFees/ManualPaymentModal
 import { BillingSettingsForm } from '../components/settings/BillingSettings'
 import { PageTabs } from '../components/ui/PageTabs'
 import { PageHeader } from '../components/ui/PageHeader'
+import { NotificationBell } from '../components/layout/NotificationBell'
 import { ViewToggle } from '../components/passengers/ViewToggle'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -27,7 +28,7 @@ import type { ViewMode } from '../types/passenger'
 
 const tabs = [
   { key: 'faturas', label: 'Faturas', icon: Wallet },
-  { key: 'regras', label: 'Regras de cobrança', icon: SlidersHorizontal },
+  { key: 'regras', label: 'Regras de cobranÃ§a', icon: SlidersHorizontal },
 ]
 
 export function Mensalidades() {
@@ -99,7 +100,7 @@ export function Mensalidades() {
     async (reason: string) => {
       if (!selectedFee) return
       await exemptFee(selectedFee.id, reason)
-      addToast('success', 'Isenção registrada com sucesso!')
+      addToast('success', 'IsenÃ§Ã£o registrada com sucesso!')
     },
     [selectedFee, exemptFee, addToast]
   )
@@ -117,7 +118,10 @@ export function Mensalidades() {
     return (
       <div className="space-y-6 sm:space-y-8">
         <PageHeader className="hidden sm:block" eyebrow="Financeiro" title="Mensalidades" subtitle="Controle de pagamentos mensais" />
-        <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+        <div className="flex items-center justify-between gap-3">
+          <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+          <NotificationBell className="shrink-0" />
+        </div>
         <SkeletonTable />
       </div>
     )
@@ -127,7 +131,10 @@ export function Mensalidades() {
     return (
       <div className="space-y-6 sm:space-y-8">
         <PageHeader className="hidden sm:block" eyebrow="Financeiro" title="Mensalidades" subtitle="Controle de pagamentos mensais" />
-        <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+        <div className="flex items-center justify-between gap-3">
+          <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+          <NotificationBell className="shrink-0" />
+        </div>
         <div className="text-center py-16">
           <p className="text-sm text-gray-500 mb-4">{error}</p>
           <Button onClick={reload}>Tentar novamente</Button>
@@ -144,12 +151,15 @@ export function Mensalidades() {
         title="Mensalidades"
         subtitle={
           tab === 'regras'
-            ? 'Regras de cobrança e férias'
+            ? 'Regras de cobranÃ§a e fÃ©rias'
             : 'Controle de pagamentos mensais'
         }
       />
 
-      <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+      <div className="flex items-center justify-between gap-3">
+          <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+          <NotificationBell className="shrink-0" />
+        </div>
 
       {tab === 'regras' && (
         <Card>

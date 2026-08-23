@@ -5,20 +5,19 @@ import { SearchInput } from '../components/passengers/SearchInput'
 import { FiltersPanel } from '../components/passengers/FiltersPanel'
 import { PassengerList } from '../components/passengers/PassengerList'
 import { PassengerForm } from '../components/passengers/PassengerForm'
-import { PassengerCard } from '../components/passengers/PassengerCard'
 import { DeleteModal } from '../components/passengers/DeleteModal'
 import { EmptyPassengers } from '../components/passengers/EmptyPassengers'
-import { ViewToggle } from '../components/passengers/ViewToggle'
 import { DisponibilidadeSection } from './CentralDisponibilidade'
 import { PageTabs } from '../components/ui/PageTabs'
 import { PageHeader } from '../components/ui/PageHeader'
+import { NotificationBell } from '../components/layout/NotificationBell'
 import { Card } from '../components/ui/Card'
 import { Pagination } from '../components/ui/Pagination'
 import { SkeletonTable } from '../components/ui/Skeleton'
 import { useToast } from '../contexts/ToastContext'
 import { passengerService } from '../services/passengerService'
 import { Users, CalendarOff } from 'lucide-react'
-import type { Passenger, ViewMode } from '../types/passenger'
+import type { Passenger } from '../types/passenger'
 
 const tabs = [
   { key: 'passageiros', label: 'Passageiros', icon: Users },
@@ -32,7 +31,6 @@ export function Passageiros() {
     updateFilters, resetFilters, setPage, setSortField, removePassenger, reload,
   } = usePassengers()
   const { addToast } = useToast()
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(null)
   const [deletingPassenger, setDeletingPassenger] = useState<Passenger | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -101,22 +99,22 @@ export function Passageiros() {
         }
       />
 
-      <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+      <div className="flex items-center justify-between gap-3">
+        <PageTabs tabs={tabs} value={tab} onChange={handleTabChange} />
+        <NotificationBell className="shrink-0" />
+      </div>
 
       {tab === 'disponibilidade' ? (
         <DisponibilidadeSection embedded />
       ) : (
         <>
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex items-center gap-3">
         <SearchInput
           value={filters.search}
           onChange={(v) => updateFilters({ search: v })}
           className="flex-1"
         />
-        <div className="flex items-center gap-3">
-          <FiltersPanel filters={filters} onChange={updateFilters} onReset={resetFilters} />
-          <ViewToggle value={viewMode} onChange={setViewMode} />
-        </div>
+        <FiltersPanel filters={filters} onChange={updateFilters} onReset={resetFilters} />
       </div>
 
       {passengers.length === 0 ? (
@@ -127,7 +125,7 @@ export function Passageiros() {
             actionLabel={filters.search ? 'Limpar pesquisa' : 'Atualizar'}
           />
         </Card>
-      ) : viewMode === 'list' ? (
+      ) : (
         <Card padding={false} className="overflow-hidden">
           <PassengerList
             passengers={passengers}
@@ -138,12 +136,6 @@ export function Passageiros() {
             onDelete={setDeletingPassenger}
           />
         </Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {viewMode === 'cards' && passengers.map((p, i) => (
-            <PassengerCard key={p.id} passenger={p} onEdit={handleEdit} onDelete={setDeletingPassenger} index={i} />
-          ))}
-        </div>
       )}
 
       {totalPages > 1 && (

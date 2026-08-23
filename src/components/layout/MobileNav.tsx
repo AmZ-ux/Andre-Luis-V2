@@ -54,9 +54,7 @@ export function MobileNav() {
         onClick={onClick}
         className={cn(
           'flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px]',
-          !onClick && 'rounded-2xl px-2.5 py-1 transition-colors',
-          onClick && 'flex-row justify-start gap-3 w-full px-3 min-h-[48px] rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
-          isActive && 'bg-primary-soft'
+          onClick && 'flex-row justify-start gap-3 w-full px-3 min-h-[48px] rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'
         )}
       >
         <span className="inline-flex items-center justify-center h-6">
@@ -88,10 +86,7 @@ export function MobileNav() {
         {moreItems.length > 0 && (
           <button
             onClick={() => setMoreOpen(true)}
-            className={cn(
-              'flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px] rounded-2xl px-2.5 py-1 transition-colors',
-              moreActive && 'bg-primary-soft'
-            )}
+            className="flex flex-col items-center justify-center gap-1 min-w-[44px] min-h-[44px]"
             aria-label="Mais opções"
             aria-expanded={moreOpen}
           >
