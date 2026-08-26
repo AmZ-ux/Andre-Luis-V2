@@ -5,8 +5,8 @@ import { loadSettings } from './settingsService.js'
 import { ensureContractFees } from './monthlyFeeGenerator.js'
 import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySummaryToAdmins } from './feeAutomation.js'
 import { createBackup, pruneBackups, uploadBackupOffsite } from './backupService.js'
-import { searchPaymentByExternalReference, mpStatus } from './mercadopagoService.js'
-import { finalizePayment } from './paymentService.js'
+import { getPayment, mpStatus } from './mercadopagoService.js'
+import { finalizePayment, recordOverpayment } from './paymentService.js'
 import { alertIntegrationIssue } from './integrationAlert.js'
 import { logger } from '../utils/logger.js'
 import { addLog } from './appLogService.js'
@@ -91,6 +91,10 @@ function runAutoBackup(): void {
 
 // Reconcilia cobrancas pendentes com o Mercado Pago: pagamentos confirmados fora
 // da sessao (aba fechada, timeout) sao finalizados e cobrancas canceladas marcadas.
+//
+// Uses getPayment(payment_intent_id) directly for each charge instead of
+// searchPaymentByExternalReference(limit=1), which was blind to older approved
+// charges when a more recent pending one existed.
 export async function runPaymentReconciliation(): Promise<void> {
   const db = getDb()
   try {
@@ -106,14 +110,21 @@ export async function runPaymentReconciliation(): Promise<void> {
       try {
         const expiryHours = Number(process.env.MP_PIX_EXPIRY_HOURS) || 24
         const expiredLocal = db.prepare("SELECT 1 FROM pix_charges WHERE id = ? AND created_at <= datetime('now', ?)").get(charge.id, `-${expiryHours} hours`)
-        const payment = await searchPaymentByExternalReference(String(charge.monthly_fee_id))
-        if (!payment) {
+
+        // Consulta MP usando o payment_intent_id específico desta cobrança
+        // (não mais searchByExternalReference que retornava apenas a mais recente)
+        let payment
+        try {
+          payment = await getPayment(Number(charge.payment_intent_id))
+        } catch {
+          // Cobrança não encontrada na MP ou erro de rede
           if (expiredLocal) {
             db.prepare("UPDATE pix_charges SET status = 'expired', updated_at = datetime('now') WHERE id = ?").run(charge.id)
             logger.info({ chargeId: charge.id }, 'Charge marked as expired (no payment found after PIX expiry)')
           }
           continue
         }
+
         const status = mpStatus(payment.status)
         if (status === 'paid') {
           const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(charge.monthly_fee_id) as any
@@ -127,7 +138,16 @@ export async function runPaymentReconciliation(): Promise<void> {
               charge.id
             )
           } else if (fee) {
-            db.prepare("UPDATE pix_charges SET status = 'succeeded', updated_at = datetime('now') WHERE id = ?").run(charge.id)
+            // Regra de Ouro: fee already paid but this charge is approved.
+            // Record overpayment — money received must never be invisible.
+            recordOverpayment(
+              db,
+              fee,
+              String(payment.id),
+              Number(payment.transaction_amount ?? 0),
+              payment.payment_method_id === 'pix' ? 'pix' : 'card',
+              charge.id
+            )
           }
         } else if (status === 'cancelled') {
           db.prepare("UPDATE pix_charges SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(charge.id)

@@ -28,7 +28,7 @@ interface MpErrorBody {
   cause?: Array<{ description?: string; code?: string }>
 }
 
-async function mpRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function mpRequest<T>(method: string, path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
   const headers: Record<string, string> = {
     'Authorization': `Bearer ${mpAccessToken()}`,
     'Content-Type': 'application/json',
@@ -36,7 +36,7 @@ async function mpRequest<T>(method: string, path: string, body?: unknown): Promi
   const options: RequestInit = { method, headers }
   if (body !== undefined) {
     options.body = JSON.stringify(body)
-    headers['X-Idempotency-Key'] = uuid()
+    headers['X-Idempotency-Key'] = idempotencyKey || uuid()
   }
 
   let res: Response
@@ -102,6 +102,7 @@ export async function createPixCharge(data: {
   payerEmail: string
   payerCpf?: string
   expiresInHours?: number
+  idempotencyKey?: string
 }): Promise<MpPayment> {
   const payment = await mpRequest<MpPayment>('POST', '/v1/payments', {
     transaction_amount: Number(data.amount.toFixed(2)),
@@ -113,7 +114,7 @@ export async function createPixCharge(data: {
       email: data.payerEmail || 'passageiro@transportesandreluis.com.br',
       ...(data.payerCpf ? { identification: { type: 'CPF', number: data.payerCpf } } : {}),
     },
-  })
+  }, data.idempotencyKey)
   return payment
 }
 
@@ -127,6 +128,16 @@ export async function searchPaymentByExternalReference(externalReference: string
     `/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}&limit=1&sort=date_created&criteria=desc`
   )
   return res.results && res.results.length > 0 ? res.results[0] : null
+}
+
+// Returns ALL payments for a given external_reference (no limit=1).
+// Used when we need to find any approved payment, not just the most recent.
+export async function searchAllPaymentsByExternalReference(externalReference: string): Promise<MpPayment[]> {
+  const res = await mpRequest<{ results: MpPayment[] }>(
+    'GET',
+    `/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}&sort=date_created&criteria=desc`
+  )
+  return res.results || []
 }
 
 export interface MpPreference {

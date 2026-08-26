@@ -177,6 +177,9 @@ CREATE TABLE IF NOT EXISTS pix_charges (
   monthly_fee_id TEXT NOT NULL,
   amount REAL NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending',
+  pix_code TEXT DEFAULT '',
+  qr_image TEXT DEFAULT '',
+  superseded_at TEXT DEFAULT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -235,6 +238,36 @@ export async function runMigrations(): Promise<void> {
   try { db.exec('ALTER TABLE payments ADD COLUMN interest REAL NOT NULL DEFAULT 0') } catch {}
   try {
     db.exec("UPDATE monthly_fees SET due_date = printf('%02d/%02d/%04d', due_day, month, year) WHERE length(due_date) <= 7")
+  } catch {}
+
+  // --- P1: multi-charge prevention migration ---
+  // Add pix_charges columns if missing (for existing databases)
+  try { db.exec("ALTER TABLE pix_charges ADD COLUMN pix_code TEXT DEFAULT ''") } catch {}
+  try { db.exec("ALTER TABLE pix_charges ADD COLUMN qr_image TEXT DEFAULT ''") } catch {}
+  try { db.exec("ALTER TABLE pix_charges ADD COLUMN superseded_at TEXT DEFAULT NULL") } catch {}
+
+  // Supersede duplicate pending charges: keep the newest per fee, mark rest as superseded.
+  // This ensures the unique partial index (below) can be created without conflict.
+  try {
+    const dupes = db.prepare(
+      "SELECT monthly_fee_id FROM pix_charges WHERE status = 'pending' GROUP BY monthly_fee_id HAVING COUNT(*) > 1"
+    ).all() as any[]
+    for (const d of dupes) {
+      const newest = db.prepare(
+        "SELECT id FROM pix_charges WHERE monthly_fee_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1"
+      ).get(d.monthly_fee_id) as any
+      if (newest) {
+        db.prepare(
+          "UPDATE pix_charges SET status = 'superseded', superseded_at = datetime('now'), updated_at = datetime('now') WHERE monthly_fee_id = ? AND status = 'pending' AND id != ?"
+        ).run(d.monthly_fee_id, newest.id)
+      }
+    }
+  } catch {}
+
+  // Unique partial index: at most one pending charge per monthly fee.
+  // The INSERT path enforces this at the database engine level, making race conditions impossible.
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_per_fee ON pix_charges(monthly_fee_id) WHERE status = 'pending'")
   } catch {}
 
   // Bump default billing tolerance from 5 to 0 days (fees flip to overdue right after the due date)

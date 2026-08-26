@@ -94,7 +94,7 @@ describe('POST /api/payments/webhook (público)', () => {
     expect(payment.payment_method).toBe('pix')
   })
 
-  it('should not double-finalize when the fee is already paid', async () => {
+  it('should record overpayment when the fee is already paid (Regra de Ouro)', async () => {
     const db = getDb()
     const fid = seedFee('paid')
     vi.mocked(getPayment).mockResolvedValue({
@@ -108,8 +108,10 @@ describe('POST /api/payments/webhook (público)', () => {
 
     const res = await request(app).post('/api/payments/webhook').send({ type: 'payment', data: { id: 556 } })
     expect(res.status).toBe(200)
-    const payments = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').all(fid)
-    expect(payments.length).toBe(0)
+    // Should NOT be empty — the overpayment is recorded
+    const payments = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND notes LIKE '%OVERPAYMENT%'").all(fid)
+    expect(payments.length).toBe(1)
+    expect(payments[0].amount).toBe(189.9)
   })
 
   it('should cancel pending charges when the payment is cancelled', async () => {
@@ -157,5 +159,89 @@ describe('POST /api/payments/webhook (público)', () => {
     expect(logs.length).toBeGreaterThan(0)
     const notifications = db.prepare("SELECT * FROM notifications WHERE type = 'warning'").all()
     expect(notifications.length).toBe(1)
+  })
+
+  it('should not record duplicate overpayment for the same paymentId', async () => {
+    const db = getDb()
+    const fid = seedFee('paid')
+    vi.mocked(getPayment).mockResolvedValue({
+      id: 7777,
+      status: 'approved',
+      status_detail: 'accredited',
+      transaction_amount: 189.9,
+      payment_method_id: 'pix',
+      external_reference: fid,
+    } as any)
+
+    await request(app).post('/api/payments/webhook').send({ type: 'payment', data: { id: 7777 } })
+    await request(app).post('/api/payments/webhook').send({ type: 'payment', data: { id: 7777 } })
+
+    const payments = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND notes LIKE '%OVERPAYMENT%'").all(fid)
+    expect(payments.length).toBe(1)
+  })
+
+  it('should finalize normal payment first, then record overpayment for second approved payment', async () => {
+    const db = getDb()
+    const fid = seedFee()
+
+    // First payment: fee pending → finalize normally
+    vi.mocked(getPayment).mockResolvedValueOnce({
+      id: 1001,
+      status: 'approved',
+      status_detail: 'accredited',
+      transaction_amount: 189.9,
+      payment_method_id: 'pix',
+      external_reference: fid,
+    } as any)
+    await request(app).post('/api/payments/webhook').send({ type: 'payment', data: { id: 1001 } })
+
+    const fee1 = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(fid) as any
+    expect(fee1.status).toBe('paid')
+    const normalPayments = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND notes NOT LIKE '%OVERPAYMENT%'").all(fid)
+    expect(normalPayments.length).toBe(1)
+
+    // Second payment: fee already paid → overpayment
+    vi.mocked(getPayment).mockResolvedValueOnce({
+      id: 1002,
+      status: 'approved',
+      status_detail: 'accredited',
+      transaction_amount: 189.9,
+      payment_method_id: 'pix',
+      external_reference: fid,
+    } as any)
+    await request(app).post('/api/payments/webhook').send({ type: 'payment', data: { id: 1002 } })
+
+    const overPayments = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND notes LIKE '%OVERPAYMENT%'").all(fid)
+    expect(overPayments.length).toBe(1)
+    expect(overPayments[0].amount).toBe(189.9)
+
+    // Fee should still be paid (not double-paid)
+    const fee2 = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(fid) as any
+    expect(fee2.status).toBe('paid')
+
+    // Total payments: 1 normal + 1 overpayment
+    const allPayments = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').all(fid)
+    expect(allPayments.length).toBe(2)
+  })
+
+  it('should mark superseded charge as succeeded_overpaid when webhook arrives late', async () => {
+    const db = getDb()
+    const fid = seedFee('paid')
+    const chargeId = uuid()
+    db.prepare("INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status) VALUES (?, '8888', ?, 189.90, 'superseded')").run(chargeId, fid)
+
+    vi.mocked(getPayment).mockResolvedValue({
+      id: 8888,
+      status: 'approved',
+      status_detail: 'accredited',
+      transaction_amount: 189.9,
+      payment_method_id: 'pix',
+      external_reference: fid,
+    } as any)
+
+    await request(app).post('/api/payments/webhook').send({ type: 'payment', data: { id: 8888 } })
+
+    const charge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
+    expect(charge.status).toBe('succeeded_overpaid')
   })
 })

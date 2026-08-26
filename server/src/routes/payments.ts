@@ -3,7 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
 import { calculateDueFromFee } from '../services/billingRules.js'
-import { finalizePayment, type PaymentMethod } from '../services/paymentService.js'
+import { finalizePayment, recordOverpayment, type PaymentMethod } from '../services/paymentService.js'
 import { alertIntegrationIssue } from '../services/integrationAlert.js'
 import {
   MpError,
@@ -46,15 +46,28 @@ paymentsWebhookRouter.post('/webhook', async (req, res) => {
     }
 
     const status = mpStatus(payment.status)
-    if (status === 'paid' && fee.status !== 'paid') {
-      finalizePayment(
-        db,
-        fee,
-        String(payment.id),
-        Number(payment.transaction_amount ?? 0),
-        payment.payment_method_id === 'pix' ? 'pix' : 'card'
-      )
-      logger.info({ paymentId: payment.id, feeId }, 'Pagamento finalizado via webhook')
+    if (status === 'paid') {
+      if (fee.status !== 'paid') {
+        finalizePayment(
+          db,
+          fee,
+          String(payment.id),
+          Number(payment.transaction_amount ?? 0),
+          payment.payment_method_id === 'pix' ? 'pix' : 'card'
+        )
+        logger.info({ paymentId: payment.id, feeId }, 'Pagamento finalizado via webhook')
+      } else {
+        // Regra de Ouro: fee already paid but MP says this payment is approved.
+        // Record the overpayment — money received must never be invisible.
+        recordOverpayment(
+          db,
+          fee,
+          String(payment.id),
+          Number(payment.transaction_amount ?? 0),
+          payment.payment_method_id === 'pix' ? 'pix' : 'card'
+        )
+        logger.info({ paymentId: payment.id, feeId }, 'Pagamento excedente detectado via webhook')
+      }
     } else if (status === 'cancelled') {
       db.prepare("UPDATE pix_charges SET status = 'cancelled', updated_at = datetime('now') WHERE monthly_fee_id = ? AND status = 'pending'").run(feeId)
     }
@@ -98,23 +111,74 @@ paymentsRouter.post('/create', async (req, res) => {
 
   try {
     if (payMethod === 'pix') {
+      const expiryHours = Number(process.env.MP_PIX_EXPIRY_HOURS) || 24
+
+      // ── Charge reuse / supersede logic ──────────────────────────────────
+      // Only one pending charge per fee is allowed (enforced by unique partial
+      // index idx_one_pending_per_fee). If one exists:
+      //   • valid + has QR data  → return cached QR (no MP call)
+      //   • expired / no QR      → supersede it, then create a new one below
+      const existingPending = db.prepare(
+        "SELECT id, payment_intent_id, pix_code, qr_image, amount FROM pix_charges WHERE monthly_fee_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1"
+      ).get(monthlyFeeId) as any
+
+      if (existingPending) {
+        const isExpired = db.prepare(
+          "SELECT 1 FROM pix_charges WHERE id = ? AND created_at <= datetime('now', ?)"
+        ).get(existingPending.id, `-${expiryHours} hours`)
+
+        if (isExpired || !existingPending.pix_code || !existingPending.qr_image) {
+          // Supersede: keep the charge trackable but mark it as no longer payable
+          db.prepare(
+            "UPDATE pix_charges SET status = 'superseded', superseded_at = datetime('now'), updated_at = datetime('now') WHERE id = ?"
+          ).run(existingPending.id)
+          // Fall through to create a new charge
+        } else {
+          // Valid pending charge with QR data — return cached response
+          res.json({
+            paymentId: existingPending.payment_intent_id,
+            amount: existingPending.amount,
+            currency: 'brl',
+            breakdown,
+            method: 'pix',
+            pixCode: existingPending.pix_code,
+            qrImage: existingPending.qr_image,
+          })
+          return
+        }
+      }
+
+      // ── Deterministic idempotency key ───────────────────────────────────
+      // Key = pix:{feeId}:{YYYY-MM}:v{attemptNumber}
+      // attemptNumber = total charges ever created for this fee + 1
+      // This lets retries of the SAME request use the same key (safe: no
+      // supersede happened yet) while allowing NEW charges after supersede
+      // (key changes because count incremented).
+      const attemptCount = db.prepare(
+        "SELECT COUNT(*) as cnt FROM pix_charges WHERE monthly_fee_id = ?"
+      ).get(monthlyFeeId) as any
+      const attemptNumber = (attemptCount?.cnt || 0) + 1
+      const monthKey = `${fee.year}-${String(fee.month).padStart(2, '0')}`
+      const idempotencyKey = `pix:${monthlyFeeId}:${monthKey}:v${attemptNumber}`
+
       const payment = await createPixCharge({
         amount: breakdown.total,
         description,
         monthlyFeeId,
         payerEmail: passenger?.email || '',
         payerCpf: cpfDigits.length === 11 ? cpfDigits : undefined,
+        idempotencyKey,
       })
-
-      db.prepare(`
-        INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status)
-        VALUES (?, ?, ?, ?, 'pending')
-      `).run(uuid(), String(payment.id), monthlyFeeId, breakdown.total)
 
       const txn = payment.point_of_interaction?.transaction_data
       if (!txn?.qr_code || !txn.qr_code_base64) {
         throw new MpError('O Mercado Pago não retornou o QR Code do PIX. Tente novamente.')
       }
+
+      db.prepare(`
+        INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status, pix_code, qr_image)
+        VALUES (?, ?, ?, ?, 'pending', ?, ?)
+      `).run(uuid(), String(payment.id), monthlyFeeId, breakdown.total, txn.qr_code, `data:image/png;base64,${txn.qr_code_base64}`)
 
       res.json({
         paymentId: String(payment.id),

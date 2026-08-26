@@ -4,7 +4,7 @@ import { runMigrations } from '../database/schema.js'
 import { resetDb, getDb } from '../database/connection.js'
 
 vi.mock('./mercadopagoService.js', () => ({
-  searchPaymentByExternalReference: vi.fn(),
+  getPayment: vi.fn(),
   mpStatus: (s: string) => {
     if (s === 'approved') return 'paid'
     if (s === 'rejected' || s === 'cancelled') return 'cancelled'
@@ -12,12 +12,12 @@ vi.mock('./mercadopagoService.js', () => ({
   },
 }))
 
-import { searchPaymentByExternalReference } from './mercadopagoService.js'
+import { getPayment } from './mercadopagoService.js'
 import { runPaymentReconciliation } from './scheduler.js'
 
 process.env.DATABASE_PATH = ':memory:'
 
-const mockSearch = searchPaymentByExternalReference as ReturnType<typeof vi.fn>
+const mockGetPayment = getPayment as ReturnType<typeof vi.fn>
 
 function seedPassenger(): string {
   const db = getDb()
@@ -51,7 +51,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   resetDb()
-  mockSearch.mockReset()
+  mockGetPayment.mockReset()
 })
 
 describe('runPaymentReconciliation', () => {
@@ -59,7 +59,8 @@ describe('runPaymentReconciliation', () => {
     const pid = seedPassenger()
     const feeId = seedFee(pid)
     const chargeId = seedCharge(feeId)
-    mockSearch.mockResolvedValue({
+    const charge = getDb().prepare('SELECT payment_intent_id FROM pix_charges WHERE id = ?').get(chargeId) as any
+    mockGetPayment.mockResolvedValue({
       id: 12345,
       status: 'approved',
       status_detail: 'accredited',
@@ -75,15 +76,17 @@ describe('runPaymentReconciliation', () => {
     expect(payment.amount).toBe(189.9)
     const fee = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(feeId) as any
     expect(fee.status).toBe('paid')
-    const charge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
-    expect(charge.status).toBe('succeeded')
+    const updatedCharge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
+    expect(updatedCharge.status).toBe('succeeded')
+    // Should call getPayment with the specific payment_intent_id
+    expect(mockGetPayment).toHaveBeenCalledWith(Number(charge.payment_intent_id))
   })
 
   it('should mark cancelled charges as cancelled', async () => {
     const pid = seedPassenger()
     const feeId = seedFee(pid)
     const chargeId = seedCharge(feeId)
-    mockSearch.mockResolvedValue({
+    mockGetPayment.mockResolvedValue({
       id: 12346,
       status: 'cancelled',
       status_detail: 'expired',
@@ -94,8 +97,8 @@ describe('runPaymentReconciliation', () => {
     await runPaymentReconciliation()
 
     const db = getDb()
-    const charge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
-    expect(charge.status).toBe('cancelled')
+    const updatedCharge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
+    expect(updatedCharge.status).toBe('cancelled')
     const fee = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(feeId) as any
     expect(fee.status).toBe('pending')
   })
@@ -104,7 +107,7 @@ describe('runPaymentReconciliation', () => {
     const pid = seedPassenger()
     const feeId = seedFee(pid)
     const chargeId = seedCharge(feeId)
-    mockSearch.mockResolvedValue({
+    mockGetPayment.mockResolvedValue({
       id: 12347,
       status: 'in_process',
       status_detail: 'pending_review',
@@ -126,23 +129,14 @@ describe('runPaymentReconciliation', () => {
 
     await runPaymentReconciliation()
 
-    expect(mockSearch).not.toHaveBeenCalled()
-  })
-
-  it('should not fail when MP returns no payment', async () => {
-    const pid = seedPassenger()
-    const feeId = seedFee(pid)
-    seedCharge(feeId)
-    mockSearch.mockResolvedValue(null)
-
-    await expect(runPaymentReconciliation()).resolves.toBeUndefined()
+    expect(mockGetPayment).not.toHaveBeenCalled()
   })
 
   it('should expire charges older than PIX expiry when MP has no payment', async () => {
     const pid = seedPassenger()
     const feeId = seedFee(pid)
     const chargeId = seedCharge(feeId, 25 * 60)
-    mockSearch.mockResolvedValue(null)
+    mockGetPayment.mockRejectedValue(new Error('not found'))
 
     await runPaymentReconciliation()
 
@@ -155,12 +149,58 @@ describe('runPaymentReconciliation', () => {
     const pid = seedPassenger()
     const feeId = seedFee(pid)
     const chargeId = seedCharge(feeId, 15)
-    mockSearch.mockResolvedValue(null)
+    mockGetPayment.mockRejectedValue(new Error('not found'))
 
     await runPaymentReconciliation()
 
     const db = getDb()
     const charge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
     expect(charge.status).toBe('pending')
+  })
+
+  it('should record overpayment when fee is already paid', async () => {
+    const pid = seedPassenger()
+    const feeId = seedFee(pid, 7, 2026)
+    const db = getDb()
+    // Mark fee as paid
+    db.prepare("UPDATE monthly_fees SET status = 'paid' WHERE id = ?").run(feeId)
+    const chargeId = seedCharge(feeId)
+    mockGetPayment.mockResolvedValue({
+      id: 99999,
+      status: 'approved',
+      status_detail: 'accredited',
+      transaction_amount: 189.9,
+      payment_method_id: 'pix',
+    })
+
+    await runPaymentReconciliation()
+
+    const payments = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND notes LIKE '%OVERPAYMENT%'").all(feeId)
+    expect(payments.length).toBe(1)
+    expect(payments[0].amount).toBe(189.9)
+    const charge = db.prepare('SELECT status FROM pix_charges WHERE id = ?').get(chargeId) as any
+    expect(charge.status).toBe('succeeded_overpaid')
+  })
+
+  it('should not create duplicate overpayment for same paymentId', async () => {
+    const pid = seedPassenger()
+    const feeId = seedFee(pid, 7, 2026)
+    const db = getDb()
+    db.prepare("UPDATE monthly_fees SET status = 'paid' WHERE id = ?").run(feeId)
+    seedCharge(feeId)
+    mockGetPayment.mockResolvedValue({
+      id: 88888,
+      status: 'approved',
+      status_detail: 'accredited',
+      transaction_amount: 189.9,
+      payment_method_id: 'pix',
+    })
+
+    // Run reconciliation twice
+    await runPaymentReconciliation()
+    await runPaymentReconciliation()
+
+    const payments = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND notes LIKE '%OVERPAYMENT%'").all(feeId)
+    expect(payments.length).toBe(1)
   })
 })
