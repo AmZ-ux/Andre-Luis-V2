@@ -28,7 +28,7 @@ import type { ViewMode } from '../types/passenger'
 
 const tabs = [
   { key: 'faturas', label: 'Faturas', icon: Wallet },
-  { key: 'regras', label: 'Regras de cobranÃ§a', icon: SlidersHorizontal },
+  { key: 'regras', label: 'Regras de cobrança', icon: SlidersHorizontal },
 ]
 
 export function Mensalidades() {
@@ -100,7 +100,7 @@ export function Mensalidades() {
     async (reason: string) => {
       if (!selectedFee) return
       await exemptFee(selectedFee.id, reason)
-      addToast('success', 'IsenÃ§Ã£o registrada com sucesso!')
+      addToast('success', 'Isenção registrada com sucesso!')
     },
     [selectedFee, exemptFee, addToast]
   )
@@ -151,7 +151,7 @@ export function Mensalidades() {
         title="Mensalidades"
         subtitle={
           tab === 'regras'
-            ? 'Regras de cobranÃ§a e fÃ©rias'
+            ? 'Regras de cobrança e férias'
             : 'Controle de pagamentos mensais'
         }
       />
