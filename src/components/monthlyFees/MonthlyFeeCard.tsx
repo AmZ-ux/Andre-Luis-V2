@@ -12,7 +12,7 @@ interface MonthlyFeeCardProps {
 }
 
 const monthNames = [
-  'Janeiro', 'Fevereiro', 'MarÃ§o', 'Abril', 'Maio', 'Junho',
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ]
 
@@ -44,7 +44,7 @@ export function MonthlyFeeCard({ fee, onCancel, onExempt, onEdit, onPay }: Month
           <span className="min-w-0">
             <b className="block text-sm font-semibold text-text truncate">{fee.passengerName}</b>
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {monthNames[fee.month - 1]}/{fee.year} Â· vence {fee.dueDate}
+              {monthNames[fee.month - 1]}/{fee.year} · vence {fee.dueDate}
             </span>
           </span>
         </button>

@@ -10,7 +10,7 @@ import { X, Variable, Save } from 'lucide-react'
 const categoryOptions = [
   { value: 'reminder', label: 'Lembrete' },
   { value: 'payment', label: 'Pagamento' },
-  { value: 'vacation_return', label: 'Retorno de FÃ©rias' },
+  { value: 'vacation_return', label: 'Retorno de Férias' },
   { value: 'welcome', label: 'Boas-vindas' },
   { value: 'custom', label: 'Personalizado' },
 ]
@@ -48,13 +48,13 @@ export function TemplateEditor({ template, onSave, onClose }: TemplateEditorProp
   }
 
   const preview = body ? templateService.render({ ...template, body, variables: [] } as MessageTemplate, {
-    nome: 'JoÃ£o Silva',
+    nome: 'João Silva',
     valor: 'R$ 150,00',
     vencimento: '15/07/2026',
     empresa: 'Empresa ABC',
     instituicao: 'Universidade XYZ',
-    cidade: 'SÃ£o Paulo',
-    tipo_transporte: 'UniversitÃ¡rio',
+    cidade: 'São Paulo',
+    tipo_transporte: 'Universitário',
   }) : ''
 
   return (
@@ -93,7 +93,7 @@ export function TemplateEditor({ template, onSave, onClose }: TemplateEditorProp
         <div className="flex items-center justify-between mb-2">
           <label className="text-sm font-medium text-text">Mensagem</label>
           <div className="flex items-center gap-1">
-            <span className="text-[10px] text-gray-400">VariÃ¡veis:</span>
+            <span className="text-[10px] text-gray-400">Variáveis:</span>
             {KNOWN_VARIABLES.map((v) => (
               <button
                 key={v}
@@ -109,7 +109,7 @@ export function TemplateEditor({ template, onSave, onClose }: TemplateEditorProp
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Digite o modelo da mensagem... Use {{variavel}} para campos dinÃ¢micos"
+          placeholder="Digite o modelo da mensagem... Use {{variavel}} para campos dinâmicos"
           rows={5}
           className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-text placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 resize-y"
         />
@@ -117,7 +117,7 @@ export function TemplateEditor({ template, onSave, onClose }: TemplateEditorProp
 
       {preview && (
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
-          <p className="text-xs font-medium text-gray-500 mb-2">PrÃ©-visualizaÃ§Ã£o:</p>
+          <p className="text-xs font-medium text-gray-500 mb-2">Pré-visualização:</p>
           <p className="text-sm text-text">{preview}</p>
         </div>
       )}

@@ -47,7 +47,7 @@ const actionButtonClass =
 const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
 const paymentLabels: Record<string, string> = {
-  pix: 'PIX', cash: 'Dinheiro', transfer: 'TransferÃªncia', card: 'CartÃ£o',
+  pix: 'PIX', cash: 'Dinheiro', transfer: 'Transferência', card: 'Cartão',
 }
 
 export function MonthlyFeeTable({
@@ -95,7 +95,7 @@ export function MonthlyFeeTable({
 
               <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-gray-500">
                 <div>
-                  <p className="text-gray-400">CompetÃªncia</p>
+                  <p className="text-gray-400">Competência</p>
                   <p className="text-sm font-semibold text-text">
                     {monthNames[fee.month - 1]} {fee.year}
                   </p>
@@ -178,7 +178,7 @@ export function MonthlyFeeTable({
               <SortHeader label="Passageiro" field="passengerName" current={sort} onClick={onSort} />
             </th>
             <th className="px-4 py-2.5 text-center">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">MÃªs</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Mês</span>
             </th>
             <th className="px-4 py-2.5 text-right">
               <SortHeader label="Valor" field="amount" current={sort} onClick={onSort} />
@@ -196,7 +196,7 @@ export function MonthlyFeeTable({
               <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Forma</span>
             </th>
             <th className="px-4 py-2.5 text-right">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">AÃ§Ãµes</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Ações</span>
             </th>
           </tr>
         </thead>

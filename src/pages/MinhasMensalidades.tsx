@@ -152,7 +152,7 @@ export function MinhasMensalidades() {
             return (
               <div
                 key={fee.id}
-                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card p-5"
+                className="bg-white dark:bg-gray-900 rounded-2xl shadow-card p-5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>

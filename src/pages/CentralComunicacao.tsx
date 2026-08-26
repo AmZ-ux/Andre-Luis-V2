@@ -10,7 +10,7 @@ import { useSettings } from '../hooks/useSettings'
 
 const tabs = [
   { key: 'mensagens', label: 'Mensagens', icon: MessageSquare },
-  { key: 'configuracoes', label: 'ConfiguraÃ§Ãµes', icon: Settings },
+  { key: 'configuracoes', label: 'Configurações', icon: Settings },
 ]
 
 export function CentralComunicacao() {
@@ -27,12 +27,12 @@ export function CentralComunicacao() {
     <div className="space-y-6 sm:space-y-8">
       <PageHeader
         className="hidden sm:block"
-        eyebrow="OperaÃ§Ã£o"
-        title="ComunicaÃ§Ã£o"
+        eyebrow="Operação"
+        title="Comunicação"
         subtitle={
           tab === 'configuracoes'
-            ? 'ConfiguraÃ§Ãµes de mensagens e templates'
-            : 'Envie mensagens e notificaÃ§Ãµes para os passageiros'
+            ? 'Configurações de mensagens e templates'
+            : 'Envie mensagens e notificações para os passageiros'
         }
       />
 

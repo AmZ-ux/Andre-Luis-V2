@@ -10,7 +10,7 @@ interface TemplateCardProps {
 }
 
 const categoryLabels: Record<string, string> = {
-  reminder: 'Lembrete', payment: 'Pagamento', vacation_return: 'Retorno FÃ©rias', welcome: 'Boas-vindas', custom: 'Personalizado',
+  reminder: 'Lembrete', payment: 'Pagamento', vacation_return: 'Retorno Férias', welcome: 'Boas-vindas', custom: 'Personalizado',
 }
 
 const categoryColors: Record<string, string> = {

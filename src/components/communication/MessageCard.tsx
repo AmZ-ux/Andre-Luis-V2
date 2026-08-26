@@ -47,7 +47,7 @@ export function MessageCard({ message, onClick }: MessageCardProps) {
             </span>
             <span className="text-[10px] text-gray-400">{formatDate(message.createdAt)}</span>
             {message.recipients.length > 0 && (
-              <span className="text-[10px] text-gray-400">{message.recipients.length} destinatÃ¡rio(s)</span>
+              <span className="text-[10px] text-gray-400">{message.recipients.length} destinatário(s)</span>
             )}
           </div>
         </div>

@@ -123,7 +123,7 @@ export function ProfilePage() {
   const handleSave = async () => {
     const nextErrors: typeof errors = {}
     if (form.name.trim().length < 3) nextErrors.name = 'Informe seu nome completo'
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) nextErrors.email = 'Informe um email vÃ¡lido'
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) nextErrors.email = 'Informe um email válido'
     if (!validatePhone(form.phone)) nextErrors.phone = 'Informe um telefone com DDD'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -152,9 +152,9 @@ export function ProfilePage() {
       const result = await sendVerificationEmail()
       setCodeSent(true)
       setDemoCode(result.demoCode)
-      addToast('success', 'CÃ³digo enviado para seu email!')
+      addToast('success', 'Código enviado para seu email!')
     } catch (err) {
-      addToast('error', err instanceof Error ? err.message : 'Erro ao enviar cÃ³digo')
+      addToast('error', err instanceof Error ? err.message : 'Erro ao enviar código')
     } finally {
       setVerifying(false)
     }
@@ -162,7 +162,7 @@ export function ProfilePage() {
 
   const handleConfirmCode = async () => {
     if (code.trim().length !== 6) {
-      setCodeError('Informe o cÃ³digo de 6 dÃ­gitos')
+      setCodeError('Informe o código de 6 dígitos')
       return
     }
     setConfirming(true)
@@ -173,7 +173,7 @@ export function ProfilePage() {
       setCodeSent(false)
       setDemoCode(undefined)
     } catch (err) {
-      setCodeError(err instanceof Error ? err.message : 'CÃ³digo incorreto')
+      setCodeError(err instanceof Error ? err.message : 'Código incorreto')
     } finally {
       setConfirming(false)
     }
@@ -183,7 +183,7 @@ export function ProfilePage() {
     setEndingContract(true)
     try {
       await endContract()
-      addToast('success', 'Contrato encerrado! A administraÃ§Ã£o foi notificada.')
+      addToast('success', 'Contrato encerrado! A administração foi notificada.')
     } catch (err) {
       addToast('error', err instanceof Error ? err.message : 'Erro ao encerrar contrato')
     } finally {
@@ -196,13 +196,13 @@ export function ProfilePage() {
     { icon: Phone, label: 'Telefone', value: user.phone },
     { icon: CreditCard, label: 'CPF', value: user.cpf },
     { icon: Calendar, label: 'Cadastro', value: user.createdAt },
-    { icon: Clock, label: 'Ãšltimo acesso', value: user.lastAccess },
+    { icon: Clock, label: 'Último acesso', value: user.lastAccess },
   ]
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-2xl mx-auto">
       <div className="flex items-start justify-between gap-3">
-        <PageHeader eyebrow="Minha conta" title="Meu Perfil" subtitle="Suas informaÃ§Ãµes pessoais e preferÃªncias" />
+        <PageHeader eyebrow="Minha conta" title="Meu Perfil" subtitle="Suas informações pessoais e preferências" />
         <ThemeDropdown />
       </div>
 
@@ -221,7 +221,7 @@ export function ProfilePage() {
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-warning-dark dark:text-warning">
-                  <ShieldAlert className="h-3.5 w-3.5" /> Email nÃ£o verificado
+                  <ShieldAlert className="h-3.5 w-3.5" /> Email não verificado
                 </span>
               )}
             </div>
@@ -306,21 +306,21 @@ export function ProfilePage() {
             <div className="flex-1">
               <h2 className="text-sm font-bold text-text mb-1">Verificar email (recomendado)</h2>
               <p className="text-xs text-gray-500 mb-3">
-                Confirmar seu email Ã© opcional, mas ajuda a proteger sua conta e a receber
-                comunicaÃ§Ãµes importantes. VocÃª pode fazer isso a qualquer momento.
+                Confirmar seu email é opcional, mas ajuda a proteger sua conta e a receber
+                comunicações importantes. Você pode fazer isso a qualquer momento.
               </p>
               {codeSent ? (
                 <div className="space-y-3">
                   {demoCode && (
                     <div className="bg-primary/5 border border-primary/10 rounded-xl px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
-                      <strong className="text-text">Modo demonstraÃ§Ã£o:</strong> como o envio real de email sÃ³
-                      funciona com a API configurada, seu cÃ³digo Ã©{' '}
+                      <strong className="text-text">Modo demonstração:</strong> como o envio real de email só
+                      funciona com a API configurada, seu código é{' '}
                       <strong className="text-primary">{demoCode}</strong>
                     </div>
                   )}
                   <Input
-                    label="CÃ³digo de verificaÃ§Ã£o"
-                    placeholder="6 dÃ­gitos"
+                    label="Código de verificação"
+                    placeholder="6 dígitos"
                     value={code}
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     error={codeError || undefined}
@@ -341,7 +341,7 @@ export function ProfilePage() {
                       disabled={code.trim().length !== 6}
                       onClick={handleConfirmCode}
                     >
-                      Confirmar cÃ³digo
+                      Confirmar código
                     </Button>
                   </div>
                 </div>
@@ -353,7 +353,7 @@ export function ProfilePage() {
                   loading={verifying}
                   onClick={handleSendCode}
                 >
-                  Enviar cÃ³digo de verificaÃ§Ã£o
+                  Enviar código de verificação
                 </Button>
               )}
             </div>
@@ -362,7 +362,7 @@ export function ProfilePage() {
       )}
 
       <Card>
-        <h2 className="text-base font-semibold text-text mb-4">AÃ§Ãµes</h2>
+        <h2 className="text-base font-semibold text-text mb-4">Ações</h2>
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <Button
             variant="secondary"
@@ -379,7 +379,7 @@ export function ProfilePage() {
           {user.role === 'passenger' &&
             (user.contractStatus === 'inactive' ? (
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success py-2">
-                <CheckCircle2 className="h-4 w-4" /> Seu contrato estÃ¡ encerrado
+                <CheckCircle2 className="h-4 w-4" /> Seu contrato está encerrado
               </span>
             ) : (
               <Button
@@ -409,7 +409,7 @@ export function ProfilePage() {
         onClose={() => setShowEndContract(false)}
         onConfirm={handleEndContract}
         title="Encerrar contrato"
-        message="Tem certeza? Seu contrato serÃ¡ encerrado e a administraÃ§Ã£o serÃ¡ notificada. Esta aÃ§Ã£o nÃ£o pode ser desfeita."
+        message="Tem certeza? Seu contrato será encerrado e a administração será notificada. Esta ação não pode ser desfeita."
         confirmLabel={endingContract ? 'Encerrando...' : 'Encerrar contrato'}
         variant="danger"
       />
