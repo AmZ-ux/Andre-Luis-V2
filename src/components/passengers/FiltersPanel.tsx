@@ -59,7 +59,7 @@ export function FiltersPanel({ filters, onChange, onReset }: FiltersPanelProps) 
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card p-5 mt-3 space-y-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-card p-5 mt-3 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-text">Filtros</p>
                 <button
@@ -99,8 +99,8 @@ export function FiltersPanel({ filters, onChange, onReset }: FiltersPanelProps) 
                   onChange={(e) => onChange({ dueDay: e.target.value.replace(/\D/g, '').slice(0, 2) })}
                 />
                 <Input
-                  label="InstituiÃ§Ã£o"
-                  placeholder="Filtrar por instituiÃ§Ã£o"
+                  label="Instituição"
+                  placeholder="Filtrar por instituição"
                   value={filters.institution}
                   onChange={(e) => onChange({ institution: e.target.value })}
                 />

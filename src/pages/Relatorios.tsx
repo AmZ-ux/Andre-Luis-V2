@@ -72,7 +72,7 @@ export function Relatorios({ embedded = false }: { embedded?: boolean }) {
         )}
         <Card>
           <div className="flex flex-col items-center justify-center py-12 gap-4">
-            <div className="h-12 w-12 rounded-full bg-error/10 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-error-soft flex items-center justify-center">
               <Filter className="h-6 w-6 text-error" />
             </div>
             <p className="text-sm text-gray-500">{error}</p>

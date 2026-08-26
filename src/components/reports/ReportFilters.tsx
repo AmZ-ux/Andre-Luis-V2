@@ -45,7 +45,7 @@ export function ReportFilters({ filters, onChange, onReset, visible = true }: Re
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card p-4 sm:p-5">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-card p-4 sm:p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 text-sm font-medium text-text">
           <Filter className="h-4 w-4 text-primary" />

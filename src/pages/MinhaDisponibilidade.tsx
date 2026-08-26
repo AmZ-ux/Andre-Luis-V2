@@ -55,11 +55,11 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
         submittedBy: user.name,
         submittedById: user.id,
       })
-      addToast('success', 'PerÃ­odo cadastrado com sucesso!')
+      addToast('success', 'Período cadastrado com sucesso!')
       setShowForm(false)
       await load()
     } catch (err) {
-      addToast('error', err instanceof Error ? err.message : 'Erro ao cadastrar perÃ­odo')
+      addToast('error', err instanceof Error ? err.message : 'Erro ao cadastrar período')
     } finally {
       setSubmitting(false)
     }
@@ -69,11 +69,11 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
     if (!cancelling || !user) return
     try {
       await availabilityService.cancel(cancelling.id, reason, user.name, user.id)
-      addToast('success', 'PerÃ­odo cancelado com sucesso!')
+      addToast('success', 'Período cancelado com sucesso!')
       setCancelling(null)
       await load()
     } catch {
-      addToast('error', 'Erro ao cancelar perÃ­odo')
+      addToast('error', 'Erro ao cancelar período')
     }
   }
 
@@ -82,12 +82,12 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
   if (loadError) {
     return (
       <div className="flex flex-col items-center justify-center text-center py-16">
-        <div className="h-16 w-16 rounded-2xl bg-error/10 flex items-center justify-center mb-4">
+        <div className="h-16 w-16 rounded-2xl bg-error-soft flex items-center justify-center mb-4">
           <span className="text-2xl text-error">!</span>
         </div>
         <h2 className="text-lg font-semibold text-text mb-1">Erro ao carregar</h2>
         <p className="text-sm text-gray-500 mb-6">{loadError}</p>
-        <button onClick={load} className="h-11 px-5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-light transition-colors">
+        <button onClick={load} className="h-11 px-5 rounded-full bg-primary text-white text-sm font-semibold hover:bg-primary-light transition-colors">
           Tentar novamente
         </button>
       </div>
@@ -102,7 +102,7 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
       {!showForm && (
         <div className="flex justify-end">
           <Button icon={<Plus className="h-4 w-4" />} onClick={() => setShowForm(true)}>
-            Novo PerÃ­odo
+            Novo Período
           </Button>
         </div>
       )}
@@ -110,7 +110,7 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
       {showForm && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-text">Cadastrar PerÃ­odo de AusÃªncia</h2>
+            <h2 className="text-sm font-bold text-text">Cadastrar Período de Ausência</h2>
             <button
               onClick={() => setShowForm(false)}
               className="text-sm text-gray-400 hover:text-text transition-colors"
@@ -131,9 +131,9 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
         <Card>
           <div className="text-center py-12">
             <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">Nenhum perÃ­odo de ausÃªncia cadastrado</p>
+            <p className="text-sm text-gray-500">Nenhum período de ausência cadastrado</p>
             <Button variant="secondary" className="mt-4" onClick={() => setShowForm(true)}>
-              Cadastrar PerÃ­odo
+              Cadastrar Período
             </Button>
           </div>
         </Card>
@@ -150,13 +150,13 @@ export function MinhaDisponibilidade({ embedded = false }: { embedded?: boolean 
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-3 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-primary bg-primary/10 rounded-full px-2.5 py-0.5">FÃ©rias</span>
+                      <span className="text-xs font-medium text-primary bg-primary/10 rounded-full px-2.5 py-0.5">Férias</span>
                       <AvailabilityStatusBadge status={av.status} />
                     </div>
                     <div className="flex items-center gap-4 text-sm text-text">
                       <span className="flex items-center gap-1.5">
                         <Calendar className="h-4 w-4 text-gray-400" />
-                        {av.startDate} â€” {av.endDate}
+                        {av.startDate} — {av.endDate}
                       </span>
                       <span className="flex items-center gap-1.5">
                         <Clock className="h-4 w-4 text-gray-400" />

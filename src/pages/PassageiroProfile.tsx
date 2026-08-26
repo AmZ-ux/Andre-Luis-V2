@@ -11,13 +11,13 @@ import { ArrowLeft, Pencil, Phone, Mail, MapPin, Calendar, DollarSign, CreditCar
 import type { Passenger } from '../types/passenger'
 
 const typeLabel: Record<string, string> = {
-  university: 'UniversitÃ¡rio',
+  university: 'Universitário',
   school: 'Escolar',
   contract: 'Contrato',
 }
 
 const paymentLabel: Record<string, string> = {
-  pix: 'PIX', cash: 'Dinheiro', transfer: 'TransferÃªncia', card: 'CartÃ£o',
+  pix: 'PIX', cash: 'Dinheiro', transfer: 'Transferência', card: 'Cartão',
 }
 
 export function PassageiroProfile() {
@@ -44,7 +44,7 @@ export function PassageiroProfile() {
   if (error || !passenger) {
     return (
       <div className="text-center py-16">
-        <h2 className="text-lg font-semibold text-text">Passageiro nÃ£o encontrado</h2>
+        <h2 className="text-lg font-semibold text-text">Passageiro não encontrado</h2>
         <Button onClick={() => navigate('/passageiros')} className="mt-4">
           Voltar para lista
         </Button>
@@ -56,7 +56,7 @@ export function PassageiroProfile() {
     { icon: Phone, label: 'Telefone', value: passenger.phone },
     { icon: Phone, label: 'WhatsApp', value: passenger.whatsapp || '-' },
     { icon: Mail, label: 'Email', value: passenger.email },
-    { icon: MapPin, label: 'EndereÃ§o', value: `${passenger.address.street}, ${passenger.address.number}${passenger.address.complement ? ` - ${passenger.address.complement}` : ''} - ${passenger.address.neighborhood}, ${passenger.address.city}/${passenger.address.state} - CEP ${passenger.address.zipCode}` },
+    { icon: MapPin, label: 'Endereço', value: `${passenger.address.street}, ${passenger.address.number}${passenger.address.complement ? ` - ${passenger.address.complement}` : ''} - ${passenger.address.neighborhood}, ${passenger.address.city}/${passenger.address.state} - CEP ${passenger.address.zipCode}` },
     { icon: Calendar, label: 'CPF', value: passenger.cpf },
     { icon: Calendar, label: 'RG', value: passenger.rg || '-' },
     { icon: Calendar, label: 'Nascimento', value: passenger.birthDate },
@@ -65,7 +65,7 @@ export function PassageiroProfile() {
 
   const transportInfo = [
     { icon: Building2, label: 'Tipo', value: typeLabel[passenger.transportType] },
-    ...(passenger.institution ? [{ icon: BookOpen, label: passenger.transportType === 'school' ? 'Escola' : 'InstituiÃ§Ã£o', value: passenger.institution }] : []),
+    ...(passenger.institution ? [{ icon: BookOpen, label: passenger.transportType === 'school' ? 'Escola' : 'Instituição', value: passenger.institution }] : []),
     ...(passenger.course ? [{ icon: BookOpen, label: 'Curso', value: passenger.course }] : []),
     ...(passenger.class ? [{ icon: BookOpen, label: 'Turma', value: passenger.class }] : []),
     ...(passenger.company ? [{ icon: Briefcase, label: 'Empresa', value: passenger.company }] : []),
@@ -178,7 +178,7 @@ export function PassageiroProfile() {
 
       {passenger.notes && (
         <Card>
-          <h2 className="text-sm font-bold text-text mb-2">ObservaÃ§Ãµes</h2>
+          <h2 className="text-sm font-bold text-text mb-2">Observações</h2>
           <p className="text-sm text-gray-600 dark:text-gray-300">{passenger.notes}</p>
         </Card>
       )}

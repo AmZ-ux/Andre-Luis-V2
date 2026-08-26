@@ -30,17 +30,17 @@ export function SettingsMenu({ activeCategory, onSelect }: SettingsMenuProps) {
             animate={{ opacity: 1, x: 0 }}
             onClick={() => onSelect(cat.key)}
             className={cn(
-              'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left',
+              'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-sm font-medium transition-colors duration-150 text-left',
               isActive
-                ? 'bg-primary/10 text-primary shadow-sm'
+                ? 'bg-primary-soft text-primary'
                 : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-text'
             )}
           >
             <div className={cn(
-              'h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors',
-              isActive ? 'bg-primary/10' : 'bg-gray-100 dark:bg-gray-800'
+              'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-colors',
+              isActive ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-800'
             )}>
-              <Icon className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-gray-400')} />
+              <Icon className={cn('h-4 w-4', isActive ? 'text-white' : 'text-gray-400')} />
             </div>
             <div className="min-w-0 text-left">
               <p className="text-sm font-medium truncate">{cat.label}</p>

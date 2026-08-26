@@ -45,7 +45,7 @@ export function SessionTimeoutModal() {
           role="alert"
         >
           <div className="flex items-start gap-3">
-            <div className="h-9 w-9 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+            <div className="h-9 w-9 rounded-lg bg-warning-soft flex items-center justify-center shrink-0">
               <Clock className="h-4 w-4 text-warning" />
             </div>
             <div className="flex-1 min-w-0">

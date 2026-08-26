@@ -19,7 +19,7 @@ const monthOptions = [
   { value: '', label: 'Todos os meses' },
   { value: '1', label: 'Janeiro' },
   { value: '2', label: 'Fevereiro' },
-  { value: '3', label: 'MarÃ§o' },
+  { value: '3', label: 'Março' },
   { value: '4', label: 'Abril' },
   { value: '5', label: 'Maio' },
   { value: '6', label: 'Junho' },
@@ -42,7 +42,7 @@ const yearOptions = [
 
 const transportOptions: { value: TransportType | ''; label: string }[] = [
   { value: '', label: 'Todos os tipos' },
-  { value: 'university', label: 'UniversitÃ¡rio' },
+  { value: 'university', label: 'Universitário' },
   { value: 'school', label: 'Escolar' },
   { value: 'contract', label: 'Contrato' },
 ]
@@ -92,7 +92,7 @@ export function MonthlyFilters({ filters, onChange, onReset }: MonthlyFiltersPro
                   options={monthOptions}
                   value={filters.month}
                   onChange={(e) => onChange({ month: e.target.value })}
-                  placeholder="MÃªs"
+                  placeholder="Mês"
                 />
                 <Select
                   options={yearOptions}
@@ -118,7 +118,7 @@ export function MonthlyFilters({ filters, onChange, onReset }: MonthlyFiltersPro
                   onChange={(e) => onChange({ passenger: e.target.value })}
                 />
                 <Input
-                  placeholder="Dia vencimento inÃ­cio"
+                  placeholder="Dia vencimento início"
                   value={filters.dueDayStart}
                   onChange={(e) => onChange({ dueDayStart: e.target.value })}
                   type="number"

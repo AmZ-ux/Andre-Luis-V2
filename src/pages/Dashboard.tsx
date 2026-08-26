@@ -25,7 +25,7 @@ export function Dashboard() {
     return (
       <div className="space-y-6">
         <div className="h-52 bg-gray-200 dark:bg-gray-700 rounded-xl animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-card overflow-hidden">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 divide-gray-100 dark:divide-gray-800 sm:divide-x">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="h-[76px] bg-gray-100 dark:bg-gray-800 animate-[skeleton-pulse_1.5s_ease-in-out_infinite]" />
@@ -68,7 +68,7 @@ export function Dashboard() {
     <div className="space-y-6 sm:space-y-8">
       <FinancialSummary data={data.financialSummary} />
 
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-card overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 divide-gray-100 dark:divide-gray-800 sm:divide-x">
           {data.statistics.map((stat, i) => (
             <StatisticCard key={stat.id} data={stat} index={i} />

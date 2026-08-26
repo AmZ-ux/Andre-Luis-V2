@@ -66,7 +66,7 @@ export function AvailabilityList({ availabilities, sort, onSort, onCancel }: Ava
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, delay: i * 0.03 }}
-              className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-card p-5"
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-card p-5"
             >
               <div className="flex items-start justify-between gap-2">
                 <button
