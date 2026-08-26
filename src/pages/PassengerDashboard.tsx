@@ -77,18 +77,29 @@ export function PassengerDashboard() {
   const [fees, setFees] = useState<MonthlyFee[]>([])
   const [checkoutFee, setCheckoutFee] = useState<MonthlyFee | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   const load = useCallback(async () => {
     if (!user) return
     setLoading(true)
+    setLoadError(false)
     try {
       try { await monthlyFeeService.ensureCurrent() } catch {}
-      const [passengerData, feeData] = await Promise.all([
-        passengerService.getById(user.id),
+      const [passengerRes, feeRes] = await Promise.allSettled([
+        passengerService.getMe(),
         monthlyFeeService.getByPassengerId(user.id),
       ])
-      setPassenger(passengerData)
-      setFees(feeData)
+      if (passengerRes.status === 'fulfilled') {
+        setPassenger(passengerRes.value ?? null)
+      } else {
+        setPassenger(null)
+      }
+      if (feeRes.status === 'rejected') {
+        throw new Error('fees')
+      }
+      setFees(feeRes.value)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -99,6 +110,19 @@ export function PassengerDashboard() {
   }, [load])
 
   if (loading || !user) return <PageSpinner />
+
+  if (loadError && fees.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center py-16">
+        <div className="h-16 w-16 rounded-lg bg-error-soft flex items-center justify-center mb-4">
+          <span className="text-2xl">!</span>
+        </div>
+        <h2 className="text-lg font-semibold text-text mb-1">Não foi possível carregar</h2>
+        <p className="text-sm text-gray-500 mb-6">Ocorreu um erro ao buscar suas mensalidades.</p>
+        <Button onClick={() => load()}>Tentar novamente</Button>
+      </div>
+    )
+  }
 
   const sortedFees = [...fees].sort((a, b) => b.year - a.year || b.month - a.month)
   const nextUnpaid = [...fees]
@@ -187,6 +211,42 @@ export function PassengerDashboard() {
           </div>
         </div>
 
+        <Card className="lg:order-3 lg:col-span-3">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text">Minhas mensalidades</h2>
+            <button
+              onClick={() => navigate('/minhas-mensalidades')}
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              Ver tudo
+            </button>
+          </div>
+
+          {sortedFees.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">Nenhuma mensalidade lançada</p>
+          ) : (
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              {sortedFees.slice(0, 5).map((fee) => {
+                const status = calculateStatus(fee, fee.payment)
+                return (
+                  <li key={fee.id} className="flex items-center justify-between gap-3 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-text">
+                        {MONTH_NAMES[fee.month - 1]} de {fee.year}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">Venceu em {fee.dueDate}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-text">{formatBR(fee.amount)}</span>
+                      <Badge variant={feeStatusVariant[status]}>{feeStatusLabel[status]}</Badge>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Card>
+
         <Card>
           <div className="flex items-center gap-2 mb-4">
             <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text">Meu contrato</h2>
@@ -235,42 +295,6 @@ export function PassengerDashboard() {
           </dl>
         </Card>
       </div>
-
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-text">Minhas mensalidades</h2>
-          <button
-            onClick={() => navigate('/minhas-mensalidades')}
-            className="text-xs font-semibold text-primary hover:underline"
-          >
-            Ver tudo
-          </button>
-        </div>
-
-        {sortedFees.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-6">Nenhuma mensalidade lançada</p>
-        ) : (
-          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-            {sortedFees.slice(0, 5).map((fee) => {
-              const status = calculateStatus(fee, fee.payment)
-              return (
-                <li key={fee.id} className="flex items-center justify-between gap-3 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-text">
-                      {MONTH_NAMES[fee.month - 1]} de {fee.year}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">Venceu em {fee.dueDate}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-text">{formatBR(fee.amount)}</span>
-                    <Badge variant={feeStatusVariant[status]}>{feeStatusLabel[status]}</Badge>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Card>
 
       <FeeCheckoutModal
         fee={checkoutFee}

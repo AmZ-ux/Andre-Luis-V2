@@ -209,3 +209,101 @@ describe('DELETE /api/passengers/:id', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('GET /api/passengers/me (self-service)', () => {
+  let passengerToken: string
+  let passengerId: string
+  let otherPassengerId: string
+
+  beforeEach(() => {
+    const db = getDb()
+    passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Carlos Pereira', 'carlos@teste.com', '123.123.123-00', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, pickup_point, destination, notes) VALUES (?, 'Carlos Pereira', '123.123.123-00', '2000-01-01', 'university', 'active', 'Centro', 'UFSC', 'observacao interna')")
+      .run(passengerId)
+    passengerToken = jwt.sign({ userId: passengerId, role: 'passenger' }, 'dev-secret-change-in-production')
+
+    otherPassengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(otherPassengerId, 'Other Passenger', 'other@test.com', '999.999.999-99', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, 'Other Passenger', '999.999.999-99', '2000-01-01', 'school', 'active')")
+      .run(otherPassengerId)
+  })
+
+  it('returns own data for authenticated passenger (200)', async () => {
+    const res = await request(app)
+      .get('/api/passengers/me')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body.id).toBe(passengerId)
+    expect(res.body.name).toBe('Carlos Pereira')
+    expect(res.body.cpf).toBe('123.123.123-00')
+    expect(res.body.pickup_point).toBe('Centro')
+  })
+
+  it('does not expose internal notes or updated_at', async () => {
+    const res = await request(app)
+      .get('/api/passengers/me')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body.notes).toBeUndefined()
+    expect(res.body.updated_at).toBeUndefined()
+  })
+
+  it('blocks passenger from accessing third-party passenger by id (403)', async () => {
+    const res = await request(app)
+      .get(`/api/passengers/${otherPassengerId}`)
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('blocks passenger from listing passengers (403)', async () => {
+    const res = await request(app)
+      .get('/api/passengers')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('blocks passenger from updating (403)', async () => {
+    const res = await request(app)
+      .put(`/api/passengers/${otherPassengerId}`)
+      .set('Authorization', `Bearer ${passengerToken}`)
+      .send({ name: 'Hacked' })
+    expect(res.status).toBe(403)
+  })
+
+  it('blocks passenger from deleting (403)', async () => {
+    const res = await request(app)
+      .delete(`/api/passengers/${otherPassengerId}`)
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+    const db = getDb()
+    expect(db.prepare('SELECT id FROM passengers WHERE id = ?').get(otherPassengerId)).toBeDefined()
+  })
+
+  it('keeps admin access to GET /:id (200)', async () => {
+    const res = await request(app)
+      .get(`/api/passengers/${passengerId}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.name).toBe('Carlos Pereira')
+  })
+
+  it('requires authentication on /me (401)', async () => {
+    const res = await request(app).get('/api/passengers/me')
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 404 when authenticated user has no passenger record', async () => {
+    const db = getDb()
+    const orphanId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, 'Orfan', 'orfan@teste.com', '888.888.888-88', '', 'passenger', 'x')")
+      .run(orphanId)
+    const orphanToken = jwt.sign({ userId: orphanId, role: 'passenger' }, 'dev-secret-change-in-production')
+    const res = await request(app)
+      .get('/api/passengers/me')
+      .set('Authorization', `Bearer ${orphanToken}`)
+    expect(res.status).toBe(404)
+  })
+})

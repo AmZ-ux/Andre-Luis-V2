@@ -207,6 +207,13 @@ export const passengerService = {
     return data.find((p) => p.id === id) || null
   },
 
+  // Self-service: carrega o cadastro do passageiro autenticado (rota /passengers/me).
+  async getMe(): Promise<Passenger | null> {
+    if (config.realApi) return realPassengers.getMe()
+    await delay(200)
+    return null
+  },
+
   async create(
     passenger: Omit<Passenger, 'id' | 'createdAt' | 'updatedAt'>,
     options?: { id?: string }

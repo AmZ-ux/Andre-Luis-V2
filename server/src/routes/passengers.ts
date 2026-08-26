@@ -1,9 +1,28 @@
 ﻿import { Router } from 'express'
 import { getDb } from '../database/connection.js'
 import { sanitizeInput } from '../middleware/validation.js'
-import { requireAdmin } from '../middleware/roles.js'
+import { requireAdmin, requireAuth } from '../middleware/roles.js'
 
 const router = Router()
+
+// Self-service: o passageiro autenticado carrega SOMENTE o próprio cadastro.
+// Deve ficar ANTES de router.use(requireAdmin). Usa exclusivamente req.user.userId
+// (do token) — nenhum identificador vindo do cliente. Não expõe notes (uso interno
+// administrativo) nem updated_at.
+router.get('/me', requireAuth, (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  const db = getDb()
+  const passenger = db.prepare(`
+    SELECT id, name, cpf, birth_date, phone, whatsapp, email,
+           zip_code, street, number, complement, neighborhood, city, state,
+           transport_type, institution, course, class, company, school, workplace,
+           monthly_fee, due_day, payment_method, status,
+           pickup_point, destination, contract_start_date, created_at
+    FROM passengers WHERE id = ?
+  `).get(req.user.userId)
+  if (!passenger) { res.status(404).json({ error: 'Cadastro de passageiro não encontrado' }); return }
+  res.json(passenger)
+})
 
 router.use(requireAdmin)
 

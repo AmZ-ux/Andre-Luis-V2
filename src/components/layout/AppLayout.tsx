@@ -30,7 +30,7 @@ export function AppLayout() {
     <div className="min-h-screen bg-secondary dark:bg-gray-950">
       <Sidebar />
 
-      <div className="lg:ml-64 flex flex-col min-h-screen pb-16 lg:pb-0">
+      <div className="lg:ml-64 flex flex-col min-h-screen pb-24 lg:pb-0">
         {hasHeaderContent && (
         <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 sm:px-6 py-3 bg-secondary/80 dark:bg-gray-950/80 backdrop-blur lg:border-b lg:border-gray-100 lg:dark:border-gray-800">
           {showGreeting && (

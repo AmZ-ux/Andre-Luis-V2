@@ -124,6 +124,9 @@ export const realPassengers = {
   getById: async (id: string) =>
     toPassengerAddress(await api.get<any>(`/passengers/${id}`)),
 
+  getMe: async () =>
+    toPassengerAddress(await api.get<any>('/passengers/me')),
+
   create: async (data: Omit<Passenger, 'id' | 'createdAt' | 'updatedAt'>) =>
     toPassengerAddress(await api.post<any>('/passengers', flattenPassenger(data))),
 
