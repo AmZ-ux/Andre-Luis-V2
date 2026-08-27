@@ -9,7 +9,7 @@ import { sanitizeBody } from '../middleware/validation.js'
 import { resetDb, getDb } from '../database/connection.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { paymentsRouter } from '../routes/payments.js'
-import { finalizePayment, recordOverpayment } from '../services/paymentService.js'
+import { finalizePayment, recordOverpayment, toCentavos } from '../services/paymentService.js'
 
 process.env.DATABASE_PATH = ':memory:'
 delete process.env.MERCADO_PAGO_ACCESS_TOKEN
@@ -66,6 +66,18 @@ function seedMonthlyFee(passengerId: string, overrides: Record<string, any> = {}
   )
   return id
 }
+
+function seedCharge(feeId: string, amount = 189.90, paymentIntentId = 'mp-test'): string {
+  const db = getDb()
+  const id = uuid()
+  db.prepare(`
+    INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status)
+    VALUES (?, ?, ?, ?, 'pending')
+  `).run(id, paymentIntentId, feeId, amount)
+  return id
+}
+
+// ── Original tests (unchanged) ────────────────────────────────────────────
 
 describe('POST /api/payments/create (sem MERCADO_PAGO_ACCESS_TOKEN)', () => {
   it('should require monthlyFeeId', async () => {
@@ -155,7 +167,7 @@ describe('GET /api/payments/status', () => {
   })
 })
 
-// ── P1: charge reuse, supersede, unique index, transactional finalize ────────
+// ── P1: charge reuse, supersede, unique index ──────────────────────────────
 
 describe('POST /api/payments/create — PIX charge reuse (cached QR)', () => {
   it('should return cached QR when a valid pending charge exists', async () => {
@@ -174,7 +186,6 @@ describe('POST /api/payments/create — PIX charge reuse (cached QR)', () => {
     expect(res.body.qrImage).toContain('data:image/png;base64')
     expect(res.body.paymentId).toBe('mp-cached-1')
 
-    // No additional charge should have been created
     const charges = db.prepare('SELECT * FROM pix_charges WHERE monthly_fee_id = ?').all(fid)
     expect(charges.length).toBe(1)
   })
@@ -189,9 +200,7 @@ describe('POST /api/payments/create — PIX charge reuse (cached QR)', () => {
     `).run(uuid(), fid)
 
     const res = await request(app).post('/api/payments/create').set('Authorization', `Bearer ${token}`).send({ monthlyFeeId: fid, method: 'pix' })
-    // Falls through to MP call which fails (no token)
     expect(res.status).toBe(502)
-    // Old charge should be superseded
     const oldCharge = db.prepare("SELECT status FROM pix_charges WHERE payment_intent_id = 'mp-expired'").get() as any
     expect(oldCharge.status).toBe('superseded')
   })
@@ -206,7 +215,7 @@ describe('POST /api/payments/create — PIX charge reuse (cached QR)', () => {
     `).run(uuid(), fid)
 
     const res = await request(app).post('/api/payments/create').set('Authorization', `Bearer ${token}`).send({ monthlyFeeId: fid, method: 'pix' })
-    expect(res.status).toBe(502) // Falls through to MP (no token)
+    expect(res.status).toBe(502)
     const oldCharge = db.prepare("SELECT status FROM pix_charges WHERE payment_intent_id = 'mp-legacy'").get() as any
     expect(oldCharge.status).toBe('superseded')
   })
@@ -245,11 +254,14 @@ describe('pix_charges unique partial index (engine-level enforcement)', () => {
   })
 })
 
+// ── P1 updated: finalizePayment dedup (requires charge record) ─────────────
+
 describe('finalizePayment — transactional + deduplication', () => {
   it('should finalize only once when called twice with the same paymentId', () => {
     const pid = seedPassenger()
     const fid = seedMonthlyFee(pid)
     const db = getDb()
+    seedCharge(fid, 189.90, 'mp-dup-test')
     const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
 
     const result1 = finalizePayment(db, fee, 'mp-dup-test', 189.90, 'pix')
@@ -265,12 +277,15 @@ describe('finalizePayment — transactional + deduplication', () => {
     const pid = seedPassenger()
     const fid = seedMonthlyFee(pid, { status: 'paid' })
     const db = getDb()
+    seedCharge(fid, 189.90, 'mp-already-paid')
     const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
 
     const result = finalizePayment(db, fee, 'mp-already-paid', 189.90, 'pix')
     expect(result).toBe(false)
   })
 })
+
+// ── P1: recordOverpayment ──────────────────────────────────────────────────
 
 describe('recordOverpayment — Regra de Ouro', () => {
   it('should record overpayment when fee is already paid', () => {
@@ -329,5 +344,321 @@ describe('POST /api/payments/create — rejected fee statuses', () => {
     const res = await request(app).post('/api/payments/create').set('Authorization', `Bearer ${token}`).send({ monthlyFeeId: fid })
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('isenta')
+  })
+})
+
+// ── P2: amount validation ──────────────────────────────────────────────────
+
+describe('finalizePayment — amount validation (P2)', () => {
+  it('should finalize when received === expected (exact)', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-exact')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-exact', 189.90, 'pix')
+    expect(result).toBe(true)
+
+    const payment = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND entry_type = 'NORMAL'").get(fid) as any
+    expect(payment.amount).toBe(189.90)
+    expect(payment.external_payment_id).toBe('mp-exact')
+    expect(payment.entry_type).toBe('NORMAL')
+
+    const feeAfter = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(fid) as any
+    expect(feeAfter.status).toBe('paid')
+  })
+
+  it('should reject 1 centavo below (subpayment)', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-sub-1cent')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-sub-1cent', 189.89, 'pix')
+    expect(result).toBe(false)
+
+    const payment = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND entry_type = 'SUBPAYMENT'").get(fid) as any
+    expect(payment).toBeTruthy()
+    expect(payment.amount).toBe(189.89)
+    expect(payment.external_payment_id).toBe('mp-sub-1cent')
+
+    const charge = db.prepare("SELECT status FROM pix_charges WHERE payment_intent_id = 'mp-sub-1cent'").get() as any
+    expect(charge.status).toBe('succeeded_underpaid')
+
+    const feeAfter = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(fid) as any
+    expect(feeAfter.status).toBe('pending')
+  })
+
+  it('should finalize with overpayment for 1 centavo above', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-over-1cent')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-over-1cent', 189.91, 'pix')
+    expect(result).toBe(true)
+
+    const normal = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND entry_type = 'NORMAL'").get(fid) as any
+    expect(normal.amount).toBe(189.90)
+
+    const overpay = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND entry_type = 'OVERPAYMENT'").get(fid) as any
+    expect(overpay.amount).toBe(0.01)
+
+    const feeAfter = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(fid) as any
+    expect(feeAfter.status).toBe('paid')
+
+    const charge = db.prepare("SELECT status FROM pix_charges WHERE payment_intent_id = 'mp-over-1cent'").get() as any
+    expect(charge.status).toBe('succeeded_overpaid')
+  })
+
+  it('should reject very small amount (subpayment)', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-sub-big')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-sub-big', 1.00, 'pix')
+    expect(result).toBe(false)
+
+    const payment = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND entry_type = 'SUBPAYMENT'").get(fid) as any
+    expect(payment.amount).toBe(1.00)
+    expect(fee.status).toBe('pending')
+  })
+
+  it('should finalize with large overpayment', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-over-big')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-over-big', 400.00, 'pix')
+    expect(result).toBe(true)
+
+    const normal = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND entry_type = 'NORMAL'").get(fid) as any
+    expect(normal.amount).toBe(189.90)
+
+    const overpay = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND entry_type = 'OVERPAYMENT'").get(fid) as any
+    expect(overpay.amount).toBe(210.10)
+
+    // Sum must equal received
+    expect(toCentavos(normal.amount) + toCentavos(overpay.amount)).toBe(toCentavos(400.00))
+  })
+
+  it('should reject amountReceived = 0', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-zero')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-zero', 0, 'pix')
+    expect(result).toBe(false)
+    expect(fee.status).toBe('pending')
+  })
+
+  it('should reject amountReceived = NaN', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-nan')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-nan', NaN, 'pix')
+    expect(result).toBe(false)
+    expect(fee.status).toBe('pending')
+  })
+
+  it('should reject amountReceived = Infinity', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-inf')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-inf', Infinity, 'pix')
+    expect(result).toBe(false)
+    expect(fee.status).toBe('pending')
+  })
+
+  it('should reject amountReceived = -100', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-neg')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-neg', -100, 'pix')
+    expect(result).toBe(false)
+    expect(fee.status).toBe('pending')
+  })
+
+  it('should use charge amount with late fees (not fee.amount)', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid, { amount: 189.90 })
+    const db = getDb()
+    seedCharge(fid, 205.50, 'mp-late-fee')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    // Charge was R$205.50 (with late fee), received R$205.50 → exact match
+    const result = finalizePayment(db, fee, 'mp-late-fee', 205.50, 'pix')
+    expect(result).toBe(true)
+
+    const payment = db.prepare("SELECT * FROM payments WHERE monthly_fee_id = ? AND entry_type = 'NORMAL'").get(fid) as any
+    expect(payment.amount).toBe(205.50)
+  })
+
+  it('should not finalize without charge record (no fallback to fee.amount)', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid, { amount: 189.90 })
+    const db = getDb()
+    // No charge created
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    const result = finalizePayment(db, fee, 'mp-no-charge', 189.90, 'pix')
+    expect(result).toBe(false)
+    expect(fee.status).toBe('pending')
+  })
+
+  it('should allow new charge creation after subpayment', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-sub-then-new')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    // First: subpayment
+    finalizePayment(db, fee, 'mp-sub-then-new', 100.00, 'pix')
+    expect(fee.status).toBe('pending')
+
+    // Second: new charge with different paymentId
+    seedCharge(fid, 189.90, 'mp-new-charge')
+    const fee2 = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+    const result = finalizePayment(db, fee2, 'mp-new-charge', 189.90, 'pix')
+    expect(result).toBe(true)
+    const feeAfter = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(fid) as any
+    expect(feeAfter.status).toBe('paid')
+
+    // Should have 2 payment records: subpayment + normal
+    const payments = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').all(fid)
+    expect(payments.length).toBe(2)
+  })
+
+  it('overpayment sum normal + excess = received', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-sum-test')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    finalizePayment(db, fee, 'mp-sum-test', 250.75, 'pix')
+
+    const normal = db.prepare("SELECT amount FROM payments WHERE monthly_fee_id = ? AND entry_type = 'NORMAL'").get(fid) as any
+    const overpay = db.prepare("SELECT amount FROM payments WHERE monthly_fee_id = ? AND entry_type = 'OVERPAYMENT'").get(fid) as any
+    expect(toCentavos(normal.amount) + toCentavos(overpay.amount)).toBe(toCentavos(250.75))
+  })
+
+  it('should use charge found by payment_intent_id when chargeId not provided', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-by-intent')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    // Call without chargeId — should find charge via payment_intent_id
+    const result = finalizePayment(db, fee, 'mp-by-intent', 189.90, 'pix')
+    expect(result).toBe(true)
+  })
+})
+
+describe('finalizePayment — idempotency via external_payment_id', () => {
+  it('should not finalize duplicate paymentId with same entry_type', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-struct-dup')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    finalizePayment(db, fee, 'mp-struct-dup', 189.90, 'pix')
+    finalizePayment(db, fee, 'mp-struct-dup', 189.90, 'pix')
+
+    const payments = db.prepare("SELECT * FROM payments WHERE external_payment_id = 'mp-struct-dup' AND entry_type = 'NORMAL'").all()
+    expect(payments.length).toBe(1)
+  })
+
+  it('should not create duplicate OVERPAYMENT for same paymentId', () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const db = getDb()
+    seedCharge(fid, 189.90, 'mp-ow-dup')
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fid) as any
+
+    finalizePayment(db, fee, 'mp-ow-dup', 200.00, 'pix')
+    finalizePayment(db, fee, 'mp-ow-dup', 200.00, 'pix')
+
+    const payments = db.prepare("SELECT * FROM payments WHERE external_payment_id = 'mp-ow-dup' AND entry_type = 'OVERPAYMENT'").all()
+    expect(payments.length).toBe(1)
+  })
+})
+
+describe('external_payment_id + entry_type — unique constraint', () => {
+  it('should prevent duplicate (external_payment_id, entry_type) via UNIQUE index', () => {
+    const db = getDb()
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+
+    db.prepare(`
+      INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, external_payment_id, entry_type)
+      VALUES (?, ?, 189.90, '25/08/2026', 'pix', 'test', 'mp-uniq-test', 'NORMAL')
+    `).run(uuid(), fid)
+
+    expect(() => {
+      db.prepare(`
+        INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, external_payment_id, entry_type)
+        VALUES (?, ?, 189.90, '25/08/2026', 'pix', 'test', 'mp-uniq-test', 'NORMAL')
+      `).run(uuid(), fid)
+    }).toThrow()
+  })
+
+  it('should allow same external_payment_id with different entry_type', () => {
+    const db = getDb()
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+
+    db.prepare(`
+      INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, external_payment_id, entry_type)
+      VALUES (?, ?, 189.90, '25/08/2026', 'pix', 'test', 'mp-multi-type', 'NORMAL')
+    `).run(uuid(), fid)
+
+    db.prepare(`
+      INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, external_payment_id, entry_type)
+      VALUES (?, ?, 10.10, '25/08/2026', 'pix', 'test', 'mp-multi-type', 'OVERPAYMENT')
+    `).run(uuid(), fid)
+
+    const count = db.prepare("SELECT COUNT(*) as cnt FROM payments WHERE external_payment_id = 'mp-multi-type'").get() as any
+    expect(count.cnt).toBe(2)
+  })
+
+  it('should allow NULL external_payment_id (legacy rows)', () => {
+    const db = getDb()
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+
+    db.prepare(`
+      INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes)
+      VALUES (?, ?, 189.90, '25/08/2026', 'pix', 'LEGACY payment')
+    `).run(uuid(), fid)
+
+    db.prepare(`
+      INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes)
+      VALUES (?, ?, 189.90, '25/08/2026', 'pix', 'ANOTHER LEGACY')
+    `).run(uuid(), fid)
+
+    const count = db.prepare('SELECT COUNT(*) as cnt FROM payments WHERE monthly_fee_id = ?').get(fid) as any
+    expect(count.cnt).toBe(2)
   })
 })

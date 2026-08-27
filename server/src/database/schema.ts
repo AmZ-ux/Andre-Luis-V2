@@ -1,6 +1,17 @@
 import { getDb, initDatabase } from './connection.js'
 import { logger } from '../utils/logger.js'
 
+function extractExternalPaymentId(notes: string): string | null {
+  const match = /Mercado Pago (\d+)$/.exec(notes)
+  return match ? match[1] : null
+}
+
+function extractEntryType(notes: string): string {
+  if (notes.includes('OVERPAYMENT')) return 'OVERPAYMENT'
+  if (notes.includes('SUBPAYMENT')) return 'SUBPAYMENT'
+  return 'NORMAL'
+}
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
@@ -86,6 +97,10 @@ CREATE TABLE IF NOT EXISTS payments (
   payment_date TEXT NOT NULL,
   payment_method TEXT NOT NULL,
   notes TEXT DEFAULT '',
+  late_fee REAL NOT NULL DEFAULT 0,
+  interest REAL NOT NULL DEFAULT 0,
+  external_payment_id TEXT DEFAULT NULL,
+  entry_type TEXT DEFAULT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -245,6 +260,55 @@ export async function runMigrations(): Promise<void> {
   try { db.exec("ALTER TABLE pix_charges ADD COLUMN pix_code TEXT DEFAULT ''") } catch {}
   try { db.exec("ALTER TABLE pix_charges ADD COLUMN qr_image TEXT DEFAULT ''") } catch {}
   try { db.exec("ALTER TABLE pix_charges ADD COLUMN superseded_at TEXT DEFAULT NULL") } catch {}
+
+  // --- P2: amount validation migration ---
+  // Add external_payment_id and entry_type columns to payments if missing
+  try { db.exec("ALTER TABLE payments ADD COLUMN external_payment_id TEXT DEFAULT NULL") } catch {}
+  try { db.exec("ALTER TABLE payments ADD COLUMN entry_type TEXT DEFAULT NULL") } catch {}
+
+  // Backfill external_payment_id and entry_type from existing notes
+  try {
+    const legacy = db.prepare(
+      "SELECT id, notes FROM payments WHERE external_payment_id IS NULL AND notes IS NOT NULL AND notes != ''"
+    ).all() as any[]
+    for (const row of legacy) {
+      const extId = extractExternalPaymentId(row.notes)
+      const eType = extractEntryType(row.notes)
+      if (extId) {
+        db.prepare('UPDATE payments SET external_payment_id = ?, entry_type = ? WHERE id = ?')
+          .run(extId, eType, row.id)
+      }
+    }
+  } catch {}
+
+  // Deduplicate: if multiple payments share the same (external_payment_id, entry_type),
+  // keep the oldest and clear the rest to avoid UNIQUE constraint violations on legacy data.
+  try {
+    const dupes = db.prepare(`
+      SELECT external_payment_id, entry_type, COUNT(*) as cnt
+      FROM payments
+      WHERE external_payment_id IS NOT NULL AND entry_type IS NOT NULL
+      GROUP BY external_payment_id, entry_type
+      HAVING cnt > 1
+    `).all() as any[]
+    for (const d of dupes) {
+      const keep = db.prepare(
+        'SELECT id FROM payments WHERE external_payment_id = ? AND entry_type = ? ORDER BY created_at ASC LIMIT 1'
+      ).get(d.external_payment_id, d.entry_type) as any
+      if (keep) {
+        db.prepare(
+          'UPDATE payments SET external_payment_id = NULL, entry_type = NULL WHERE external_payment_id = ? AND entry_type = ? AND id != ?'
+        ).run(d.external_payment_id, d.entry_type, keep.id)
+      }
+    }
+  } catch {}
+
+  // Unique index: prevent duplicate external payment per entry type.
+  // NULLs are NOT considered equal in UNIQUE indexes, so legacy rows with
+  // NULL external_payment_id + entry_type won't conflict.
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_external ON payments(external_payment_id, entry_type) WHERE external_payment_id IS NOT NULL")
+  } catch {}
 
   // Supersede duplicate pending charges: keep the newest per fee, mark rest as superseded.
   // This ensures the unique partial index (below) can be created without conflict.

@@ -73,6 +73,8 @@ describe('POST /api/payments/webhook (público)', () => {
   it('should finalize the fee when the payment is approved', async () => {
     const db = getDb()
     const fid = seedFee()
+    db.prepare("INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status) VALUES (?, '555', ?, 189.90, 'pending')")
+      .run(uuid(), fid)
     vi.mocked(getPayment).mockResolvedValue({
       id: 555,
       status: 'approved',
@@ -183,6 +185,8 @@ describe('POST /api/payments/webhook (público)', () => {
   it('should finalize normal payment first, then record overpayment for second approved payment', async () => {
     const db = getDb()
     const fid = seedFee()
+    db.prepare("INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status) VALUES (?, '1001', ?, 189.90, 'pending')")
+      .run(uuid(), fid)
 
     // First payment: fee pending → finalize normally
     vi.mocked(getPayment).mockResolvedValueOnce({

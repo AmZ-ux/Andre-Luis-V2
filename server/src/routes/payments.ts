@@ -48,23 +48,32 @@ paymentsWebhookRouter.post('/webhook', async (req, res) => {
     const status = mpStatus(payment.status)
     if (status === 'paid') {
       if (fee.status !== 'paid') {
+        // Look up the charge for amount validation
+        const charge = db.prepare(
+          "SELECT id FROM pix_charges WHERE payment_intent_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1"
+        ).get(String(payment.id)) as any
         finalizePayment(
           db,
           fee,
           String(payment.id),
           Number(payment.transaction_amount ?? 0),
-          payment.payment_method_id === 'pix' ? 'pix' : 'card'
+          payment.payment_method_id === 'pix' ? 'pix' : 'card',
+          charge?.id
         )
         logger.info({ paymentId: payment.id, feeId }, 'Pagamento finalizado via webhook')
       } else {
         // Regra de Ouro: fee already paid but MP says this payment is approved.
         // Record the overpayment — money received must never be invisible.
+        const charge = db.prepare(
+          "SELECT id FROM pix_charges WHERE payment_intent_id = ? ORDER BY created_at DESC LIMIT 1"
+        ).get(String(payment.id)) as any
         recordOverpayment(
           db,
           fee,
           String(payment.id),
           Number(payment.transaction_amount ?? 0),
-          payment.payment_method_id === 'pix' ? 'pix' : 'card'
+          payment.payment_method_id === 'pix' ? 'pix' : 'card',
+          charge?.id
         )
         logger.info({ paymentId: payment.id, feeId }, 'Pagamento excedente detectado via webhook')
       }
@@ -256,7 +265,11 @@ paymentsRouter.get('/status', async (req, res) => {
       const status = mpStatus(payment.status)
       if (status === 'paid') {
         const method: PaymentMethod = payment.payment_method_id === 'pix' ? 'pix' : 'card'
-        finalizePayment(db, fee, String(payment.id), Number(payment.transaction_amount ?? 0), method)
+        // Look up the charge for amount validation
+        const charge = db.prepare(
+          "SELECT id FROM pix_charges WHERE payment_intent_id = ? ORDER BY created_at DESC LIMIT 1"
+        ).get(String(payment.id)) as any
+        finalizePayment(db, fee, String(payment.id), Number(payment.transaction_amount ?? 0), method, charge?.id)
         res.json({ status: 'paid' })
         return
       }
