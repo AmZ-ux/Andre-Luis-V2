@@ -73,13 +73,6 @@ export interface MonthlyFeePagination {
   total: number
 }
 
-export interface PaymentFormData {
-  amount: string
-  paymentDate: string
-  paymentMethod: PaymentMethod
-  notes: string
-}
-
 export interface MonthlyFeeEditData {
   amount: string
   dueDay: string

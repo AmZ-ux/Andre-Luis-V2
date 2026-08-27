@@ -10,7 +10,6 @@ import { MonthlyFeeCard } from '../components/monthlyFees/MonthlyFeeCard'
 import { CancelModal } from '../components/monthlyFees/CancelModal'
 import { ExemptionModal } from '../components/monthlyFees/ExemptionModal'
 import { EditFeeModal } from '../components/monthlyFees/EditFeeModal'
-import { ManualPaymentModal } from '../components/monthlyFees/ManualPaymentModal'
 import { BillingSettingsForm } from '../components/settings/BillingSettings'
 import { PageTabs } from '../components/ui/PageTabs'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -36,7 +35,7 @@ export function Mensalidades() {
   const {
     fees, summary, loading, error, filters, sort, pagination, totalPages,
     updateFilters, resetFilters, setPage, setSortField,
-    registerPayment, cancelFee, exemptFee, updateFee, reload,
+    cancelFee, exemptFee, updateFee, reload,
   } = useMonthlyFees()
   const { settings, updateCategory, saved } = useSettings()
   const { addToast } = useToast()
@@ -53,24 +52,6 @@ export function Mensalidades() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [exemptionModalOpen, setExemptionModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
-
-  const handlePay = useCallback((fee: MonthlyFee) => {
-    setSelectedFee(fee)
-    setPaymentModalOpen(true)
-  }, [])
-
-  const handlePayConfirm = useCallback(
-    async (data: { amount: number; paymentDate: string; paymentMethod: string; notes?: string }) => {
-      if (!selectedFee) return
-      await registerPayment(selectedFee.id, {
-        ...data,
-        paymentMethod: data.paymentMethod as import('../types/passenger').PaymentMethod,
-      })
-      addToast('success', 'Pagamento registrado com sucesso!')
-    },
-    [selectedFee, registerPayment, addToast]
-  )
 
   const handleCancel = useCallback((fee: MonthlyFee) => {
     setSelectedFee(fee)
@@ -202,7 +183,6 @@ export function Mensalidades() {
             onCancel={handleCancel}
             onExempt={handleExempt}
             onEdit={handleEdit}
-            onPay={handlePay}
           />
         </Card>
       ) : (
@@ -214,7 +194,6 @@ export function Mensalidades() {
               onCancel={handleCancel}
               onExempt={handleExempt}
               onEdit={handleEdit}
-              onPay={handlePay}
             />
           ))}
         </div>
@@ -246,13 +225,6 @@ export function Mensalidades() {
         isOpen={editModalOpen}
         onClose={() => { setEditModalOpen(false); setSelectedFee(null) }}
         onConfirm={handleEditConfirm}
-        fee={selectedFee}
-      />
-
-      <ManualPaymentModal
-        isOpen={paymentModalOpen}
-        onClose={() => { setPaymentModalOpen(false); setSelectedFee(null) }}
-        onConfirm={handlePayConfirm}
         fee={selectedFee}
       />
         </>

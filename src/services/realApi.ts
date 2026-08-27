@@ -4,7 +4,7 @@
 import { api } from './apiClient'
 import type { LoginCredentials, AuthResponse, User, RegisterCredentials } from '../types/auth'
 import type { Passenger, PassengerFilters, SortState } from '../types/passenger'
-import type { MonthlyFee, MonthlyFeeFilters, MonthlyFeeSort, Payment } from '../types/monthlyFee'
+import type { MonthlyFee, MonthlyFeeFilters, MonthlyFeeSort } from '../types/monthlyFee'
 import type { Availability } from '../types/availability'
 import type { DashboardData } from '../types/dashboard'
 
@@ -156,9 +156,6 @@ export const realMonthlyFees = {
 
   update: (id: string, data: any) =>
     api.put<MonthlyFee>(`/monthly-fees/${id}`, data),
-
-  pay: (id: string, data: { paymentMethod: string; amount: number; paymentDate: string; notes?: string }) =>
-    api.post<MonthlyFee & { payment?: Payment; breakdown?: any }>(`/monthly-fees/${id}/pay`, data),
 
   remove: (id: string) =>
     api.delete<void>(`/monthly-fees/${id}`),

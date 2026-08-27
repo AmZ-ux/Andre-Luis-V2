@@ -1,5 +1,5 @@
 ﻿import { useNavigate } from 'react-router-dom'
-import { ChevronUp, ChevronDown, Pencil, XCircle, CheckCircle, CircleDollarSign } from 'lucide-react'
+import { ChevronUp, ChevronDown, Pencil, XCircle, CheckCircle } from 'lucide-react'
 import { MonthlyFeeStatus } from './MonthlyFeeStatus'
 import { cn } from '../../utils/cn'
 import { useIsMobile } from '../../hooks/useBreakpoint'
@@ -12,7 +12,6 @@ interface MonthlyFeeTableProps {
   onCancel: (fee: MonthlyFee) => void
   onExempt: (fee: MonthlyFee) => void
   onEdit: (fee: MonthlyFee) => void
-  onPay: (fee: MonthlyFee) => void
 }
 
 interface SortHeaderProps {
@@ -57,7 +56,6 @@ export function MonthlyFeeTable({
   onCancel,
   onExempt,
   onEdit,
-  onPay,
 }: MonthlyFeeTableProps) {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -76,7 +74,6 @@ export function MonthlyFeeTable({
         {fees.map((fee) => {
           const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
           const canExempt = fee.status !== 'paid' && fee.status !== 'exempt'
-          const canPay = fee.status === 'pending' || fee.status === 'overdue'
 
           return (
             <div
@@ -123,16 +120,6 @@ export function MonthlyFeeTable({
               </div>
 
               <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-                {canPay && (
-                  <button
-                    onClick={() => onPay(fee)}
-                    className={cn(actionButtonClass, 'text-success hover:text-green-700')}
-                    aria-label="Registrar pagamento"
-                    title="Registrar pagamento"
-                  >
-                    <CircleDollarSign className="h-4 w-4" />
-                  </button>
-                )}
                 {canExempt && (
                   <button
                     onClick={() => onExempt(fee)}
@@ -204,7 +191,6 @@ export function MonthlyFeeTable({
           {fees.map((fee) => {
             const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
             const canExempt = fee.status !== 'paid' && fee.status !== 'exempt'
-            const canPay = fee.status === 'pending' || fee.status === 'overdue'
 
             return (
               <tr
@@ -237,16 +223,6 @@ export function MonthlyFeeTable({
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex items-center gap-1">
-                    {canPay && (
-                      <button
-                        onClick={() => onPay(fee)}
-                        className={cn(actionButtonClass, 'text-success hover:text-green-700')}
-                        aria-label="Registrar pagamento"
-                        title="Registrar pagamento"
-                      >
-                        <CircleDollarSign className="h-4 w-4" />
-                      </button>
-                    )}
                     {canExempt && (
                       <button
                         onClick={() => onExempt(fee)}

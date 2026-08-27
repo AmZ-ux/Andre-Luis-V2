@@ -7,8 +7,6 @@ import type {
   MonthlyFeeSummary,
 } from '../types/monthlyFee'
 import { monthlyFeeService } from '../services/monthlyFeeService'
-import { paymentService } from '../services/paymentService'
-import type { PaymentMethod } from '../types/passenger'
 
 const defaultFilters: MonthlyFeeFilters = {
   search: '',
@@ -83,25 +81,6 @@ export function useMonthlyFees(pageSize = 15) {
     setPagination((prev) => ({ ...prev, page: 1 }))
   }, [])
 
-  const registerPayment = useCallback(
-    async (
-      feeId: string,
-      data: { amount: number; paymentDate: string; paymentMethod: PaymentMethod; notes?: string }
-    ) => {
-      const result = await paymentService.register(feeId, data)
-      setFees((prev) =>
-        prev.map((f) =>
-          f.id === feeId
-            ? { ...f, status: result.feeStatus, payment: result.payment }
-            : f
-        )
-      )
-      await load()
-      return result
-    },
-    [load]
-  )
-
   const cancelFee = useCallback(async (id: string, reason: string) => {
     await monthlyFeeService.update(id, {
       status: 'cancelled',
@@ -158,7 +137,6 @@ export function useMonthlyFees(pageSize = 15) {
     resetFilters,
     setPage,
     setSortField,
-    registerPayment,
     cancelFee,
     exemptFee,
     updateFee,

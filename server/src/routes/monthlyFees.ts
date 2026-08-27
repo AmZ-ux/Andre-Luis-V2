@@ -1,10 +1,8 @@
 ﻿import { Router } from 'express'
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
-import { loadSettings } from '../services/settingsService.js'
 import { ensureContractFees } from '../services/monthlyFeeGenerator.js'
-import { calculateDueFromFee } from '../services/billingRules.js'
-import { markOverdueFees, notifyPaymentReceived } from '../services/feeAutomation.js'
+import { markOverdueFees } from '../services/feeAutomation.js'
 import { requireAdmin as requireAdminRole } from '../middleware/roles.js'
 
 const router = Router()
@@ -194,55 +192,6 @@ router.put('/:id', (req, res) => {
   params.push(req.params.id)
   db.prepare(`UPDATE monthly_fees SET ${sets.join(', ')} WHERE id = ?`).run(...params)
   res.json(db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id))
-})
-
-router.post('/:id/pay', (req, res) => {
-  if (!requireAdmin(req, res)) return
-  const db = getDb()
-  const { amount, paymentDate, paymentMethod, notes } = req.body
-  const existing = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id) as any
-  if (!existing) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
-
-  if (existing.status === 'paid') { res.status(400).json({ error: 'Pagamento já registrado para esta mensalidade' }); return }
-  if (existing.status === 'cancelled') { res.status(400).json({ error: 'Não é possível registrar pagamento para uma mensalidade cancelada' }); return }
-  if (existing.status === 'exempt') { res.status(400).json({ error: 'Não é possível registrar pagamento para uma mensalidade isenta' }); return }
-
-  const settings = loadSettings(db)
-  const breakdown = calculateDueFromFee(existing, settings, new Date())
-  const payAmount = amount !== undefined && amount !== null ? Number(amount) : breakdown.total
-
-  if (!paymentDate || !paymentMethod) {
-    res.status(400).json({ error: 'Dados de pagamento incompletos (data e forma são obrigatórios)' })
-    return
-  }
-
-  const payId = uuid()
-  db.prepare(`
-    INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    payId,
-    req.params.id,
-    payAmount,
-    paymentDate,
-    paymentMethod,
-    notes || '',
-    breakdown.lateFee,
-    breakdown.interest
-  )
-
-  db.prepare('UPDATE monthly_fees SET status = \'paid\', updated_at = datetime(\'now\') WHERE id = ?').run(req.params.id)
-
-  const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id) as any
-  const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(req.params.id)
-
-  const payer = req.user ? db.prepare('SELECT name, role FROM users WHERE id = ?').get(req.user.userId) as any : null
-  db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(uuid(), 'payment', `Pagamento de R$ ${Number(payAmount).toFixed(2)} registrado`, payer?.name || 'Administrador', payer?.role || 'admin', 'payment')
-
-  notifyPaymentReceived(db, fee, payment)
-
-  res.json({ ...fee, payment, breakdown })
 })
 
 router.get('/passenger/:passengerId', (req, res) => {

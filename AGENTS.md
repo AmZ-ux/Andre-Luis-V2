@@ -457,3 +457,17 @@ Melhorar somente o que precisa ser melhorado.
 Preferir pequenas alterações controladas a grandes refatorações.
 
 A consistência visual é mais importante do que criar uma interface diferente em cada tela.
+
+---
+
+# 24. PAGAMENTOS — GATEWAY ONLY
+
+Mensalidades não podem ser marcadas como pagas manualmente.
+
+O status `paid` deve ser resultado exclusivo de confirmação válida do gateway de pagamento através do fluxo financeiro autorizado (`finalizePayment`).
+
+Pagamentos manuais históricos podem ser exibidos, mas novos pagamentos manuais não podem ser criados.
+
+Nenhuma rota administrativa deve permitir `monthly_fees.status = 'paid'` diretamente.
+
+As únicas alterações de status autorizadas por ação administrativa são: `cancelled` e `exempt`.

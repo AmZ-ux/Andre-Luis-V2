@@ -274,92 +274,22 @@ describe('PUT /api/monthly-fees/:id', () => {
 })
 
 describe('POST /api/monthly-fees/:id/pay', () => {
-  it('should register a payment for a fee', async () => {
+  it('should return 404 — route removed', async () => {
     const pid = seedPassenger()
     const fid = seedMonthlyFee(pid)
     const res = await request(app)
       .post(`/api/monthly-fees/${fid}/pay`)
       .set('Authorization', `Bearer ${token}`)
       .send({ amount: 189.90, paymentDate: '15/07/2026', paymentMethod: 'pix' })
-    expect(res.status).toBe(200)
-    expect(res.body.status).toBe('paid')
-    expect(res.body.payment).toBeTruthy()
-    expect(res.body.payment.amount).toBe(189.90)
-    expect(res.body.payment.payment_method).toBe('pix')
+    expect(res.status).toBe(404)
   })
 
-  it('should return 404 when fee not found', async () => {
+  it('should return 404 for non-existent fee', async () => {
     const res = await request(app)
       .post('/api/monthly-fees/non-existent/pay')
       .set('Authorization', `Bearer ${token}`)
       .send({ amount: 100, paymentDate: '01/01/2026', paymentMethod: 'cash' })
     expect(res.status).toBe(404)
-    expect(res.body.error).toBe('Mensalidade não encontrada')
-  })
-
-  it('should return 400 when payment fields are missing', async () => {
-    const pid = seedPassenger()
-    const fid = seedMonthlyFee(pid)
-    const res = await request(app)
-      .post(`/api/monthly-fees/${fid}/pay`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({})
-    expect(res.status).toBe(400)
-    expect(res.body.error).toContain('obrigatórios')
-  })
-
-  it('should reject duplicate payments', async () => {
-    const pid = seedPassenger()
-    const fid = seedMonthlyFee(pid)
-    const payload = { amount: 189.90, paymentDate: '15/07/2026', paymentMethod: 'pix' }
-    const first = await request(app).post(`/api/monthly-fees/${fid}/pay`).set('Authorization', `Bearer ${token}`).send(payload)
-    expect(first.status).toBe(200)
-    const second = await request(app).post(`/api/monthly-fees/${fid}/pay`).set('Authorization', `Bearer ${token}`).send(payload)
-    expect(second.status).toBe(400)
-    expect(second.body.error).toBe('Pagamento já registrado para esta mensalidade')
-  })
-
-  it('should reject payment for cancelled and exempt fees', async () => {
-    const pid = seedPassenger()
-    const cancelledId = seedMonthlyFee(pid, { status: 'cancelled', cpf: '111.111.111-20' })
-    const exemptId = seedMonthlyFee(pid, { status: 'exempt', cpf: '111.111.111-21', month: 6 })
-    const payload = { amount: 189.90, paymentDate: '15/07/2026', paymentMethod: 'pix' }
-    const res1 = await request(app).post(`/api/monthly-fees/${cancelledId}/pay`).set('Authorization', `Bearer ${token}`).send(payload)
-    expect(res1.status).toBe(400)
-    const res2 = await request(app).post(`/api/monthly-fees/${exemptId}/pay`).set('Authorization', `Bearer ${token}`).send(payload)
-    expect(res2.status).toBe(400)
-  })
-
-  it('should apply late fee and interest when configured and fee is overdue', async () => {
-    const db = getDb()
-    db.prepare("INSERT INTO settings (id, category, data) VALUES (?, 'billing', ?)").run(
-      uuid(),
-      JSON.stringify({ autoChargeLateFee: true, autoChargeInterest: true, toleranceDays: 0, lateFeePercent: 2, interestRatePerDay: 0.033 })
-    )
-    const pid = seedPassenger()
-    // due 01/07/2026, payment registered today => daysLate > 0
-    const fid = seedMonthlyFee(pid, { month: 7, year: 2026, dueDay: 1 })
-    const res = await request(app)
-      .post(`/api/monthly-fees/${fid}/pay`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ paymentDate: '05/07/2026', paymentMethod: 'pix' })
-    expect(res.status).toBe(200)
-    expect(res.body.payment.late_fee).toBe(3.8)
-    expect(res.body.payment.interest).toBeGreaterThan(0)
-    expect(res.body.breakdown).toBeTruthy()
-    expect(res.body.breakdown.total).toBe(res.body.payment.amount)
-  })
-
-  it('should create a notification for the passenger on payment', async () => {
-    const pid = seedPassenger()
-    const fid = seedMonthlyFee(pid)
-    await request(app)
-      .post(`/api/monthly-fees/${fid}/pay`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ amount: 189.90, paymentDate: '15/07/2026', paymentMethod: 'pix' })
-    const notifications = getDb().prepare('SELECT * FROM notifications WHERE user_id = ?').all(pid)
-    expect(notifications.length).toBe(1)
-    expect(notifications[0].title).toBe('Pagamento registrado')
   })
 })
 
@@ -442,7 +372,7 @@ describe('Role checks on admin-only endpoints', () => {
     expect(res.status).toBe(403)
   })
 
-  it('should deny passenger registering a payment', async () => {
+  it('should deny passenger registering a payment — route removed (404)', async () => {
     const pid = seedPassenger()
     const feeId = seedMonthlyFee(pid)
     const passengerToken = seedPassengerToken()
@@ -450,7 +380,7 @@ describe('Role checks on admin-only endpoints', () => {
       .post(`/api/monthly-fees/${feeId}/pay`)
       .set('Authorization', `Bearer ${passengerToken}`)
       .send({ amount: 189.9, paymentDate: '15/07/2026', paymentMethod: 'pix' })
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(404)
   })
 
   it('should deny passenger updating a fee', async () => {

@@ -1,6 +1,5 @@
 ﻿import { useNavigate } from 'react-router-dom'
 import { MonthlyFeeStatus } from './MonthlyFeeStatus'
-import { cn } from '../../utils/cn'
 import type { MonthlyFee } from '../../types/monthlyFee'
 
 interface MonthlyFeeCardProps {
@@ -8,7 +7,6 @@ interface MonthlyFeeCardProps {
   onCancel: (fee: MonthlyFee) => void
   onExempt: (fee: MonthlyFee) => void
   onEdit: (fee: MonthlyFee) => void
-  onPay: (fee: MonthlyFee) => void
 }
 
 const monthNames = [
@@ -26,10 +24,9 @@ function initialsOf(name: string): string {
     .toUpperCase()
 }
 
-export function MonthlyFeeCard({ fee, onCancel, onExempt, onEdit, onPay }: MonthlyFeeCardProps) {
+export function MonthlyFeeCard({ fee, onCancel, onExempt, onEdit }: MonthlyFeeCardProps) {
   const navigate = useNavigate()
   const canCancel = fee.status !== 'paid' && fee.status !== 'cancelled'
-  const canPay = fee.status === 'pending' || fee.status === 'overdue'
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-card p-4 sm:p-5">
@@ -56,46 +53,36 @@ export function MonthlyFeeCard({ fee, onCancel, onExempt, onEdit, onPay }: Month
         </div>
       </div>
 
-      {canPay ? (
-        <div className={cn('flex gap-2 mt-4 pt-3.5 border-t border-gray-100 dark:border-gray-800')}>
-          <button
-            onClick={() => onPay(fee)}
-            className="flex-1 h-10 rounded-full bg-primary text-white text-[13px] font-semibold shadow-md shadow-primary/30 hover:bg-primary-light transition-colors"
-          >
-            Registrar pagamento
-          </button>
+      {canCancel ? (
+        <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={() => onExempt(fee)}
-            className="h-10 px-4 rounded-full bg-primary-soft text-primary text-[13px] font-semibold hover:brightness-95 transition-all"
+            className="h-9 px-4 rounded-full bg-primary-soft text-primary text-[13px] font-semibold hover:brightness-95 transition-all"
           >
             Isentar
           </button>
           <button
-            onClick={() => onEdit(fee)}
-            aria-label="Editar"
-            title="Editar"
-            className="h-10 w-10 rounded-full bg-primary-soft text-primary font-semibold hover:brightness-95 transition-all shrink-0"
+            onClick={() => onCancel(fee)}
+            className="h-9 px-4 rounded-full bg-error-soft text-error text-[13px] font-semibold hover:brightness-95 transition-all"
           >
-            âœŽ
+            Cancelar
+          </button>
+          <button
+            onClick={() => onEdit(fee)}
+            className="h-9 px-4 rounded-full bg-primary-soft text-primary text-[13px] font-semibold hover:brightness-95 transition-all"
+          >
+            Editar
           </button>
         </div>
       ) : (
-        canCancel && (
-          <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-gray-100 dark:border-gray-800">
-            <button
-              onClick={() => onCancel(fee)}
-              className="h-9 px-4 rounded-full bg-error-soft text-error text-[13px] font-semibold hover:brightness-95 transition-all"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={() => onEdit(fee)}
-              className="h-9 px-4 rounded-full bg-primary-soft text-primary text-[13px] font-semibold hover:brightness-95 transition-all"
-            >
-              Editar
-            </button>
-          </div>
-        )
+        <div className="flex justify-end gap-2 mt-4 pt-3.5 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={() => onEdit(fee)}
+            className="h-9 px-4 rounded-full bg-primary-soft text-primary text-[13px] font-semibold hover:brightness-95 transition-all"
+          >
+            Editar
+          </button>
+        </div>
       )}
     </div>
   )
