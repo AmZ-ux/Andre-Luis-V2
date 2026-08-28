@@ -251,21 +251,23 @@ export function finalizePayment(
 
   if (!finalized) return false
 
+  const payload: { amount: number; isOverpayment: boolean } = notificationPayload!
+
   // Notifications are outside the transaction to minimise lock duration.
   const updated = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(fee.id) as any
   const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(fee.id)
   notifyPaymentReceived(db, updated, payment)
 
   const methodLabel = method === 'pix' ? 'PIX' : 'Cartão'
-  if (notificationPayload?.isOverpayment) {
-    const excessAmount = (toCentavos(notificationPayload.amount) - toCentavos(expectedAmount)) / 100
+  if (payload?.isOverpayment) {
+    const excessAmount = (toCentavos(payload.amount) - toCentavos(expectedAmount)) / 100
     db.prepare(`
       INSERT INTO notifications (id, user_id, title, message, type, status)
       VALUES (?, ?, ?, ?, 'payment', 'unread')
     `).run(
       uuid(), fee.passenger_id,
       `${methodLabel} confirmado com excedente`,
-      `Pagamento ${methodLabel} de R$ ${notificationPayload.amount.toFixed(2)} confirmado para a mensalidade ${String(fee.month).padStart(2, '0')}/${fee.year}. ` +
+      `Pagamento ${methodLabel} de R$ ${payload.amount.toFixed(2)} confirmado para a mensalidade ${String(fee.month).padStart(2, '0')}/${fee.year}. ` +
       `Valor esperado: R$ ${expectedAmount.toFixed(2)}. Excedente de R$ ${excessAmount.toFixed(2)} registrado.`
     )
   } else {
