@@ -256,11 +256,11 @@ describe('PUT /api/monthly-fees/:id', () => {
     const res = await request(app)
       .put(`/api/monthly-fees/${fid}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ amount: 250, dueDay: 10, status: 'paid' })
+      .send({ amount: 250, dueDay: 10, status: 'cancelled' })
     expect(res.status).toBe(200)
     expect(res.body.amount).toBe(250)
     expect(res.body.due_day).toBe(10)
-    expect(res.body.status).toBe('paid')
+    expect(res.body.status).toBe('cancelled')
   })
 
   it('should return 404 when fee not found', async () => {
@@ -270,6 +270,90 @@ describe('PUT /api/monthly-fees/:id', () => {
       .send({ amount: 150 })
     expect(res.status).toBe(404)
     expect(res.body.error).toBe('Mensalidade não encontrada')
+  })
+
+  it('should reject status "paid" — only gateway may liquidate a fee', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const res = await request(app)
+      .put(`/api/monthly-fees/${fid}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'paid' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('Status inválido')
+
+    const fee = getDb().prepare('SELECT status FROM monthly_fees WHERE id = ?').get(fid) as any
+    expect(fee.status).toBe('pending')
+  })
+
+  it('should not create any payment when rejecting status "paid"', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    await request(app)
+      .put(`/api/monthly-fees/${fid}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'paid' })
+
+    const payments = getDb().prepare('SELECT COUNT(*) as c FROM payments WHERE monthly_fee_id = ?').get(fid) as { c: number }
+    expect(payments.c).toBe(0)
+
+    const charges = getDb().prepare('SELECT COUNT(*) as c FROM pix_charges WHERE monthly_fee_id = ?').get(fid) as { c: number }
+    expect(charges.c).toBe(0)
+  })
+
+  it('should reject unknown/invalid status values', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const res = await request(app)
+      .put(`/api/monthly-fees/${fid}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'invalid_status' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('Status inválido')
+  })
+
+  it('should allow status "pending"', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid, { status: 'overdue' })
+    const res = await request(app)
+      .put(`/api/monthly-fees/${fid}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'pending' })
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('pending')
+  })
+
+  it('should allow status "cancelled"', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const res = await request(app)
+      .put(`/api/monthly-fees/${fid}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'cancelled' })
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('cancelled')
+  })
+
+  it('should allow status "exempt"', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const res = await request(app)
+      .put(`/api/monthly-fees/${fid}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'exempt' })
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('exempt')
+  })
+
+  it('should reject status "overdue" — managed by scheduler only', async () => {
+    const pid = seedPassenger()
+    const fid = seedMonthlyFee(pid)
+    const res = await request(app)
+      .put(`/api/monthly-fees/${fid}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'overdue' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('Status inválido')
   })
 })
 

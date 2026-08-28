@@ -187,7 +187,14 @@ router.put('/:id', (req, res) => {
     sets.push('due_day = ?'); params.push(dueDayNum)
   }
   if (notes !== undefined) { sets.push('notes = ?'); params.push(notes) }
-  if (status !== undefined) { sets.push('status = ?'); params.push(status) }
+  if (status !== undefined) {
+    const allowedStatuses = ['pending', 'cancelled', 'exempt']
+    if (!allowedStatuses.includes(status)) {
+      res.status(400).json({ error: 'Status inválido. Valores permitidos: pending, cancelled, exempt.' })
+      return
+    }
+    sets.push('status = ?'); params.push(status)
+  }
 
   params.push(req.params.id)
   db.prepare(`UPDATE monthly_fees SET ${sets.join(', ')} WHERE id = ?`).run(...params)
