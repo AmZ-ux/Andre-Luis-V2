@@ -8,8 +8,11 @@
  *   - Sem bypass para produção
  *   - Idempotente: roden múltiplas vezes sem duplicar dados
  *
- * Uso:
- *   ALLOW_STAGING_SEED=true STAGING_SEED_TARGET=local npm run seed:staging
+ * Uso (Railway):
+ *   npm run seed:staging          # requer RAILWAY_ENVIRONMENT_NAME=staging
+ *
+ * Uso (local):
+ *   npm run seed:staging:local    # requer STAGING_SEED_TARGET=local
  */
 
 import bcrypt from 'bcryptjs'
@@ -60,7 +63,7 @@ export function assertStagingAllowed(): void {
     console.error(
       '\n❌ RAILWAY_ENVIRONMENT_NAME not set and STAGING_SEED_TARGET != "local".\n' +
       '   To seed locally, run:\n' +
-      '     ALLOW_STAGING_SEED=true STAGING_SEED_TARGET=local npm run seed:staging\n'
+      '     npm run seed:staging:local\n'
     )
     process.exit(1)
   }

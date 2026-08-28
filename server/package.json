@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "backup": "node scripts/backup.mjs",
-    "seed:staging": "ALLOW_STAGING_SEED=true STAGING_SEED_TARGET=local tsx src/stagingSeed.ts",
+    "seed:staging": "ALLOW_STAGING_SEED=true node dist/stagingSeed.js",
+    "seed:staging:local": "ALLOW_STAGING_SEED=true STAGING_SEED_TARGET=local node dist/stagingSeed.js",
     "test:staging": "vitest run src/routes/staging.test.ts"
   },
   "dependencies": {
