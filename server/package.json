@@ -11,7 +11,9 @@
     "migrate": "tsx src/database/migrate.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "backup": "node scripts/backup.mjs"
+    "backup": "node scripts/backup.mjs",
+    "seed:staging": "ALLOW_STAGING_SEED=true STAGING_SEED_TARGET=local tsx src/stagingSeed.ts",
+    "test:staging": "vitest run src/routes/staging.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1106.0",
