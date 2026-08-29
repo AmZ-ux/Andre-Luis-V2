@@ -123,6 +123,24 @@ router.get('/', requireAdminRole, (req, res) => {
   })
 })
 
+router.get('/me', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  const db = getDb()
+  markOverdueFees(db)
+  const data = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? ORDER BY year DESC, month DESC').all(req.user.userId)
+  res.json(data)
+})
+
+router.get('/passenger/:passengerId', (req, res) => {
+  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
+  const isAdmin = req.user.role === 'admin'
+  const passengerId = isAdmin ? req.params.passengerId : req.user.userId
+  const db = getDb()
+  markOverdueFees(db)
+  const data = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? ORDER BY year DESC, month DESC').all(passengerId)
+  res.json(data)
+})
+
 router.get('/:id', (req, res) => {
   if (!requireAdmin(req, res)) return
   const db = getDb()
@@ -199,16 +217,6 @@ router.put('/:id', (req, res) => {
   params.push(req.params.id)
   db.prepare(`UPDATE monthly_fees SET ${sets.join(', ')} WHERE id = ?`).run(...params)
   res.json(db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(req.params.id))
-})
-
-router.get('/passenger/:passengerId', (req, res) => {
-  if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
-  const isAdmin = req.user.role === 'admin'
-  const passengerId = isAdmin ? req.params.passengerId : req.user.userId
-  const db = getDb()
-  markOverdueFees(db)
-  const data = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? ORDER BY year DESC, month DESC').all(passengerId)
-  res.json(data)
 })
 
 router.delete('/:id', (req, res) => {

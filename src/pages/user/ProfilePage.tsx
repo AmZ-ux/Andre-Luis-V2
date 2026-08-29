@@ -105,7 +105,7 @@ export function ProfilePage() {
   useEffect(() => {
     if (user?.role !== 'passenger') return
     monthlyFeeService
-      .getByPassengerId(user.id)
+      .getMe()
       .then((fees) => setOpenFees(fees.filter((f) => f.status === 'pending' || f.status === 'overdue').length))
       .catch(() => {})
   }, [user])

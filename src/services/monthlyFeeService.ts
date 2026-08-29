@@ -224,6 +224,13 @@ export const monthlyFeeService = {
       })
   },
 
+  async getMe(): Promise<MonthlyFee[]> {
+    if (config.realApi) return realMonthlyFees.getMe()
+    const session = sessionManager.load()
+    if (!session?.user) throw new Error('Não autenticado')
+    return this.getByPassengerId(session.user.id)
+  },
+
   async ensureContractFees(passengerId: string): Promise<void> {
     const passenger = await passengerService.getById(passengerId)
     if (!passenger || passenger.status !== 'active') return

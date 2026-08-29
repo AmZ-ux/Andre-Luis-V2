@@ -87,7 +87,7 @@ export function PassengerDashboard() {
       try { await monthlyFeeService.ensureCurrent() } catch {}
       const [passengerRes, feeRes] = await Promise.allSettled([
         passengerService.getMe(),
-        monthlyFeeService.getByPassengerId(user.id),
+        monthlyFeeService.getMe(),
       ])
       if (passengerRes.status === 'fulfilled') {
         setPassenger(passengerRes.value ?? null)

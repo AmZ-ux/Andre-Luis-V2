@@ -46,7 +46,7 @@ export function MinhasMensalidades() {
       if (ensure) {
         try { await monthlyFeeService.ensureCurrent() } catch {}
       }
-      let fees = await monthlyFeeService.getByPassengerId(user.id)
+      let fees = await monthlyFeeService.getMe()
       fees = fees.sort((a, b) => (b.year - a.year) || (b.month - a.month))
       setFees(fees)
     } catch {

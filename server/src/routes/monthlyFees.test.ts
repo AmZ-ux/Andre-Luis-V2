@@ -478,3 +478,117 @@ describe('Role checks on admin-only endpoints', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('GET /api/monthly-fees/me', () => {
+  it('should return 401 without authentication', async () => {
+    const res = await request(app).get('/api/monthly-fees/me')
+    expect(res.status).toBe(401)
+  })
+
+  it('should return only the authenticated passenger fees', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pid, 'Passenger A', 'pass-a-me@test.com', '111.111.111-01', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pid, 'Passenger A', '111.111.111-01', '2000-01-01')
+    const passengerToken = jwt.sign({ userId: pid, role: 'passenger' }, 'dev-secret-change-in-production')
+
+    const feeId = seedMonthlyFee(pid, { month: 8, year: 2026 })
+
+    const res = await request(app)
+      .get('/api/monthly-fees/me')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].id).toBe(feeId)
+    expect(res.body[0].passenger_id).toBe(pid)
+  })
+
+  it('should NOT contain fees from another passenger', async () => {
+    const db = getDb()
+    const pidA = uuid()
+    const pidB = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pidA, 'Passenger A', 'pass-a-iso@test.com', '222.222.222-01', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pidA, 'Passenger A', '222.222.222-01', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pidB, 'Passenger B', 'pass-b-iso@test.com', '333.333.333-01', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pidB, 'Passenger B', '333.333.333-01', '2000-01-01')
+
+    seedMonthlyFee(pidA, { month: 8, year: 2026 })
+    seedMonthlyFee(pidB, { month: 8, year: 2026, passengerName: 'Passenger B', cpf: '333.333.333-01' })
+
+    const tokenA = jwt.sign({ userId: pidA, role: 'passenger' }, 'dev-secret-change-in-production')
+    const res = await request(app)
+      .get('/api/monthly-fees/me')
+      .set('Authorization', `Bearer ${tokenA}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].passenger_id).toBe(pidA)
+  })
+
+  it('should return empty array when passenger has no fees', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pid, 'Passenger Empty', 'pass-empty-me@test.com', '444.444.444-01', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pid, 'Passenger Empty', '444.444.444-01', '2000-01-01')
+    const passengerToken = jwt.sign({ userId: pid, role: 'passenger' }, 'dev-secret-change-in-production')
+
+    const res = await request(app)
+      .get('/api/monthly-fees/me')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(0)
+  })
+
+  it('should return own fees for admin (or empty if no passenger record)', async () => {
+    const res = await request(app)
+      .get('/api/monthly-fees/me')
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+  })
+})
+
+describe('GET /api/monthly-fees/passenger/:passengerId (legacy)', () => {
+  it('admin can query any passenger fees', async () => {
+    const pid = seedPassenger()
+    seedMonthlyFee(pid, { month: 8, year: 2026 })
+    const res = await request(app)
+      .get(`/api/monthly-fees/passenger/${pid}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].passenger_id).toBe(pid)
+  })
+
+  it('passenger using another passengerId still gets only own fees', async () => {
+    const db = getDb()
+    const pidA = uuid()
+    const pidB = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pidA, 'Pass A', 'pass-a-leg@test.com', '555.555.555-01', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pidA, 'Pass A', '555.555.555-01', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pidB, 'Pass B', 'pass-b-leg@test.com', '666.666.666-01', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pidB, 'Pass B', '666.666.666-01', '2000-01-01')
+
+    seedMonthlyFee(pidA, { month: 8, year: 2026 })
+    seedMonthlyFee(pidB, { month: 8, year: 2026, passengerName: 'Pass B', cpf: '666.666.666-01' })
+
+    const tokenA = jwt.sign({ userId: pidA, role: 'passenger' }, 'dev-secret-change-in-production')
+    const res = await request(app)
+      .get(`/api/monthly-fees/passenger/${pidB}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].passenger_id).toBe(pidA)
+  })
+})
