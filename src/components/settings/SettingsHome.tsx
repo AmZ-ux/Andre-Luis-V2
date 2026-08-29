@@ -10,6 +10,7 @@ import { LogsViewer } from './LogsViewer'
 import { AuditHistory } from './AuditHistory'
 import { SystemSettingsForm } from './SystemSettingsForm'
 import { useSettings } from '../../hooks/useSettings'
+import { useAuth } from '../../auth/AuthContext'
 import { SETTINGS_CATEGORIES } from '../../types/settings'
 import type { SettingsCategory } from '../../types/settings'
 import { AdminsManager } from './AdminsManager'
@@ -30,6 +31,7 @@ export function SettingsHome() {
     updateCategory, createBackup, restoreBackup, deleteBackup, downloadBackup,
     clearLogs, clearAudit,
   } = useSettings()
+  const { user } = useAuth()
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory | null>('company')
   const [innerTab, setInnerTab] = useState<InnerTab>('settings')
@@ -81,7 +83,7 @@ export function SettingsHome() {
         case 'security':
           return <SecuritySettingsForm settings={settings.security} onSave={(v) => updateCategory('security', v)} saved={saved} />
         case 'backup':
-          return <BackupCenter backups={backups} onCreateBackup={createBackup} onRestore={restoreBackup} onDelete={deleteBackup} onDownload={downloadBackup} />
+          return <BackupCenter backups={backups} onCreateBackup={createBackup} onRestore={restoreBackup} onDelete={deleteBackup} onDownload={downloadBackup} canRestoreDelete={user?.superAdmin === true} />
         case 'system':
           return <SystemSettingsForm settings={settings.system} onSave={(v) => updateCategory('system', v)} saved={saved} />
         case 'users':

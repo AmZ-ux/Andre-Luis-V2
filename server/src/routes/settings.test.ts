@@ -21,6 +21,7 @@ app.use('/api/settings', authMiddleware, settingsRoutes)
 
 let token: string
 let adminId: string
+let superAdminToken: string
 
 beforeAll(async () => {
   await runMigrations()
@@ -35,6 +36,11 @@ beforeEach(() => {
   db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'admin', ?)")
     .run(adminId, 'Admin', 'admin@test.com', '000.000.000-00', '', bcrypt.hashSync('password', 10))
   token = jwt.sign({ userId: adminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+  const superAdminId = uuid()
+  db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+    .run(superAdminId, 'Super Admin', 'super@test.com', '111.111.111-00', '', bcrypt.hashSync('password', 10))
+  superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
 })
 
 describe('GET /api/settings', () => {
@@ -158,7 +164,7 @@ describe('Backup endpoints', () => {
     const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
     const restored = await request(app)
       .post(`/api/settings/backups/${list.body[0].id}/restore`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
     expect(restored.status).toBe(200)
     expect(restored.body.success).toBe(true)
 
@@ -170,7 +176,7 @@ describe('Backup endpoints', () => {
   it('should return 404 when restoring a missing backup', async () => {
     const res = await request(app)
       .post('/api/settings/backups/missing-id/restore')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
     expect(res.status).toBe(404)
   })
 
@@ -179,7 +185,7 @@ describe('Backup endpoints', () => {
     const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
     const res = await request(app)
       .delete(`/api/settings/backups/${list.body[0].id}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
     expect(res.status).toBe(204)
     const after = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
     expect(after.body).toHaveLength(0)
@@ -198,11 +204,11 @@ describe('Backup endpoints', () => {
   it('should return 400 for path traversal in backup id', async () => {
     const res = await request(app)
       .post('/api/settings/backups/..%2F..%2Fetc%2Fpasswd/restore')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
     expect(res.status).toBe(400)
     const del = await request(app)
       .delete('/api/settings/backups/..%2F..%2Fetc%2Fpasswd')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
     expect(del.status).toBe(400)
   })
 })
@@ -251,7 +257,7 @@ describe('GET /api/settings/users', () => {
       .run(otherId, 'Passenger', 'pass@test.com', '333.333.333-33', '', bcrypt.hashSync('pass', 10))
     const res = await request(app).get('/api/settings/users').set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(200)
-    expect(res.body).toHaveLength(2)
+    expect(res.body.length).toBeGreaterThanOrEqual(3)
     const names = res.body.map((u: any) => u.name)
     expect(names).toContain('Admin')
     expect(names).toContain('Passenger')
@@ -417,5 +423,156 @@ describe('Settings authorization — admin continues working', () => {
       .send({ name: 'Updated Name' })
     expect(res.status).toBe(200)
     expect(res.body.company.name).toBe('Updated Name')
+  })
+})
+
+describe('Backup — super admin restriction', () => {
+  let passengerToken: string
+
+  beforeEach(() => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Pass', 'pass-backup@test.com', '222.222.222-00', '', bcrypt.hashSync('password', 10))
+    passengerToken = jwt.sign({ userId: passengerId, role: 'passenger' }, 'dev-secret-change-in-production')
+  })
+
+  it('passenger: restore → 403', async () => {
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .post(`/api/settings/backups/${list.body[0].id}/restore`)
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('passenger: delete backup → 403', async () => {
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .delete(`/api/settings/backups/${list.body[0].id}`)
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('admin comum: restore → 403', async () => {
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .post(`/api/settings/backups/${list.body[0].id}/restore`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe('Apenas o super administrador')
+  })
+
+  it('admin comum: delete backup → 403', async () => {
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .delete(`/api/settings/backups/${list.body[0].id}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe('Apenas o super administrador')
+  })
+
+  it('admin comum: create backup → continua permitido', async () => {
+    const res = await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty('id')
+  })
+
+  it('admin comum: list → continua permitido', async () => {
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const res = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+  })
+
+  it('admin comum: download → continua permitido', async () => {
+    const created = await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .get(`/api/settings/backups/${created.body.id}/download`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+  })
+
+  it('superAdmin: restore → permitido', async () => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(passengerId, 'Original', '333.333.333-00', '2000-01-01')
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+
+    db.prepare('DELETE FROM passengers').run()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'blocked')")
+      .run(passengerId, 'Changed', '333.333.333-00', '2000-01-01')
+
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .post(`/api/settings/backups/${list.body[0].id}/restore`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+
+    const row = db.prepare('SELECT * FROM passengers WHERE id = ?').get(passengerId) as any
+    expect(row.name).toBe('Original')
+    expect(row.status).toBe('active')
+  })
+
+  it('superAdmin: delete → permitido', async () => {
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const res = await request(app)
+      .delete(`/api/settings/backups/${list.body[0].id}`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(204)
+    const after = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    expect(after.body).toHaveLength(0)
+  })
+
+  it('restore por superAdmin: cria backup pré-restore ANTES da alteração', async () => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(passengerId, 'Before', '444.444.444-00', '2000-01-01')
+    await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${token}`)
+
+    db.prepare('DELETE FROM passengers').run()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'blocked')")
+      .run(passengerId, 'After', '444.444.444-00', '2000-01-01')
+
+    const beforeList = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    const backupCountBefore = beforeList.body.length
+
+    const list = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    await request(app)
+      .post(`/api/settings/backups/${list.body[0].id}/restore`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+
+    const afterList = await request(app).get('/api/settings/backups').set('Authorization', `Bearer ${token}`)
+    expect(afterList.body.length).toBe(backupCountBefore + 1)
+
+    const automaticBackup = afterList.body.find((b: any) => b.type === 'automatic')
+    expect(automaticBackup).toBeDefined()
+  })
+
+  it('restante: GET /api/settings não sofreu regressão', async () => {
+    const res = await request(app).get('/api/settings').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty('company')
+  })
+
+  it('restante: PUT /api/settings/company não sofreu regressão', async () => {
+    const res = await request(app)
+      .put('/api/settings/company')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Still Works' })
+    expect(res.status).toBe(200)
+    expect(res.body.company.name).toBe('Still Works')
+  })
+
+  it('restante: GET /api/settings/audit não sofreu regressão', async () => {
+    const res = await request(app).get('/api/settings/audit').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
   })
 })

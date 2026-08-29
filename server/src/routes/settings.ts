@@ -2,7 +2,7 @@
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
-import { requireAdmin } from '../middleware/roles.js'
+import { requireAdmin, requireSuperAdmin } from '../middleware/roles.js'
 import { addLog } from '../services/appLogService.js'
 import { alertIntegrationIssue } from '../services/integrationAlert.js'
 import { createBackup, listBackups, getBackupPath, restoreBackup, deleteBackup, pruneBackups, isValidBackupId, uploadBackupOffsite } from '../services/backupService.js'
@@ -121,14 +121,20 @@ router.get('/backups/:id/download', requireAdmin, (req, res) => {
   res.download(filePath, `backup_${String(req.params.id)}.json`)
 })
 
-// Restaura um backup salvo
-router.post('/backups/:id/restore', requireAdmin, (req, res) => {
+// Restaura um backup salvo (somente super admin)
+router.post('/backups/:id/restore', requireSuperAdmin, (req, res) => {
   const id = String(req.params.id)
   if (!isValidBackupId(id)) {
     res.status(400).json({ error: 'ID de backup inválido' })
     return
   }
   const db = getDb()
+  try {
+    createBackup(db, 'automatic')
+  } catch (err: any) {
+    res.status(500).json({ error: 'Falha ao criar backup pré-restore. Restore abortado.' })
+    return
+  }
   try {
     restoreBackup(db, id)
   } catch (err: any) {
@@ -139,8 +145,8 @@ router.post('/backups/:id/restore', requireAdmin, (req, res) => {
   res.json({ success: true })
 })
 
-// Remove um backup salvo
-router.delete('/backups/:id', requireAdmin, (req, res) => {
+// Remove um backup salvo (somente super admin)
+router.delete('/backups/:id', requireSuperAdmin, (req, res) => {
   const id = String(req.params.id)
   if (!isValidBackupId(id)) {
     res.status(400).json({ error: 'ID de backup inválido' })

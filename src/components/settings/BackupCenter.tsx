@@ -9,13 +9,14 @@ interface BackupCenterProps {
   onRestore: (id: string) => void
   onDelete: (id: string) => void
   onDownload: (id: string) => void
+  canRestoreDelete?: boolean
 }
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR')
 }
 
-export function BackupCenter({ backups, onCreateBackup, onRestore, onDelete, onDownload }: BackupCenterProps) {
+export function BackupCenter({ backups, onCreateBackup, onRestore, onDelete, onDownload, canRestoreDelete = true }: BackupCenterProps) {
   const [restoring, setRestoring] = useState<string | null>(null)
 
   const handleRestore = (id: string) => {
@@ -65,24 +66,28 @@ export function BackupCenter({ backups, onCreateBackup, onRestore, onDelete, onD
                 >
                   <Download className="h-4 w-4" />
                 </button>
-                <button
-                  onClick={() => handleRestore(b.id)}
-                  disabled={restoring === b.id}
-                  className="h-9 px-3 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {restoring === b.id ? (
-                    <><RotateCcw className="h-3.5 w-3.5 animate-spin" /> Restaurando...</>
-                  ) : (
-                    <><Upload className="h-3.5 w-3.5" /> Restaurar</>
-                  )}
-                </button>
-                <button
-                  onClick={() => onDelete(b.id)}
-                  className="h-9 w-9 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center transition-colors"
-                  aria-label="Excluir backup"
-                >
-                  <Trash2 className="h-4 w-4 text-error" />
-                </button>
+                {canRestoreDelete && (
+                  <button
+                    onClick={() => handleRestore(b.id)}
+                    disabled={restoring === b.id}
+                    className="h-9 px-3 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {restoring === b.id ? (
+                      <><RotateCcw className="h-3.5 w-3.5 animate-spin" /> Restaurando...</>
+                    ) : (
+                      <><Upload className="h-3.5 w-3.5" /> Restaurar</>
+                    )}
+                  </button>
+                )}
+                {canRestoreDelete && (
+                  <button
+                    onClick={() => onDelete(b.id)}
+                    className="h-9 w-9 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center transition-colors"
+                    aria-label="Excluir backup"
+                  >
+                    <Trash2 className="h-4 w-4 text-error" />
+                  </button>
+                )}
               </div>
             </div>
           ))}
