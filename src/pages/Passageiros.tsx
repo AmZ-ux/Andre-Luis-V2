@@ -15,6 +15,7 @@ import { Card } from '../components/ui/Card'
 import { Pagination } from '../components/ui/Pagination'
 import { SkeletonTable } from '../components/ui/Skeleton'
 import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../auth/AuthContext'
 import { passengerService } from '../services/passengerService'
 import { Users, CalendarOff } from 'lucide-react'
 import type { Passenger } from '../types/passenger'
@@ -31,6 +32,7 @@ export function Passageiros() {
     updateFilters, resetFilters, setPage, setSortField, removePassenger, reload,
   } = usePassengers()
   const { addToast } = useToast()
+  const { user } = useAuth()
   const [editingPassenger, setEditingPassenger] = useState<Passenger | null>(null)
   const [deletingPassenger, setDeletingPassenger] = useState<Passenger | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -134,6 +136,7 @@ export function Passageiros() {
             onSort={setSortField}
             onEdit={handleEdit}
             onDelete={setDeletingPassenger}
+            canDelete={user?.superAdmin === true}
           />
         </Card>
       )}

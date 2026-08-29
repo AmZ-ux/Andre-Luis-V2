@@ -4,6 +4,7 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { validateBody } from '../middleware/validation.js'
+import { requireSuperAdmin } from '../middleware/roles.js'
 
 // Gestão de administradores — somente super admin.
 // O super admin é o criador do projeto; ele cria/promove os admins
@@ -12,16 +13,6 @@ import { validateBody } from '../middleware/validation.js'
 const router = Router()
 
 router.use(authMiddleware)
-
-function requireSuperAdmin(req: any, res: any, next: any): void {
-  const db = getDb()
-  const user = db.prepare('SELECT super_admin FROM users WHERE id = ?').get(req.user?.userId) as any
-  if (req.user?.role !== 'admin' || !user?.super_admin) {
-    res.status(403).json({ error: 'Apenas o super administrador' })
-    return
-  }
-  next()
-}
 
 router.get('/admins', requireSuperAdmin, (req, res) => {
   const db = getDb()

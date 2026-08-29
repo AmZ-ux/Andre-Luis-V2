@@ -1,7 +1,7 @@
 ﻿import { Router } from 'express'
 import { getDb } from '../database/connection.js'
 import { sanitizeInput } from '../middleware/validation.js'
-import { requireAdmin, requireAuth } from '../middleware/roles.js'
+import { requireAdmin, requireAuth, requireSuperAdmin } from '../middleware/roles.js'
 
 const router = Router()
 
@@ -100,7 +100,7 @@ router.put('/:id', (req, res) => {
   res.json(updated)
 })
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireSuperAdmin, (req, res) => {
   const db = getDb()
 
   const feeIds = (db.prepare('SELECT id FROM monthly_fees WHERE passenger_id = ?').all(req.params.id) as any[]).map((f) => f.id)

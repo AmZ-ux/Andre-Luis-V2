@@ -151,20 +151,73 @@ describe('PUT /api/passengers/:id', () => {
 })
 
 describe('DELETE /api/passengers/:id', () => {
-  it('should delete a passenger', async () => {
+  it('should delete a passenger (superAdmin)', async () => {
     const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super Admin', 'super@test.com', '111.111.111-00', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
     const id = uuid()
     db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
       .run(id, 'To Delete', '888.888.888-88', '2000-01-01')
-    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${token}`)
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
     const deleted = db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)
     expect(deleted).toBeUndefined()
   })
 
-  it('should cascade delete related data (fees, payments, availabilities, login)', async () => {
+  it('should return 401 without token', async () => {
+    const res = await request(app).delete('/api/passengers/any-id')
+    expect(res.status).toBe(401)
+  })
+
+  it('should return 403 for passenger', async () => {
     const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Passenger', 'pass@test.com', '222.222.222-00', '', bcrypt.hashSync('password', 10))
+    const passengerToken = jwt.sign({ userId: passengerId, role: 'passenger' }, 'dev-secret-change-in-production')
+
+    const targetId = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(targetId, 'Target', '333.333.333-00', '2000-01-01')
+    const res = await request(app).delete(`/api/passengers/${targetId}`).set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+    expect(db.prepare('SELECT id FROM passengers WHERE id = ?').get(targetId)).toBeDefined()
+  })
+
+  it('should return 403 for regular admin (not superAdmin)', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(id, 'Protected', '444.444.444-00', '2000-01-01')
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe('Apenas o super administrador')
+    expect(db.prepare('SELECT id FROM passengers WHERE id = ?').get(id)).toBeDefined()
+  })
+
+  it('should keep passenger existing after regular admin delete attempt', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(id, 'Still Here', '555.555.555-00', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'Still Here', 'still@test.com', '555.555.555-00')
+    await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${token}`)
+    expect(db.prepare('SELECT id FROM passengers WHERE id = ?').get(id)).toBeDefined()
+    expect(db.prepare('SELECT id FROM users WHERE id = ?').get(id)).toBeDefined()
+  })
+
+  it('should cascade delete related data when superAdmin deletes', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super Admin', 'super-cascade@test.com', '666.666.666-00', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
     const id = uuid()
     db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
       .run(id, 'Cascade', '999.888.777-66', '2000-01-01')
@@ -184,10 +237,9 @@ describe('DELETE /api/passengers/:id', () => {
       .run(avId, id, 'Cascade', '999.888.777-66')
     db.prepare("INSERT INTO availability_history (id, availability_id, action, performed_by, performed_by_id) VALUES (?, ?, 'created', 'admin', 'admin')")
       .run(uuid(), avId)
-
     db.prepare("INSERT INTO notifications (id, user_id, title, message) VALUES (?, ?, 'T', 'M')").run(uuid(), id)
 
-    await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${token}`)
+    await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
 
     expect(db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(feeId)).toBeUndefined()
     expect(db.prepare('SELECT id FROM payments WHERE monthly_fee_id = ?').get(feeId)).toBeUndefined()
@@ -196,17 +248,25 @@ describe('DELETE /api/passengers/:id', () => {
     expect(db.prepare('SELECT id FROM availability_history WHERE availability_id = ?').get(avId)).toBeUndefined()
     expect(db.prepare('SELECT id FROM notifications WHERE user_id = ?').get(id)).toBeUndefined()
     expect(db.prepare('SELECT id FROM users WHERE id = ?').get(id)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM passengers WHERE id = ?').get(id)).toBeUndefined()
   })
 
-  it('should succeed even if passenger does not exist', async () => {
-    const res = await request(app).delete('/api/passengers/non-existent').set('Authorization', `Bearer ${token}`)
-    expect(res.status).toBe(200)
-    expect(res.body.success).toBe(true)
-  })
+  it('should not regress other admin operations on passengers', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 100, 5)")
+      .run(id, 'Operational', '777.777.777-00', '2000-01-01')
 
-  it('should return 401 without token', async () => {
-    const res = await request(app).get('/api/passengers')
-    expect(res.status).toBe(401)
+    const listRes = await request(app).get('/api/passengers').set('Authorization', `Bearer ${token}`)
+    expect(listRes.status).toBe(200)
+    expect(listRes.body.data.length).toBeGreaterThanOrEqual(1)
+
+    const getRes = await request(app).get(`/api/passengers/${id}`).set('Authorization', `Bearer ${token}`)
+    expect(getRes.status).toBe(200)
+
+    const putRes = await request(app).put(`/api/passengers/${id}`).set('Authorization', `Bearer ${token}`).send({ name: 'Updated' })
+    expect(putRes.status).toBe(200)
+    expect(putRes.body.name).toBe('Updated')
   })
 })
 

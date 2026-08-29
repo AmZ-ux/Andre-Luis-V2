@@ -15,6 +15,7 @@ interface PassengerListProps {
   onSort: (field: SortState['field']) => void
   onEdit: (p: Passenger) => void
   onDelete: (p: Passenger) => void
+  canDelete?: boolean
 }
 
 const typeLabel: Record<string, string> = {
@@ -35,7 +36,7 @@ const columns = [
   { key: 'actions', label: '', sortable: false },
 ]
 
-export function PassengerList({ passengers, viewMode, sort, onSort, onEdit, onDelete }: PassengerListProps) {
+export function PassengerList({ passengers, viewMode, sort, onSort, onEdit, onDelete, canDelete = true }: PassengerListProps) {
   const navigate = useNavigate()
 
   const isMobile = useIsMobile()
@@ -44,7 +45,7 @@ export function PassengerList({ passengers, viewMode, sort, onSort, onEdit, onDe
     return (
       <div className="space-y-3">
         {passengers.map((p, i) => (
-          <PassengerCard key={p.id} passenger={p} onEdit={onEdit} onDelete={onDelete} index={i} />
+          <PassengerCard key={p.id} passenger={p} onEdit={onEdit} onDelete={onDelete} index={i} canDelete={canDelete} />
         ))}
       </div>
     )
@@ -124,13 +125,15 @@ export function PassengerList({ passengers, viewMode, sort, onSort, onEdit, onDe
                   >
                     <Pencil className="h-4 w-4 text-gray-400" />
                   </button>
-                  <button
-                    onClick={() => onDelete(p)}
-                    className="h-9 w-9 rounded-lg hover:bg-error-soft flex items-center justify-center transition-colors"
-                    aria-label="Excluir"
-                  >
-                    <Trash2 className="h-4 w-4 text-error" />
-                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={() => onDelete(p)}
+                      className="h-9 w-9 rounded-lg hover:bg-error-soft flex items-center justify-center transition-colors"
+                      aria-label="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4 text-error" />
+                    </button>
+                  )}
                 </div>
               </td>
             </motion.tr>

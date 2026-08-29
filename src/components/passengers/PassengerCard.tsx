@@ -10,6 +10,7 @@ interface PassengerCardProps {
   onEdit: (p: Passenger) => void
   onDelete: (p: Passenger) => void
   index: number
+  canDelete?: boolean
 }
 
 const typeLabel: Record<string, string> = {
@@ -18,7 +19,7 @@ const typeLabel: Record<string, string> = {
   contract: 'Contrato',
 }
 
-export function PassengerCard({ passenger, onEdit, onDelete, index }: PassengerCardProps) {
+export function PassengerCard({ passenger, onEdit, onDelete, index, canDelete = true }: PassengerCardProps) {
   const navigate = useNavigate()
 
   return (
@@ -73,13 +74,15 @@ export function PassengerCard({ passenger, onEdit, onDelete, index }: PassengerC
               >
                 <Pencil className="h-4 w-4 text-gray-400" />
               </button>
-              <button
-                onClick={() => onDelete(passenger)}
-                className="h-9 w-9 rounded-lg hover:bg-error-soft flex items-center justify-center transition-colors"
-                aria-label="Excluir"
-              >
-                <Trash2 className="h-4 w-4 text-error" />
-              </button>
+              {canDelete && (
+                <button
+                  onClick={() => onDelete(passenger)}
+                  className="h-9 w-9 rounded-lg hover:bg-error-soft flex items-center justify-center transition-colors"
+                  aria-label="Excluir"
+                >
+                  <Trash2 className="h-4 w-4 text-error" />
+                </button>
+              )}
             </div>
           </div>
         </div>
