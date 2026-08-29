@@ -4,6 +4,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { ProtectedRoute } from './guards/ProtectedRoute'
 import { PageSpinner } from './components/ui/Spinner'
+import type { UserRole } from './types/auth'
 
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })))
 const Passageiros = lazy(() => import('./pages/Passageiros').then((m) => ({ default: m.Passageiros })))
@@ -27,8 +28,8 @@ const ServerErrorPage = lazy(() => import('./pages/errors/ServerErrorPage').then
 const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage').then((m) => ({ default: m.PrivacyPage })))
 const TermsPage = lazy(() => import('./pages/legal/TermsPage').then((m) => ({ default: m.TermsPage })))
 
-function protect(element: React.ReactElement) {
-  return <ProtectedRoute>{element}</ProtectedRoute>
+function protect(element: React.ReactElement, allowedRoles?: UserRole[]) {
+  return <ProtectedRoute allowedRoles={allowedRoles}>{element}</ProtectedRoute>
 }
 
 function lazyPage(element: React.ReactElement) {
@@ -70,17 +71,17 @@ export const router = createBrowserRouter([
     errorElement: lazyPage(<ServerErrorPage />),
     children: [
       { index: true, element: protect(lazyPage(<HomePage />)) },
-      { path: 'passageiros', element: protect(lazyPage(<Passageiros />)) },
-      { path: 'passageiros/:id', element: protect(lazyPage(<PassageiroProfile />)) },
-      { path: 'mensalidades', element: protect(lazyPage(<Mensalidades />)) },
-      { path: 'mensalidades/:id', element: protect(lazyPage(<MensalidadeProfile />)) },
+      { path: 'passageiros', element: protect(lazyPage(<Passageiros />), ['admin']) },
+      { path: 'passageiros/:id', element: protect(lazyPage(<PassageiroProfile />), ['admin']) },
+      { path: 'mensalidades', element: protect(lazyPage(<Mensalidades />), ['admin']) },
+      { path: 'mensalidades/:id', element: protect(lazyPage(<MensalidadeProfile />), ['admin']) },
       { path: 'disponibilidade', element: <Navigate to="/passageiros?tab=disponibilidade" replace /> },
-      { path: 'disponibilidade/:id', element: protect(lazyPage(<DisponibilidadeDetails />)) },
-      { path: 'minha-disponibilidade', element: protect(lazyPage(<MinhaDisponibilidade />)) },
-      { path: 'minhas-mensalidades', element: protect(lazyPage(<MinhasMensalidades />)) },
-      { path: 'comunicacao', element: protect(lazyPage(<CentralComunicacao />)) },
+      { path: 'disponibilidade/:id', element: protect(lazyPage(<DisponibilidadeDetails />), ['admin']) },
+      { path: 'minha-disponibilidade', element: protect(lazyPage(<MinhaDisponibilidade />), ['passenger']) },
+      { path: 'minhas-mensalidades', element: protect(lazyPage(<MinhasMensalidades />), ['passenger']) },
+      { path: 'comunicacao', element: protect(lazyPage(<CentralComunicacao />), ['admin']) },
       { path: 'relatorios', element: <Navigate to="/?tab=relatorios" replace /> },
-      { path: 'configuracoes', element: protect(lazyPage(<Configuracoes />)) },
+      { path: 'configuracoes', element: protect(lazyPage(<Configuracoes />), ['admin']) },
       { path: 'perfil', element: protect(lazyPage(<ProfilePage />)) },
       { path: 'alterar-senha', element: protect(lazyPage(<ChangePasswordPage />)) },
       { path: '*', element: lazyPage(<NotFound />) },
