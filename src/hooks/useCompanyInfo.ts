@@ -17,9 +17,9 @@ export function useCompanyInfo(): Partial<CompanySettings> {
       setCompany(settingsService.get('company'))
       return
     }
-    realSettings.get()
-      .then((settings: any) => {
-        if (!cancelled && settings?.company) setCompany(settings.company)
+    realSettings.getPublic()
+      .then((data: any) => {
+        if (!cancelled && data) setCompany(data)
       })
       .catch(() => {})
     return () => { cancelled = true }

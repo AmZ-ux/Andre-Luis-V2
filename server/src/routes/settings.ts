@@ -8,9 +8,28 @@ import { alertIntegrationIssue } from '../services/integrationAlert.js'
 import { createBackup, listBackups, getBackupPath, restoreBackup, deleteBackup, pruneBackups, isValidBackupId, uploadBackupOffsite } from '../services/backupService.js'
 import { logger } from '../utils/logger.js'
 
+export const settingsPublicRouter = Router()
+
+settingsPublicRouter.get('/public', (_req, res) => {
+  const db = getDb()
+  const settings = loadSettings(db)
+  const c = settings.company as Record<string, string>
+  res.json({
+    name: c.name ?? '',
+    tradingName: c.tradingName ?? '',
+    cnpj: c.cnpj ?? '',
+    phone: c.phone ?? '',
+    whatsapp: c.whatsapp ?? '',
+    email: c.email ?? '',
+    address: c.address ?? '',
+    city: c.city ?? '',
+    state: c.state ?? '',
+  })
+})
+
 const router = Router()
 
-router.get('/', (req, res) => {
+router.get('/', requireAdmin, (req, res) => {
   const db = getDb()
   res.json(loadSettings(db))
 })

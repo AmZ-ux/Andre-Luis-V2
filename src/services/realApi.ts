@@ -266,6 +266,9 @@ export const realCommunication = {
 
 // --- Settings ---
 export const realSettings = {
+  getPublic: () =>
+    api.get<any>('/settings/public', undefined, true),
+
   get: () =>
     api.get<any>('/settings'),
 

@@ -9,13 +9,14 @@ import { runMigrations } from '../database/schema.js'
 import { sanitizeBody } from '../middleware/validation.js'
 import { resetDb, getDb } from '../database/connection.js'
 import { authMiddleware } from '../middleware/auth.js'
-import settingsRoutes from '../routes/settings.js'
+import settingsRoutes, { settingsPublicRouter } from '../routes/settings.js'
 
 process.env.DATABASE_PATH = ':memory:'
 
 const app = express()
 app.use(express.json({ limit: '10mb' }))
 app.use(sanitizeBody)
+app.use('/api/settings', settingsPublicRouter)
 app.use('/api/settings', authMiddleware, settingsRoutes)
 
 let token: string
@@ -310,5 +311,111 @@ describe('GET /api/settings/audit', () => {
     expect(res.status).toBe(204)
     const total = (db.prepare('SELECT COUNT(*) as c FROM audit_logs').get() as any).c
     expect(total).toBe(0)
+  })
+})
+
+describe('GET /api/settings/public', () => {
+  it('should return 200 without authentication', async () => {
+    const res = await request(app).get('/api/settings/public')
+    expect(res.status).toBe(200)
+  })
+
+  it('should return only public company fields', async () => {
+    const res = await request(app).get('/api/settings/public')
+    expect(res.status).toBe(200)
+    const body = res.body
+    expect(body).toHaveProperty('name')
+    expect(body).toHaveProperty('tradingName')
+    expect(body).toHaveProperty('cnpj')
+    expect(body).toHaveProperty('phone')
+    expect(body).toHaveProperty('whatsapp')
+    expect(body).toHaveProperty('email')
+    expect(body).toHaveProperty('address')
+    expect(body).toHaveProperty('city')
+    expect(body).toHaveProperty('state')
+  })
+
+  it('should NOT contain security settings', async () => {
+    const res = await request(app).get('/api/settings/public')
+    expect(res.body).not.toHaveProperty('security')
+    expect(res.body).not.toHaveProperty('sessionTimeoutMinutes')
+    expect(res.body).not.toHaveProperty('maxLoginAttempts')
+    expect(res.body).not.toHaveProperty('autoBlockMinutes')
+  })
+
+  it('should NOT contain billing settings', async () => {
+    const res = await request(app).get('/api/settings/public')
+    expect(res.body).not.toHaveProperty('billing')
+    expect(res.body).not.toHaveProperty('lateFeePercent')
+    expect(res.body).not.toHaveProperty('interestRatePerDay')
+  })
+
+  it('should NOT contain financial settings', async () => {
+    const res = await request(app).get('/api/settings/public')
+    expect(res.body).not.toHaveProperty('financial')
+    expect(res.body).not.toHaveProperty('defaultMonthlyFee')
+  })
+
+  it('should NOT contain users/roles structure', async () => {
+    const res = await request(app).get('/api/settings/public')
+    expect(res.body).not.toHaveProperty('users')
+  })
+})
+
+describe('Settings authorization — passenger blocked', () => {
+  let passengerToken: string
+
+  beforeEach(() => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Pass', 'pass-settings@test.com', '555.555.555-55', '', bcrypt.hashSync('pass', 10))
+    passengerToken = jwt.sign({ userId: passengerId, role: 'passenger' }, 'dev-secret-change-in-production')
+  })
+
+  it('GET /api/settings → 403', async () => {
+    const res = await request(app).get('/api/settings').set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('GET /api/settings/audit → 403', async () => {
+    const res = await request(app).get('/api/settings/audit').set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('PUT /api/settings/company → 403', async () => {
+    const res = await request(app)
+      .put('/api/settings/company')
+      .set('Authorization', `Bearer ${passengerToken}`)
+      .send({ name: 'Hacked' })
+    expect(res.status).toBe(403)
+  })
+
+  it('GET /api/settings/users → 403', async () => {
+    const res = await request(app).get('/api/settings/users').set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('POST /api/settings/backup → 403', async () => {
+    const res = await request(app).post('/api/settings/backup').set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+})
+
+describe('Settings authorization — admin continues working', () => {
+  it('GET /api/settings → 200 for admin', async () => {
+    const res = await request(app).get('/api/settings').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty('company')
+    expect(res.body).toHaveProperty('security')
+  })
+
+  it('PUT /api/settings/company → 200 for admin', async () => {
+    const res = await request(app)
+      .put('/api/settings/company')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Updated Name' })
+    expect(res.status).toBe(200)
+    expect(res.body.company.name).toBe('Updated Name')
   })
 })
