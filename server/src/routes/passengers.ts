@@ -81,6 +81,12 @@ router.put('/:id', (req, res) => {
     'transport_type', 'institution', 'course', 'class', 'company', 'school', 'workplace',
     'monthly_fee', 'due_day', 'payment_method', 'status', 'notes']
 
+  const allowedStatuses = ['active', 'inactive', 'vacation', 'blocked']
+  if (req.body.status !== undefined && !allowedStatuses.includes(req.body.status)) {
+    res.status(400).json({ error: 'Status inválido. Valores permitidos: active, inactive, vacation, blocked.' })
+    return
+  }
+
   const sets: string[] = []
   const params: any[] = []
   for (const f of fields) {

@@ -307,13 +307,13 @@ describe('GET /api/settings/audit', () => {
     expect(res.body.total).toBe(5)
   })
 
-  it('should clear audit logs via DELETE', async () => {
+  it('should clear audit logs via DELETE (superAdmin only)', async () => {
     const db = getDb()
     for (let i = 0; i < 3; i++) {
       db.prepare('INSERT INTO audit_logs (id, user_id, user_name, action, category, details) VALUES (?, ?, ?, ?, ?, ?)')
         .run(uuid(), adminId, 'Admin', `action-${i}`, 'test', '{}')
     }
-    const res = await request(app).delete('/api/settings/audit').set('Authorization', `Bearer ${token}`)
+    const res = await request(app).delete('/api/settings/audit').set('Authorization', `Bearer ${superAdminToken}`)
     expect(res.status).toBe(204)
     const total = (db.prepare('SELECT COUNT(*) as c FROM audit_logs').get() as any).c
     expect(total).toBe(0)
@@ -572,6 +572,48 @@ describe('Backup — super admin restriction', () => {
   })
 
   it('restante: GET /api/settings/audit não sofreu regressão', async () => {
+    const res = await request(app).get('/api/settings/audit').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+  })
+})
+
+describe('DELETE /api/settings/audit — super admin restriction', () => {
+  it('should return 401 without token', async () => {
+    const res = await request(app).delete('/api/settings/audit')
+    expect(res.status).toBe(401)
+  })
+
+  it('should return 403 for passenger', async () => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Passenger', 'pass@test.com', '222.222.222-00', '', bcrypt.hashSync('password', 10))
+    const passengerToken = jwt.sign({ userId: passengerId, role: 'passenger' }, 'dev-secret-change-in-production')
+    const res = await request(app).delete('/api/settings/audit').set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('should return 403 for regular admin (not superAdmin)', async () => {
+    const res = await request(app).delete('/api/settings/audit').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe('Apenas o super administrador')
+  })
+
+  it('should work for superAdmin', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO audit_logs (id, user_id, user_name, action, category, details) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(uuid(), adminId, 'Admin', 'test_action', 'test', '{}')
+    const countBefore = (db.prepare('SELECT COUNT(*) as c FROM audit_logs').get() as any).c
+    expect(countBefore).toBe(1)
+
+    const res = await request(app).delete('/api/settings/audit').set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(204)
+
+    const countAfter = (db.prepare('SELECT COUNT(*) as c FROM audit_logs').get() as any).c
+    expect(countAfter).toBe(0)
+  })
+
+  it('GET /api/settings/audit still works for regular admin', async () => {
     const res = await request(app).get('/api/settings/audit').set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(200)
   })

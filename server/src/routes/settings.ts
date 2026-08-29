@@ -176,7 +176,7 @@ router.delete('/logs', requireAdmin, (_req, res) => {
 })
 
 // Limpa o histórico de auditoria
-router.delete('/audit', requireAdmin, (_req, res) => {
+router.delete('/audit', requireSuperAdmin, (_req, res) => {
   const db = getDb()
   db.prepare('DELETE FROM audit_logs').run()
   res.status(204).end()
