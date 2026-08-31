@@ -13,6 +13,7 @@ import {
   mpStatus,
   searchPaymentByExternalReference,
 } from '../services/mercadopagoService.js'
+import { validateMercadoPagoWebhookSignature, getWebhookSecret } from '../services/webhookSignature.js'
 import { logger } from '../utils/logger.js'
 
 export const paymentsRouter = Router()
@@ -20,18 +21,52 @@ export const paymentsWebhookRouter = Router()
 
 // Webhook do Mercado Pago (público — montado antes do authMiddleware no index.ts).
 // Elimina a dependência do polling: notificações de pagamento são processadas
-// imediatamente ao chegar. A autenticidade é garantida consultando o próprio MP.
+// imediatamente ao chegar. A autenticidade é garantida por:
+//   1. Validação HMAC-SHA-256 da assinatura (x-signature + x-request-id + data.id)
+//   2. Consulta direta à API do MP (getPayment) — defesa em profundidade
 paymentsWebhookRouter.post('/webhook', async (req, res) => {
+  // ── Signature validation (fail closed) ──────────────────────────────────
+  const secret = getWebhookSecret()
+  if (!secret) {
+    logger.error('Webhook recebido sem MERCADO_PAGO_WEBHOOK_SECRET configurado — rejeitado (fail closed)')
+    res.status(401).json({ error: 'Webhook signature verification not configured' })
+    return
+  }
+
+  const sigResult = validateMercadoPagoWebhookSignature({
+    xSignature: req.headers['x-signature'] as string | undefined,
+    xRequestId: req.headers['x-request-id'] as string | undefined,
+    dataId: req.query['data.id'] as string | undefined,
+    secret,
+  })
+
+  if (!sigResult.valid) {
+    logger.warn({ reason: sigResult.reason }, 'Webhook signature inválida — rejeitado')
+    res.status(401).json({ error: 'Invalid webhook signature' })
+    return
+  }
+
+  // ── Single source of truth: the authenticated payment ID ────────────────
+  // Only req.query['data.id'] is authenticated by the HMAC signature.
+  // body.data.id and body.payment_id are UNTRUSTED — they are never used
+  // to determine which payment to query on Mercado Pago.
+  const dataId = req.query['data.id'] as string | undefined
+  if (!dataId) {
+    logger.warn('Webhook sem data.id na query string — rejeitado')
+    res.status(400).json({ error: 'Missing data.id query parameter' })
+    return
+  }
+
   const body = req.body || {}
-  const paymentId = body?.data?.id ?? body?.payment_id
   const eventType = String(body?.type || body?.action || '')
-  if (!paymentId || !eventType.toLowerCase().includes('payment')) {
+  if (!eventType.toLowerCase().includes('payment')) {
     res.status(200).json({ received: true, ignored: true })
     return
   }
 
   try {
-    const payment = await getPayment(Number(paymentId))
+    // ── Defense in depth: always verify against MP API directly ──────────
+    const payment = await getPayment(Number(dataId))
     const feeId = payment.external_reference
     if (!feeId) {
       res.status(200).json({ received: true, ignored: true })
@@ -83,8 +118,8 @@ paymentsWebhookRouter.post('/webhook', async (req, res) => {
 
     res.status(200).json({ received: true })
   } catch (err: any) {
-    logger.error({ err: err.message, paymentId }, 'Webhook do Mercado Pago falhou')
-    alertIntegrationIssue(getDb(), 'Mercado Pago', `Falha ao processar webhook do pagamento ${paymentId}: ${err.message}`)
+    logger.error({ err: err.message, paymentId: dataId }, 'Webhook do Mercado Pago falhou')
+    alertIntegrationIssue(getDb(), 'Mercado Pago', `Falha ao processar webhook do pagamento ${dataId}: ${err.message}`)
     // Sempre 200 para o MP não ficar refazendo retentativas em envios inválidos
     res.status(200).json({ received: true, ignored: true })
   }
