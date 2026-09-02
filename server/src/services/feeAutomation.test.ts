@@ -81,6 +81,54 @@ describe('markOverdueFees', () => {
     const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
     expect(updated).toBe(0)
   })
+
+  it('marks fee as overdue even with SUBPAYMENT', () => {
+    const pid = seedPassenger()
+    const feeId = seedFee(pid, { month: 8, year: 2026, dueDay: 10 }) // due 10/08, today=15/08
+    getDb().prepare(
+      "INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest, entry_type) VALUES (?, ?, ?, ?, 'pix', 'sub', 0, 0, 'SUBPAYMENT')"
+    ).run(uuid(), feeId, 50, '12/08/2026')
+    const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
+    expect(updated).toBe(1)
+    const fee = getDb().prepare('SELECT status FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.status).toBe('overdue')
+  })
+
+  it('keeps subpaid fee as pending when not yet past due', () => {
+    const pid = seedPassenger()
+    const feeId = seedFee(pid, { month: 8, year: 2026, dueDay: 20 }) // due 20/08, today=15/08
+    getDb().prepare(
+      "INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest, entry_type) VALUES (?, ?, ?, ?, 'pix', 'sub', 0, 0, 'SUBPAYMENT')"
+    ).run(uuid(), feeId, 50, '14/08/2026')
+    const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
+    expect(updated).toBe(0)
+    const fee = getDb().prepare('SELECT status FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.status).toBe('pending')
+  })
+
+  it('does not mark fee overdue when NORMAL payment exists', () => {
+    const pid = seedPassenger()
+    const feeId = seedFee(pid, { month: 8, year: 2026, dueDay: 10 })
+    getDb().prepare(
+      "INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest, entry_type) VALUES (?, ?, ?, ?, 'pix', 'pay', 0, 0, 'NORMAL')"
+    ).run(uuid(), feeId, 189.9, '12/08/2026')
+    const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
+    expect(updated).toBe(0)
+  })
+
+  it('does not mark fee overdue when status is exempt', () => {
+    const pid = seedPassenger()
+    seedFee(pid, { month: 8, year: 2026, dueDay: 10, status: 'exempt' })
+    const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
+    expect(updated).toBe(0)
+  })
+
+  it('does not mark fee overdue when status is cancelled', () => {
+    const pid = seedPassenger()
+    seedFee(pid, { month: 8, year: 2026, dueDay: 10, status: 'cancelled' })
+    const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
+    expect(updated).toBe(0)
+  })
 })
 
 describe('generateMonthlyFees', () => {

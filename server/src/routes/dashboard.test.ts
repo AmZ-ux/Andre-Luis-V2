@@ -124,10 +124,21 @@ describe('GET /api/dashboard/chart', () => {
   })
 
   it('should return 12 monthly buckets with real values', async () => {
-    const pid = seedPassenger()
-    seedPaidFee(pid, '15/07/2026', 7, 2026, 189.90)
-    seedPaidFee(pid, '10/07/2026', 7, 2026, 150.00)
-    seedMonthlyFee(pid, { status: 'overdue', month: 6, year: 2026, amount: 200.00 })
+    const pidA = seedPassenger()
+    const db = getDb()
+    const pidB = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(pidB, 'Pass B', '222.222.222-22', '2000-01-01')
+
+    const fidA = seedMonthlyFee(pidA, { status: 'paid', month: 7, year: 2026, amount: 189.90 })
+    db.prepare('INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method) VALUES (?, ?, ?, ?, ?)')
+      .run(uuid(), fidA, 189.90, '15/07/2026', 'pix')
+
+    const fidB = seedMonthlyFee(pidB, { status: 'paid', month: 7, year: 2026, amount: 150.00, passengerName: 'Pass B', cpf: '222.222.222-22' })
+    db.prepare('INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method) VALUES (?, ?, ?, ?, ?)')
+      .run(uuid(), fidB, 150.00, '10/07/2026', 'pix')
+
+    seedMonthlyFee(pidA, { status: 'overdue', month: 6, year: 2026, amount: 200.00 })
 
     const res = await request(app).get('/api/dashboard/chart?period=12m').set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(200)

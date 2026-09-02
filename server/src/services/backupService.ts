@@ -74,16 +74,21 @@ export function restoreBackup(db: DatabaseWrapper, id: string): { success: boole
   if (!filePath) throw new Error('Backup não encontrado')
   const data = JSON.parse(fs.readFileSync(filePath, 'utf8'))
   const tables = allTables(db)
-  for (const table of tables) {
-    db.prepare(`DELETE FROM "${table}"`).run()
-  }
-  for (const table of tables) {
-    for (const item of data[table] || []) {
-      const columns = Object.keys(item)
-      const placeholders = columns.map(() => '?').join(', ')
-      db.prepare(`INSERT INTO "${table}" (${columns.join(', ')}) VALUES (${placeholders})`).run(...columns.map((c) => item[c]))
+
+  const runRestore = db.transaction(() => {
+    for (const table of tables) {
+      db.prepare(`DELETE FROM "${table}"`).run()
     }
-  }
+    for (const table of tables) {
+      for (const item of data[table] || []) {
+        const columns = Object.keys(item)
+        const placeholders = columns.map(() => '?').join(', ')
+        db.prepare(`INSERT INTO "${table}" (${columns.join(', ')}) VALUES (${placeholders})`).run(...columns.map((c) => item[c]))
+      }
+    }
+  })
+
+  runRestore()
   return { success: true }
 }
 

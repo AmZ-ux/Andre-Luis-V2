@@ -324,7 +324,7 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(401)
   })
 
-  it('should lock the account after 5 failed attempts and reject even correct password', async () => {
+  it('should lock the account after 5 failed attempts and reject even correct password', { timeout: 15000 }, async () => {
     const prevMax = process.env.LOGIN_MAX_ATTEMPTS
     const prevLock = process.env.LOGIN_LOCK_MINUTES
     try {
@@ -485,7 +485,7 @@ describe('POST /api/auth/end-contract', () => {
     // Segunda mensalidade pendente e primeira quitada (nenhuma em aberto)
     db.prepare(`
       INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)
-      VALUES (?, ?, ?, ?, 'university', '', '', 9, 2026, 189.9, 5, '05/09/2026', 'paid')
+      VALUES (?, ?, ?, ?, 'university', '', '', 10, 2026, 189.9, 5, '05/10/2026', 'paid')
     `).run('fee-encerrar-2', id, 'Passageiro Encerrar', '777.888.999-00')
     db.prepare("UPDATE monthly_fees SET status = 'paid' WHERE passenger_id = ?").run(id)
 

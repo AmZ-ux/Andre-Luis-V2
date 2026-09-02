@@ -97,8 +97,8 @@ describe('GET /api/monthly-fees', () => {
 
   it('should filter by status', async () => {
     const pid = seedPassenger()
-    seedMonthlyFee(pid, { status: 'pending' })
-    seedMonthlyFee(pid, { status: 'paid' })
+    seedMonthlyFee(pid, { status: 'pending', month: 7, year: 2026 })
+    seedMonthlyFee(pid, { status: 'paid', month: 8, year: 2026 })
     const res = await request(app).get('/api/monthly-fees?status=paid').set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(1)
@@ -590,5 +590,124 @@ describe('GET /api/monthly-fees/passenger/:passengerId (legacy)', () => {
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(1)
     expect(res.body[0].passenger_id).toBe(pidA)
+  })
+})
+
+describe('UNIQUE fee per passenger/month/year (DB constraint)', () => {
+  it('allows creating a fee for a passenger', async () => {
+    const pid = seedPassenger()
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
+    expect(res.status).toBe(201)
+  })
+
+  it('rejects duplicate fee for same passenger/month/year via API', async () => {
+    const pid = seedPassenger()
+    await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
+    expect(res.status).toBe(409)
+    expect(res.body.error).toContain('já existe')
+  })
+
+  it('allows same passenger for different month', async () => {
+    const pid = seedPassenger()
+    await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 9, year: 2026, amount: 189.9, dueDay: 5 })
+    expect(res.status).toBe(201)
+  })
+
+  it('allows same passenger for different year', async () => {
+    const pid = seedPassenger()
+    await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2027, amount: 189.9, dueDay: 5 })
+    expect(res.status).toBe(201)
+  })
+
+  it('allows different passenger for same month/year', async () => {
+    const pidA = seedPassenger()
+    const pidB = seedPassenger()
+    await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pidA, passengerName: 'Test A', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: pidB, passengerName: 'Test B', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
+    expect(res.status).toBe(201)
+  })
+
+  it('rejects duplicate at DB level even if app check is bypassed', async () => {
+    const db = getDb()
+    const pid = seedPassenger()
+    db.prepare(`
+      INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status)
+      VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')
+    `).run(uuid(), pid, 'Test', '111.111.111-11')
+    expect(() => {
+      db.prepare(`
+        INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status)
+        VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')
+      `).run(uuid(), pid, 'Test', '111.111.111-11')
+    }).toThrow()
+  })
+})
+
+describe('DUPLICATE_FEES fail-safe migration', () => {
+  it('does not delete any records when duplicates exist and throws DUPLICATE_FEES', async () => {
+    const db = getDb()
+    const pid = seedPassenger()
+
+    db.exec("DROP INDEX IF EXISTS idx_unique_fee_per_passenger")
+
+    const feeId1 = uuid()
+    const feeId2 = uuid()
+    db.prepare(`
+      INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status)
+      VALUES (?, ?, ?, ?, 'university', 6, 2025, 189.9, 5, '05/06/2025', 'paid')
+    `).run(feeId1, pid, 'Dup Test', '999.999.999-99')
+    db.prepare(`
+      INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status)
+      VALUES (?, ?, ?, ?, 'university', 6, 2025, 189.9, 5, '05/06/2025', 'pending')
+    `).run(feeId2, pid, 'Dup Test', '999.999.999-99')
+
+    const payId = uuid()
+    db.prepare(`INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method) VALUES (?, ?, ?, ?, 'pix')`)
+      .run(payId, feeId1, 189.9, '10/06/2025')
+
+    const pixId = uuid()
+    db.prepare(`INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status) VALUES (?, ?, ?, ?, 'paid')`)
+      .run(pixId, `pix-${pixId}`, feeId1, 189.9)
+
+    await expect(runMigrations()).rejects.toThrow('DUPLICATE_FEES')
+
+    const feesAfter = db.prepare('SELECT id FROM monthly_fees WHERE passenger_id = ? AND month = 6 AND year = 2025').all(pid)
+    expect(feesAfter).toHaveLength(2)
+
+    const payAfter = db.prepare('SELECT id FROM payments WHERE monthly_fee_id = ?').all(feeId1)
+    expect(payAfter).toHaveLength(1)
+
+    const pixAfter = db.prepare('SELECT id FROM pix_charges WHERE monthly_fee_id = ?').all(feeId1)
+    expect(pixAfter).toHaveLength(1)
   })
 })

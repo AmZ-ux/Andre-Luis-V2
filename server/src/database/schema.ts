@@ -334,6 +334,30 @@ export async function runMigrations(): Promise<void> {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_per_fee ON pix_charges(monthly_fee_id) WHERE status = 'pending'")
   } catch {}
 
+  // --- P3: unique fee per passenger/cycle migration ---
+  // FAIL-SAFE: detect duplicates, fail if found. Never delete data.
+  try {
+    const dupes = db.prepare(`
+      SELECT passenger_id, month, year, COUNT(*) AS cnt
+      FROM monthly_fees
+      GROUP BY passenger_id, month, year
+      HAVING cnt > 1
+    `).all() as any[]
+    if (dupes.length > 0) {
+      const detail = dupes.map((d: any) => `passenger=${d.passenger_id} month=${d.month} year=${d.year} count=${d.cnt}`).join('; ')
+      logger.error(`DUPLICATE_FEES: Found ${dupes.length} duplicate group(s). UNIQUE index NOT applied. Manual intervention required. Details: ${detail}`)
+      throw new Error(`DUPLICATE_FEES: ${dupes.length} duplicate group(s) found. UNIQUE index not applied. ${detail}`)
+    }
+  } catch (e: any) {
+    if (e?.message?.startsWith('DUPLICATE_FEES:')) throw e
+  }
+
+  // Unique index: one fee per passenger per month/year.
+  // Only created when no duplicates exist (safe).
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_fee_per_passenger ON monthly_fees(passenger_id, month, year)")
+  } catch {}
+
   // Bump default billing tolerance from 5 to 0 days (fees flip to overdue right after the due date)
   try {
     const billing = db.prepare("SELECT * FROM settings WHERE category = 'billing'").get() as any

@@ -27,7 +27,11 @@ export function markOverdueFees(db: any = getDb(), settings: AppSettings = loadS
   const pending = db.prepare(`
     SELECT * FROM monthly_fees
     WHERE status = 'pending'
-    AND NOT EXISTS (SELECT 1 FROM payments WHERE payments.monthly_fee_id = monthly_fees.id)
+    AND NOT EXISTS (
+      SELECT 1 FROM payments
+      WHERE payments.monthly_fee_id = monthly_fees.id
+      AND payments.entry_type IN ('NORMAL', 'OVERPAYMENT')
+    )
   `).all() as any[]
 
   let updated = 0
