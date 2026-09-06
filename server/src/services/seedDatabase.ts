@@ -41,13 +41,22 @@ export async function runSeed(): Promise<void> {
 
   logger.info({ users: existing.c }, 'Database already has data — checking super admin')
 
+  if (!process.env.SUPER_ADMIN_EMAIL || !process.env.SUPER_ADMIN_PASSWORD) return
+
   const hasSuperAdmin = db.prepare('SELECT COUNT(*) as c FROM users WHERE super_admin = 1').get() as { c: number }
-  if (hasSuperAdmin.c === 0 && process.env.SUPER_ADMIN_EMAIL && process.env.SUPER_ADMIN_PASSWORD) {
+  if (hasSuperAdmin.c > 0) return
+
+  const existingUser = db.prepare('SELECT id, email FROM users WHERE email = ?').get(superAdminEmail) as { id: string; email: string } | undefined
+  if (existingUser) {
+    db.prepare('UPDATE users SET role = ?, super_admin = 1, email_verified = 1, password_hash = ?, locked_until = 0, failed_login_attempts = 0 WHERE id = ?')
+      .run('admin', PASSWORD_HASH, existingUser.id)
+    logger.info({ superAdmin: superAdminEmail, id: existingUser.id }, 'Existing user promoted to super admin')
+  } else {
     const ADMIN_ID = uuid()
     db.prepare(`
       INSERT OR IGNORE INTO users (id, name, email, cpf, phone, role, super_admin, email_verified, password_hash)
       VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)
     `).run(ADMIN_ID, 'Administrador', superAdminEmail, '000.000.000-00', '(11) 99999-9999', 'admin', PASSWORD_HASH)
-    logger.info({ superAdmin: superAdminEmail }, 'Super admin restored from environment')
+    logger.info({ superAdmin: superAdminEmail }, 'Super admin created from environment')
   }
 }
