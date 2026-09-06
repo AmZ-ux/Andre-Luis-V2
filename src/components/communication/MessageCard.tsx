@@ -46,7 +46,10 @@ export function MessageCard({ message, onClick }: MessageCardProps) {
               {cfg.label}
             </span>
             <span className="text-[10px] text-gray-400">{formatDate(message.createdAt)}</span>
-            {message.recipients.length > 0 && (
+            {message.type === 'all' && (
+              <span className="text-[10px] text-gray-400">Todos os passageiros</span>
+            )}
+            {message.type !== 'all' && message.recipients.length > 0 && (
               <span className="text-[10px] text-gray-400">{message.recipients.length} destinatário(s)</span>
             )}
           </div>

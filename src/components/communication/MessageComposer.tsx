@@ -69,7 +69,7 @@ export function MessageComposer({ onSend, onClose }: MessageComposerProps) {
       body: body.trim(),
       type,
       channel,
-      recipients: type === 'all' ? [{ type: 'all', label: 'Todos' }] : recipients,
+      recipients: type === 'all' ? [] : recipients,
       templateId,
       scheduledAt: scheduleDateTime ? `${scheduleDateTime.date}T${scheduleDateTime.time}` : undefined,
     })
