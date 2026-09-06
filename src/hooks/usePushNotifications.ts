@@ -9,10 +9,21 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)))
 }
 
+export type PushError =
+  | 'unsupported'
+  | 'notifications_blocked'
+  | 'permission_denied'
+  | 'push_not_available'
+  | 'subscription_failed'
+  | 'backend_failed'
+  | 'unknown'
+
 export function usePushNotifications() {
   const [enabled, setEnabled] = useState(false)
   const [supported, setSupported] = useState(false)
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<PushError | null>(null)
 
   const checkStatus = useCallback(async () => {
     const swSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
@@ -40,37 +51,94 @@ export function usePushNotifications() {
     checkStatus()
   }, [checkStatus])
 
-  const subscribe = useCallback(async () => {
-    if (!config.realApi) return false
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
+  const subscribe = useCallback(async (): Promise<{ ok: boolean; error?: PushError }> => {
+    if (!config.realApi) return { ok: false, error: 'unsupported' }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      return { ok: false, error: 'unsupported' }
+    }
+
+    setLoading(true)
+    setError(null)
 
     try {
+      let currentPermission = Notification.permission
+
+      if (currentPermission === 'default') {
+        const result = await Notification.requestPermission()
+        currentPermission = result
+      }
+
+      if (currentPermission === 'denied') {
+        setPermission('denied')
+        setError('notifications_blocked')
+        return { ok: false, error: 'notifications_blocked' }
+      }
+
+      if (currentPermission !== 'granted') {
+        setError('permission_denied')
+        return { ok: false, error: 'permission_denied' }
+      }
+
+      setPermission('granted')
+
       const registration = await navigator.serviceWorker.register('/sw.js')
       await navigator.serviceWorker.ready
 
       const { publicKey, available } = await api.get<{ publicKey: string; available: boolean }>('/communication/push/key')
-      if (!available || !publicKey) return false
-
-      let existing = await registration.pushManager.getSubscription()
-      if (!existing) {
-        existing = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
-        })
+      if (!available || !publicKey) {
+        setError('push_not_available')
+        return { ok: false, error: 'push_not_available' }
       }
 
-      await api.post('/communication/push/subscribe', {
-        subscription: { endpoint: existing.endpoint, keys: existing.toJSON() as any },
-      })
+      let subscription = await registration.pushManager.getSubscription()
+      if (!subscription) {
+        try {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
+          })
+        } catch (err: any) {
+          const name = err?.name || ''
+          if (name === 'NotAllowedError') {
+            setError('permission_denied')
+            return { ok: false, error: 'permission_denied' }
+          }
+          if (name === 'InvalidStateError') {
+            subscription = await registration.pushManager.getSubscription()
+            if (!subscription) {
+              setError('subscription_failed')
+              return { ok: false, error: 'subscription_failed' }
+            }
+          } else {
+            setError('subscription_failed')
+            return { ok: false, error: 'subscription_failed' }
+          }
+        }
+      }
+
+      if (!subscription) {
+        setError('subscription_failed')
+        return { ok: false, error: 'subscription_failed' }
+      }
+
+      try {
+        await api.post('/communication/push/subscribe', {
+          subscription: { endpoint: subscription.endpoint, keys: subscription.toJSON() as any },
+        })
+      } catch {
+        setError('backend_failed')
+        return { ok: false, error: 'backend_failed' }
+      }
+
       setEnabled(true)
       setPermission(Notification.permission)
-      return true
+      setError(null)
+      return { ok: true }
     } catch (err: any) {
-      if (err?.message === 'permission_denied' || (err as any)?.PermissionDenied) {
-        setPermission('denied')
-      }
-      setEnabled(false)
-      return false
+      setError('unknown')
+      return { ok: false, error: 'unknown' }
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -86,5 +154,5 @@ export function usePushNotifications() {
 
   const canEnable = config.realApi && supported && permission !== 'denied' && !enabled
 
-  return { subscribe, unsubscribe, enabled, supported, permission, canEnable, refresh: checkStatus }
+  return { subscribe, unsubscribe, enabled, supported, permission, canEnable, loading, error, refresh: checkStatus }
 }

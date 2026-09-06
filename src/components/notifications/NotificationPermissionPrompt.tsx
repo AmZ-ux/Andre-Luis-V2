@@ -30,9 +30,8 @@ function isPWAInstalled(): boolean {
 
 export function NotificationPermissionPrompt() {
   const [visible, setVisible] = useState(false)
-  const { subscribe, supported, permission, enabled } = usePushNotifications()
+  const { subscribe, supported, permission, enabled, loading, error } = usePushNotifications()
   const { addToast } = useToast()
-  const [loading, setLoading] = useState(false)
 
   const shouldShow = useCallback(() => {
     if (!supported) return false
@@ -59,19 +58,20 @@ export function NotificationPermissionPrompt() {
 
   const handleActivate = useCallback(async () => {
     if (loading) return
-    setLoading(true)
-    try {
-      const ok = await subscribe()
-      if (ok) {
-        addToast('success', 'Notificações ativadas')
-        setVisible(false)
-      }
-    } finally {
-      setLoading(false)
+    const result = await subscribe()
+    if (result.ok) {
+      addToast('success', 'Notificações ativadas')
+      setVisible(false)
     }
   }, [loading, subscribe, addToast])
 
   if (!visible) return null
+
+  const errorMessage = error === 'notifications_blocked'
+    ? 'As notificações estão bloqueadas no navegador. Ative-as nas configurações do dispositivo.'
+    : error
+      ? 'Não foi possível ativar as notificações. Tente novamente.'
+      : null
 
   return (
     <Modal isOpen={visible} onClose={handleDismiss}>
@@ -85,6 +85,9 @@ export function NotificationPermissionPrompt() {
             Receba avisos importantes sobre mensalidades, comunicados e atualizações do transporte.
           </p>
         </div>
+        {errorMessage && (
+          <p className="text-sm text-error font-medium">{errorMessage}</p>
+        )}
         <div className="flex flex-col w-full gap-2 mt-2">
           <button
             onClick={handleActivate}

@@ -47,7 +47,7 @@ export function NotificationBell({ className }: { className?: string }) {
             {!push.enabled && (
               <button
                 onClick={() => push.subscribe()}
-                disabled={!push.canEnable}
+                disabled={!push.canEnable || push.loading}
                 className={cn(
                   'text-[11px] font-medium px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40',
                   push.canEnable
@@ -55,7 +55,7 @@ export function NotificationBell({ className }: { className?: string }) {
                     : 'text-gray-400 cursor-not-allowed'
                 )}
               >
-                Ativar push
+                {push.loading ? 'Ativando...' : 'Ativar push'}
               </button>
             )}
           </div>
