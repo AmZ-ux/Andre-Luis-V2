@@ -18,7 +18,7 @@ let webPush: any = null
 let webPushAvailable = false
 
 try {
-  webPush = await import('web-push')
+  webPush = (await import('web-push')).default
   if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
     webPush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
     webPushAvailable = true

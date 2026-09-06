@@ -8,8 +8,10 @@ const { sendNotificationMock, setVapidDetailsMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('web-push', () => ({
-  setVapidDetails: setVapidDetailsMock,
-  sendNotification: sendNotificationMock,
+  default: {
+    setVapidDetails: setVapidDetailsMock,
+    sendNotification: sendNotificationMock,
+  },
 }))
 
 afterEach(() => {
