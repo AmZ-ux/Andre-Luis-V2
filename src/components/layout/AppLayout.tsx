@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { NotificationBell } from './NotificationBell'
+import { NotificationPermissionPrompt } from '../notifications/NotificationPermissionPrompt'
 import { Container } from '../ui/Container'
 import { useAuth } from '../../auth/AuthContext'
 
@@ -76,6 +77,7 @@ export function AppLayout() {
       </div>
 
       <MobileNav />
+      <NotificationPermissionPrompt />
     </div>
   )
 }
