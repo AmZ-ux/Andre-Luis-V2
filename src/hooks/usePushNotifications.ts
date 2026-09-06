@@ -122,8 +122,9 @@ export function usePushNotifications() {
       }
 
       try {
+        const subJson = subscription.toJSON()
         await api.post('/communication/push/subscribe', {
-          subscription: { endpoint: subscription.endpoint, keys: subscription.toJSON() as any },
+          subscription: { endpoint: subJson.endpoint, keys: subJson.keys },
         })
       } catch {
         setError('backend_failed')

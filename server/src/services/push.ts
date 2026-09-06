@@ -47,6 +47,7 @@ export const pushService = {
       db.prepare('INSERT INTO settings (id, category, data) VALUES (?, ?, ?)')
         .run(id, `push_sub_${userId}`, JSON.stringify(subscription))
     }
+    logger.info({ userId }, 'Push subscription saved')
   },
 
   async unsubscribe(userId: string): Promise<void> {
@@ -62,16 +63,23 @@ export const pushService = {
 
     const db = getDb()
     const row = db.prepare('SELECT data FROM settings WHERE category = ?').get(`push_sub_${userId}`) as any
-    if (!row) return false
+    if (!row) {
+      logger.warn({ userId }, 'Push send skipped: no subscription')
+      return false
+    }
 
     try {
       const subscription: PushSubscription = JSON.parse(row.data)
       await webPush.sendNotification(subscription, JSON.stringify({ title, body, ...data }))
+      logger.info({ userId, title }, 'Push sent')
       return true
     } catch (err: any) {
-      if (err.statusCode === 410) {
-        // Subscription expired, remove it
+      const statusCode = err?.statusCode || err?.status || 0
+      if (statusCode === 410) {
         this.unsubscribe(userId)
+        logger.info({ userId }, 'Push subscription expired (410), removed')
+      } else {
+        logger.error({ userId, statusCode, message: err?.message }, 'Push send failed')
       }
       return false
     }
@@ -89,7 +97,16 @@ export const pushService = {
           await webPush.sendNotification(subscription, JSON.stringify({ title, body, ...data }))
         }
         sent++
-      } catch {}
+      } catch (err: any) {
+        const statusCode = err?.statusCode || err?.status || 0
+        if (statusCode === 410) {
+          const userId = row.category.replace('push_sub_', '')
+          this.unsubscribe(userId)
+          logger.info({ userId }, 'Push subscription expired (410) in sendToAll, removed')
+        } else {
+          logger.error({ statusCode, message: err?.message }, 'Push sendToAll failed for subscription')
+        }
+      }
     }
 
     return sent
