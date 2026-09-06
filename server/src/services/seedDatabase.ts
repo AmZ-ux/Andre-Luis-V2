@@ -24,24 +24,30 @@ export async function runSeed(): Promise<void> {
   await runMigrations()
   const db = getDb()
 
-  // Seed apenas em banco novo (vazio). Em produção com dados reais o seed
-  // nunca deve recriar as contas de demonstração.
-  const existing = db.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }
-  if (existing.c > 0) {
-    logger.info({ users: existing.c }, 'Database already has data — seed skipped')
-    return
-  }
-
   const superAdminPassword = resolveSuperAdminPassword()
-  const ADMIN_ID = uuid()
   const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@transporte.com'
   const PASSWORD_HASH = bcrypt.hashSync(superAdminPassword, 10)
 
-  // Default admin user (super admin — o criador do projeto)
-  db.prepare(`
-    INSERT OR IGNORE INTO users (id, name, email, cpf, phone, role, super_admin, email_verified, password_hash)
-    VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)
-  `).run(ADMIN_ID, 'Administrador', superAdminEmail, '000.000.000-00', '(11) 99999-9999', 'admin', PASSWORD_HASH)
+  const existing = db.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }
+  if (existing.c === 0) {
+    const ADMIN_ID = uuid()
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, name, email, cpf, phone, role, super_admin, email_verified, password_hash)
+      VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)
+    `).run(ADMIN_ID, 'Administrador', superAdminEmail, '000.000.000-00', '(11) 99999-9999', 'admin', PASSWORD_HASH)
+    logger.info({ superAdmin: superAdminEmail }, 'Database seeded with super admin')
+    return
+  }
 
-  logger.info({ superAdmin: superAdminEmail }, 'Database seeded with super admin')
+  logger.info({ users: existing.c }, 'Database already has data — checking super admin')
+
+  const hasSuperAdmin = db.prepare('SELECT COUNT(*) as c FROM users WHERE super_admin = 1').get() as { c: number }
+  if (hasSuperAdmin.c === 0 && process.env.SUPER_ADMIN_EMAIL && process.env.SUPER_ADMIN_PASSWORD) {
+    const ADMIN_ID = uuid()
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, name, email, cpf, phone, role, super_admin, email_verified, password_hash)
+      VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)
+    `).run(ADMIN_ID, 'Administrador', superAdminEmail, '000.000.000-00', '(11) 99999-9999', 'admin', PASSWORD_HASH)
+    logger.info({ superAdmin: superAdminEmail }, 'Super admin restored from environment')
+  }
 }
