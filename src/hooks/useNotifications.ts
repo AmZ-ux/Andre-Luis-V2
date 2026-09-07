@@ -20,8 +20,11 @@ export function useNotifications(): UseNotificationsResult {
   const [loading, setLoading] = useState(true)
   const [notSupported, setNotSupported] = useState(false)
   const polling = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fetching = useRef(false)
 
   const load = useCallback(async () => {
+    if (fetching.current) return
+    fetching.current = true
     try {
       const [list, unread] = await Promise.all([
         api.get<Notification[]>('/communication/notifications'),
@@ -33,14 +36,20 @@ export function useNotifications(): UseNotificationsResult {
       setNotSupported(true)
     } finally {
       setLoading(false)
+      fetching.current = false
     }
   }, [])
 
   useEffect(() => {
     load()
-    polling.current = setInterval(load, 60_000)
+    polling.current = setInterval(load, 10_000)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') load()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
       if (polling.current) clearInterval(polling.current)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [load])
 
