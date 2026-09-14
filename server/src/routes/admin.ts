@@ -131,4 +131,23 @@ router.post('/reset-data', requireSuperAdmin, (req, res) => {
   res.json({ success: true, message: 'Dados operacionais limpos. Mantidos: super admin e configurações.' })
 })
 
+// TEMPORÁRIO: wipe completo + novo super admin (staging only)
+router.post('/nuke-and-seed', requireSuperAdmin, validateBody('email', 'password'), (req, res) => {
+  if (process.env.RAILWAY_ENVIRONMENT_NAME !== 'staging' && process.env.NODE_ENV !== 'development') {
+    res.status(403).json({ error: 'Apenas em staging' }); return
+  }
+  const { email, password } = req.body
+  if (String(password).length < 8) {
+    res.status(400).json({ error: 'Senha minimo 8 caracteres' }); return
+  }
+  const db = getDb()
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as any[]
+  for (const t of tables) db.prepare(`DELETE FROM "${t.name}"`).run()
+  const id = uuid()
+  const hash = bcrypt.hashSync(String(password), 10)
+  db.prepare('INSERT INTO users (id, name, email, cpf, phone, role, super_admin, email_verified, password_hash) VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)')
+    .run(id, 'Super Admin', String(email).trim().toLowerCase(), '000.000.000-00', '', 'admin', hash)
+  res.json({ success: true, email: String(email).trim().toLowerCase(), message: 'Database nuked. Super admin criado.' })
+})
+
 export default router
