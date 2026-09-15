@@ -34,7 +34,7 @@ export function PageTabs({ tabs, value, onChange, className }: PageTabsProps) {
             aria-selected={isActive}
             onClick={() => onChange(tab.key)}
             className={cn(
-              'flex items-center justify-center gap-1.5 px-5 sm:px-6 h-10 text-sm font-semibold whitespace-nowrap rounded-full transition-all duration-150 min-w-fit flex-1 sm:flex-none',
+              'flex items-center justify-center gap-1.5 px-4 sm:px-6 h-10 text-sm font-semibold whitespace-nowrap rounded-full transition-all duration-150 min-w-fit shrink-0',
               isActive
                 ? 'bg-white dark:bg-gray-700 text-text shadow-sm'
                 : 'text-gray-500 dark:text-gray-400 hover:text-text'
