@@ -275,7 +275,8 @@ router.post('/push/subscribe', (req, res) => {
 
 router.post('/push/unsubscribe', (req, res) => {
   if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
-  pushService.unsubscribe(req.user.userId)
+  const { endpoint } = req.body
+  pushService.unsubscribe(req.user.userId, endpoint)
   res.json({ success: true })
 })
 
@@ -292,7 +293,7 @@ router.post('/push/send', requireAdmin, async (req, res) => {
   }
   let sent = 0
   for (const userId of userIds) {
-    if (await pushService.send(userId, title, body, data)) sent++
+    sent += await pushService.send(userId, title, body, data)
   }
   res.json({ sent, total: userIds.length })
 })

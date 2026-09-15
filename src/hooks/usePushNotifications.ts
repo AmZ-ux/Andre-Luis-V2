@@ -147,8 +147,9 @@ export function usePushNotifications() {
     try {
       const registration = await navigator.serviceWorker.ready
       const subscription = await registration.pushManager.getSubscription()
+      const endpoint = subscription?.endpoint
       if (subscription) await subscription.unsubscribe()
-      await api.post('/communication/push/unsubscribe')
+      await api.post('/communication/push/unsubscribe', endpoint ? { endpoint } : undefined)
       setEnabled(false)
     } catch {}
   }, [])
