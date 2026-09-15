@@ -15,12 +15,20 @@ function addHistory(db: any, messageId: string, action: string, description: str
     .run(uuid(), messageId, action, description || '', performedBy)
 }
 
-export function dispatchMessage(db: any, message: any): void {
+function resolveTargetUserIds(db: any, message: any): string[] {
   const recipients = (() => { try { return JSON.parse(message.recipients || '[]') } catch { return [] } })()
-  const hasRecipients = recipients.length > 0
+  if (recipients.length > 0) {
+    return recipients.map((r: any) => (typeof r === 'string' ? r : r.id)).filter(Boolean)
+  }
+  return (db.prepare("SELECT id FROM users WHERE role = 'passenger'").all() as any[]).map((u: any) => u.id)
+}
+
+export function dispatchMessage(db: any, message: any): void {
+  const targetUserIds = resolveTargetUserIds(db, message)
 
   if (message.channel === 'whatsapp' || message.channel === 'all') {
-    if (hasRecipients) {
+    const recipients = (() => { try { return JSON.parse(message.recipients || '[]') } catch { return [] } })()
+    if (recipients.length > 0) {
       for (const r of recipients) {
         const phone = r?.phone || r?.value || ''
         if (phone) whatsappService.send(phone, message.body).catch(() => {
@@ -31,6 +39,7 @@ export function dispatchMessage(db: any, message: any): void {
   }
 
   if (message.channel === 'email' || message.channel === 'all') {
+    const recipients = (() => { try { return JSON.parse(message.recipients || '[]') } catch { return [] } })()
     const emails: string[] = []
     for (const r of recipients) {
       const email = r?.email || (typeof r === 'string' && /@/.test(r) ? r : '')
@@ -41,8 +50,9 @@ export function dispatchMessage(db: any, message: any): void {
         if (user?.email) emails.push(user.email)
       }
     }
-    if (emails.length === 0 && !hasRecipients) {
-      const all = db.prepare('SELECT email FROM users WHERE email != \'\'').all() as any[]
+    if (emails.length === 0 && targetUserIds.length > 0) {
+      const placeholders = targetUserIds.map(() => '?').join(',')
+      const all = db.prepare(`SELECT email FROM users WHERE id IN (${placeholders}) AND email != ''`).all(...targetUserIds) as any[]
       for (const u of all) if (u.email) emails.push(u.email)
     }
     for (const email of [...new Set(emails)]) {
@@ -55,14 +65,14 @@ export function dispatchMessage(db: any, message: any): void {
   }
 
   if (message.channel === 'push' || message.channel === 'all') {
-    pushService.sendToAll(message.title, message.body, { data: { path: '/' } }).catch(() => {})
+    const data = { data: { path: '/' } }
+    for (const userId of targetUserIds) {
+      pushService.send(userId, message.title, message.body, data).catch(() => {})
+    }
   }
 
   if (message.channel === 'app' || message.channel === 'all') {
-    const users = hasRecipients
-      ? recipients.map((r: any) => (typeof r === 'string' ? r : r.id)).filter(Boolean)
-      : (db.prepare('SELECT id FROM users').all() as any[]).map((u: any) => u.id)
-    for (const userId of users) {
+    for (const userId of targetUserIds) {
       db.prepare(`INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, 'info')`)
         .run(uuid(), userId, message.title, message.body)
     }

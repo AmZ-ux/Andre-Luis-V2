@@ -123,12 +123,16 @@ describe('POST /api/communication', () => {
 
   it('should create a message with no recipients list (all users)', async () => {
     const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, role, password_hash) VALUES (?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Passenger', 'pass@test.com', '222.222.222-22', bcrypt.hashSync('pass', 10))
+
     const res = await request(app)
       .post('/api/communication')
       .set('Authorization', `Bearer ${token}`)
       .send({
         title: 'Broadcast',
-        body: 'To all users',
+        body: 'To all passengers',
         channel: 'app',
         recipients: [],
       })
@@ -136,6 +140,7 @@ describe('POST /api/communication', () => {
 
     const notifications = db.prepare('SELECT * FROM notifications').all()
     expect(notifications).toHaveLength(1)
+    expect(notifications[0].user_id).toBe(passengerId)
   })
 
   it('should create a message with default channel when not specified', async () => {
@@ -266,5 +271,149 @@ describe('Notification status actions', () => {
     expect(res.status).toBe(200)
     const unread = getDb().prepare("SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND status = 'unread'").get(adminId) as any
     expect(unread.count).toBe(0)
+  })
+})
+
+describe('dispatchMessage routing', () => {
+  function seedUser(name: string, email: string, role: string): string {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, role, password_hash) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(id, name, email, `${Date.now()}-${Math.random()}`, role, bcrypt.hashSync('pass', 10))
+    return id
+  }
+
+  function seedPushSub(userId: string, endpoint: string): void {
+    const db = getDb()
+    let hash = 0
+    for (let i = 0; i < endpoint.length; i++) {
+      hash = ((hash << 5) - hash + endpoint.charCodeAt(i)) | 0
+    }
+    const h = Math.abs(hash).toString(36).padStart(8, '0')
+    db.prepare("INSERT INTO settings (id, category, data) VALUES (?, ?, ?)")
+      .run(`id-${userId}-${h}`, `push_sub_${userId}_${h}`, JSON.stringify({ endpoint, keys: { p256dh: 'k', auth: 'a' } }))
+  }
+
+  it('type=all: 1 admin + 2 passengers → only passengers get notifications', async () => {
+    const db = getDb()
+    const passengerA = seedUser('Pass A', 'a@test.com', 'passenger')
+    const passengerB = seedUser('Pass B', 'b@test.com', 'passenger')
+    seedUser('Admin', 'adm@test.com', 'admin')
+
+    const { dispatchMessage } = await import('../routes/communication.js')
+    dispatchMessage(db, {
+      id: uuid(), title: 'Test', subject: '', body: 'Body',
+      type: 'all', channel: 'app', recipients: '[]',
+    })
+
+    const notifs = db.prepare('SELECT user_id FROM notifications').all() as any[]
+    expect(notifs.length).toBe(2)
+    expect(notifs.map((n: any) => n.user_id).sort()).toEqual([passengerA, passengerB].sort())
+  })
+
+  it('type=all: passenger without subscription → no exception, others receive', async () => {
+    const db = getDb()
+    const passengerA = seedUser('Pass A', 'a@test.com', 'passenger')
+    seedUser('Pass B', 'b@test.com', 'passenger')
+    seedPushSub(passengerA, 'https://p/a')
+
+    const { dispatchMessage } = await import('../routes/communication.js')
+    dispatchMessage(db, {
+      id: uuid(), title: 'Test', subject: '', body: 'Body',
+      type: 'all', channel: 'app', recipients: '[]',
+    })
+
+    const notifs = db.prepare('SELECT user_id FROM notifications').all() as any[]
+    expect(notifs.length).toBe(2)
+  })
+
+  it('type=individual: only selected passenger A receives', async () => {
+    const db = getDb()
+    const passengerA = seedUser('Pass A', 'a@test.com', 'passenger')
+    const passengerB = seedUser('Pass B', 'b@test.com', 'passenger')
+    const admin = seedUser('Admin', 'adm@test.com', 'admin')
+
+    const { dispatchMessage } = await import('../routes/communication.js')
+    dispatchMessage(db, {
+      id: uuid(), title: 'Test', subject: '', body: 'Body',
+      type: 'individual', channel: 'app',
+      recipients: JSON.stringify([{ id: passengerA }]),
+    })
+
+    const notifs = db.prepare('SELECT user_id FROM notifications').all() as any[]
+    expect(notifs.length).toBe(1)
+    expect(notifs[0].user_id).toBe(passengerA)
+  })
+
+  it('type=individual: multiple passengers selected → only them receive', async () => {
+    const db = getDb()
+    const passengerA = seedUser('Pass A', 'a@test.com', 'passenger')
+    const passengerB = seedUser('Pass B', 'b@test.com', 'passenger')
+    seedUser('Pass C', 'c@test.com', 'passenger')
+
+    const { dispatchMessage } = await import('../routes/communication.js')
+    dispatchMessage(db, {
+      id: uuid(), title: 'Test', subject: '', body: 'Body',
+      type: 'individual', channel: 'app',
+      recipients: JSON.stringify([{ id: passengerA }, { id: passengerB }]),
+    })
+
+    const notifs = db.prepare('SELECT user_id FROM notifications').all() as any[]
+    expect(notifs.length).toBe(2)
+    expect(notifs.map((n: any) => n.user_id).sort()).toEqual([passengerA, passengerB].sort())
+  })
+
+  it('app + push channels use same targetUserIds', async () => {
+    const db = getDb()
+    const passengerA = seedUser('Pass A', 'a@test.com', 'passenger')
+    seedPushSub(passengerA, 'https://p/a1')
+    seedUser('Admin', 'adm@test.com', 'admin')
+
+    const { dispatchMessage } = await import('../routes/communication.js')
+    dispatchMessage(db, {
+      id: uuid(), title: 'Test', subject: '', body: 'Body',
+      type: 'all', channel: 'all',
+      recipients: '[]',
+    })
+
+    const notifs = db.prepare('SELECT user_id FROM notifications').all() as any[]
+    expect(notifs.length).toBe(1)
+    expect(notifs[0].user_id).toBe(passengerA)
+  })
+
+  it('multi-subscription: passenger with Chrome + Firefox gets both sent', async () => {
+    const db = getDb()
+    const passengerA = seedUser('Pass A', 'a@test.com', 'passenger')
+    seedPushSub(passengerA, 'https://fcm.googleapis.com/fcm/send/chrome')
+    seedPushSub(passengerA, 'https://updates.push.services.mozilla.com/wpush/v2/firefox')
+    seedUser('Admin', 'adm@test.com', 'admin')
+
+    const { dispatchMessage } = await import('../routes/communication.js')
+    dispatchMessage(db, {
+      id: uuid(), title: 'Test', subject: '', body: 'Body',
+      type: 'all', channel: 'app',
+      recipients: '[]',
+    })
+
+    const notifs = db.prepare('SELECT user_id FROM notifications').all() as any[]
+    expect(notifs.length).toBe(1)
+    expect(notifs[0].user_id).toBe(passengerA)
+  })
+
+  it('no subscriptions: dispatch does not fail', async () => {
+    const db = getDb()
+    seedUser('Pass A', 'a@test.com', 'passenger')
+
+    const { dispatchMessage } = await import('../routes/communication.js')
+    expect(() => {
+      dispatchMessage(db, {
+        id: uuid(), title: 'Test', subject: '', body: 'Body',
+        type: 'all', channel: 'all',
+        recipients: '[]',
+      })
+    }).not.toThrow()
+
+    const notifs = db.prepare('SELECT * FROM notifications').all() as any[]
+    expect(notifs.length).toBe(1)
   })
 })
