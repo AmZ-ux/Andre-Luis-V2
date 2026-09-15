@@ -55,7 +55,7 @@ export function dispatchMessage(db: any, message: any): void {
   }
 
   if (message.channel === 'push' || message.channel === 'all') {
-    pushService.sendToAll(message.title, message.body).catch(() => {})
+    pushService.sendToAll(message.title, message.body, { data: { path: '/' } }).catch(() => {})
   }
 
   if (message.channel === 'app' || message.channel === 'all') {
