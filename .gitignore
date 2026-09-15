@@ -35,3 +35,7 @@ Thumbs.db
 
 # Screenshots de validacao
 .screenshots/
+
+# Playwright
+test-results/
+playwright-report/
