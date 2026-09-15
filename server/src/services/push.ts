@@ -72,7 +72,9 @@ export const pushService = {
       const h = Math.abs(hash).toString(36).padStart(8, '0')
       db.prepare('DELETE FROM settings WHERE category = ?').run(`push_sub_${userId}_${h}`)
     } else {
-      db.prepare("DELETE FROM settings WHERE category LIKE ?").run(`push_sub_${userId}_%`)
+      const legacyKey = `push_sub_${userId}`
+      const newPrefix = `push_sub_${userId}_%`
+      db.prepare("DELETE FROM settings WHERE category = ? OR category LIKE ?").run(legacyKey, newPrefix)
     }
   },
 
@@ -88,8 +90,9 @@ export const pushService = {
     }
 
     const db = getDb()
-    const prefix = `push_sub_${userId}_`
-    const rows = db.prepare("SELECT category, data FROM settings WHERE category LIKE ?").all(`${prefix}%`) as any[]
+    const legacyKey = `push_sub_${userId}`
+    const newPrefix = `push_sub_${userId}_%`
+    const rows = db.prepare("SELECT category, data FROM settings WHERE category = ? OR category LIKE ?").all(legacyKey, newPrefix) as any[]
     if (!rows.length) {
       logger.warn({ userId }, 'Push send skipped: no subscriptions')
       return 0

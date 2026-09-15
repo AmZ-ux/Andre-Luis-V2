@@ -408,3 +408,32 @@ describe('ANÁLISE: unsubscribe multi-device', () => {
     expect(remaining.endpoint).toBe('https://fcm.googleapis.com/fcm/send/chrome-endpoint')
   })
 })
+
+describe('ETAPA 7: Subscriptions legadas', () => {
+  it('send() encontra subscription legada (push_sub_{userId} sem hash)', async () => {
+    process.env.VAPID_PUBLIC_KEY = 'pub'
+    process.env.VAPID_PRIVATE_KEY = 'priv'
+    sendNotificationMock.mockReset()
+    sendNotificationMock.mockResolvedValue({})
+
+    const { db, pushService } = await fresh()
+    const sub = { endpoint: 'https://p/legacy', keys: { p256dh: 'k', auth: 'a' } }
+    db.prepare("INSERT INTO settings (id, category, data) VALUES (?, ?, ?)")
+      .run('id-legacy', 'push_sub_user-legacy', JSON.stringify(sub))
+
+    expect(countSubs(db, 'user-legacy')).toBe(0)
+    const sent = await pushService.send('user-legacy', 'Title', 'Body')
+    expect(sent).toBe(1)
+    expect(sendNotificationMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('unsubscribe sem endpoint remove subscriptions legadas', async () => {
+    const { db, pushService } = await fresh()
+    const sub = { endpoint: 'https://p/legacy2', keys: { p256dh: 'k', auth: 'a' } }
+    db.prepare("INSERT INTO settings (id, category, data) VALUES (?, ?, ?)")
+      .run('id-legacy2', 'push_sub_user-legacy2', JSON.stringify(sub))
+
+    await pushService.unsubscribe('user-legacy2')
+    expect(db.prepare("SELECT 1 FROM settings WHERE category = 'push_sub_user-legacy2'").get()).toBeUndefined()
+  })
+})
