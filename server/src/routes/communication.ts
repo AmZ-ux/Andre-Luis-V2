@@ -16,7 +16,9 @@ function addHistory(db: any, messageId: string, action: string, description: str
 }
 
 function resolveTargetUserIds(db: any, message: any): string[] {
-  const recipients = (() => { try { return JSON.parse(message.recipients || '[]') } catch { return [] } })()
+  const raw = message.recipients || '[]'
+  const parsed = (() => { try { return JSON.parse(raw) } catch { return [] } })()
+  const recipients = Array.isArray(parsed) ? parsed : []
   if (recipients.length > 0) {
     return recipients.map((r: any) => (typeof r === 'string' ? r : r.id)).filter(Boolean)
   }
