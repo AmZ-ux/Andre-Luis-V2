@@ -202,7 +202,7 @@ export function useCommunication() {
       recipients: data.recipients,
       scheduledAt: data.scheduledAt || undefined,
       templateId: data.templateId || undefined,
-    }).then(() => loadAll()).catch(() => {})
+    }).then(() => loadAll()).catch(() => setError('Erro ao enviar mensagem'))
     return undefined
   }, [loadAll])
 
@@ -213,7 +213,7 @@ export function useCommunication() {
       return tpl
     }
 
-    realCommunication.createTemplate(data).then(() => loadAll()).catch(() => {})
+    realCommunication.createTemplate(data).then(() => loadAll()).catch(() => setError('Erro ao criar template'))
     return undefined
   }, [loadAll])
 
@@ -224,7 +224,7 @@ export function useCommunication() {
       return tpl
     }
 
-    realCommunication.updateTemplate(id, data).then(() => loadAll()).catch(() => {})
+    realCommunication.updateTemplate(id, data).then(() => loadAll()).catch(() => setError('Erro ao atualizar template'))
     return undefined
   }, [loadAll])
 
@@ -235,7 +235,7 @@ export function useCommunication() {
       return
     }
 
-    realCommunication.deleteTemplate(id).then(() => loadAll()).catch(() => {})
+    realCommunication.deleteTemplate(id).then(() => loadAll()).catch(() => setError('Erro ao deletar template'))
   }, [loadAll])
 
   const scheduleMessage = useCallback((messageId: string, date: string, time: string) => {
@@ -247,7 +247,7 @@ export function useCommunication() {
       return entry
     }
 
-    realCommunication.schedule(messageId, date, time).then(() => loadAll()).catch(() => {})
+    realCommunication.schedule(messageId, date, time).then(() => loadAll()).catch(() => setError('Erro ao agendar mensagem'))
     return undefined
   }, [loadAll])
 
@@ -260,7 +260,7 @@ export function useCommunication() {
       return
     }
 
-    realCommunication.updateStatus(messageId, 'draft').then(() => loadAll()).catch(() => {})
+    realCommunication.updateStatus(messageId, 'draft').then(() => loadAll()).catch(() => setError('Erro ao cancelar agendamento'))
   }, [loadAll])
 
   const markNotifRead = useCallback((id: string) => {

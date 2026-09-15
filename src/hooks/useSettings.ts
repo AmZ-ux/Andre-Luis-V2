@@ -80,8 +80,11 @@ export function useSettings() {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory | null>(null)
   const [loading, setLoading] = useState(config.realApi)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
+    setError(null)
+
     if (!config.realApi) {
       setSettings(settingsService.getAll())
       setAuditLog(auditService.list())
@@ -137,7 +140,7 @@ export function useSettings() {
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
       })
-      .catch(() => {})
+      .catch(() => setError('Erro ao salvar configurações'))
       .finally(() => reload())
   }, [reload])
 
@@ -155,7 +158,7 @@ export function useSettings() {
 
     realSettings.backup()
       .then(() => reload())
-      .catch(() => {})
+      .catch(() => setError('Erro ao criar backup'))
   }, [reload])
 
   const restoreBackup = useCallback((id: string) => {
@@ -172,12 +175,15 @@ export function useSettings() {
       return result
     }
 
-    realSettings.restoreBackup(id)
+    return realSettings.restoreBackup(id)
       .then(() => {
         reload()
         return true
       })
-      .catch(() => false)
+      .catch(() => {
+        setError('Erro ao restaurar backup')
+        return false
+      })
   }, [reload])
 
   const deleteBackup = useCallback((id: string) => {
@@ -189,7 +195,7 @@ export function useSettings() {
 
     realSettings.deleteBackup(id)
       .then(() => reload())
-      .catch(() => {})
+      .catch(() => setError('Erro ao deletar backup'))
   }, [reload])
 
   const downloadBackup = useCallback((id: string) => {
@@ -206,7 +212,7 @@ export function useSettings() {
 
     realSettings.clearLogs()
       .then(() => reload())
-      .catch(() => {})
+      .catch(() => setError('Erro ao limpar logs'))
   }, [reload])
 
   const clearAudit = useCallback(() => {
@@ -218,13 +224,13 @@ export function useSettings() {
 
     realSettings.clearAudit()
       .then(() => reload())
-      .catch(() => {})
+      .catch(() => setError('Erro ao limpar auditoria'))
   }, [reload])
 
   return {
     settings, auditLog, logs, backups,
     activeCategory, setActiveCategory,
-    loading, saved,
+    loading, saved, error,
     updateCategory, createBackup, restoreBackup, deleteBackup, downloadBackup, reload,
     clearLogs, clearAudit,
   }
