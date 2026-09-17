@@ -5,6 +5,7 @@ const ADMIN_ROUTES = [
   { path: '/passageiros', name: 'passageiros' },
   { path: '/mensalidades', name: 'mensalidades' },
   { path: '/comunicacao', name: 'comunicacao' },
+  { path: '/rotas', name: 'rotas' },
   { path: '/configuracoes', name: 'configuracoes' },
   { path: '/perfil', name: 'perfil' },
   { path: '/alterar-senha', name: 'alterar-senha' },
