@@ -9,6 +9,7 @@ import { sanitizeBody } from '../middleware/validation.js'
 import { resetDb, getDb } from '../database/connection.js'
 import { authMiddleware } from '../middleware/auth.js'
 import routesRoutes from '../routes/routes.js'
+import passengersRoutes from '../routes/passengers.js'
 
 process.env.DATABASE_PATH = ':memory:'
 
@@ -16,6 +17,7 @@ const app = express()
 app.use(express.json({ limit: '10mb' }))
 app.use(sanitizeBody)
 app.use('/api/routes', authMiddleware, routesRoutes)
+app.use('/api/passengers', authMiddleware, passengersRoutes)
 
 let adminToken: string
 let passengerToken: string
@@ -346,5 +348,162 @@ describe('Snapshot protection', () => {
       .send({ origin: 'NewOrigin' })
     const passenger = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(p1) as any
     expect(passenger.monthly_fee).toBe(400) // unchanged
+  })
+})
+
+describe('Route lifecycle — deactivation', () => {
+  it('deactivate route preserves linked passenger.route_id', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(pid, 'P', '111.111.111-01', '2000-01-01', routeId)
+    await request(app).delete(`/api/routes/${routeId}`).set('Authorization', `Bearer ${adminToken}`)
+    const p = db.prepare('SELECT route_id FROM passengers WHERE id = ?').get(pid) as any
+    expect(p.route_id).toBe(routeId)
+  })
+
+  it('deactivate route preserves passenger.monthly_fee', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(pid, 'P', '111.111.111-01', '2000-01-01', routeId)
+    await request(app).delete(`/api/routes/${routeId}`).set('Authorization', `Bearer ${adminToken}`)
+    const p = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(pid) as any
+    expect(p.monthly_fee).toBe(400)
+  })
+
+  it('deactivate route preserves existing monthly_fees', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(pid, 'P', '111.111.111-01', '2000-01-01', routeId)
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 400, 5, '05/08/2026', 'pending')")
+      .run(feeId, pid, 'P', '111.111.111-01')
+    await request(app).delete(`/api/routes/${routeId}`).set('Authorization', `Bearer ${adminToken}`)
+    const fee = db.prepare('SELECT amount, status FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.amount).toBe(400)
+    expect(fee.status).toBe('pending')
+  })
+})
+
+describe('Route lifecycle — inactive route price sync blocked', () => {
+  it('price change on inactive route is rejected (400)', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    // Deactivate
+    await request(app).delete(`/api/routes/${routeId}`).set('Authorization', `Bearer ${adminToken}`)
+    // Try to change price
+    const res = await request(app)
+      .put(`/api/routes/${routeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ monthlyAmount: 500 })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('rota inativa')
+    // Passenger price unchanged
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(pid, 'P', '111.111.111-01', '2000-01-01', routeId)
+    const p = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(pid) as any
+    expect(p.monthly_fee).toBe(400)
+  })
+
+  it('active route price change still syncs passengers', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(pid, 'P', '111.111.111-01', '2000-01-01', routeId)
+    const res = await request(app)
+      .put(`/api/routes/${routeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ monthlyAmount: 550 })
+    expect(res.status).toBe(200)
+    const p = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(pid) as any
+    expect(p.monthly_fee).toBe(550)
+  })
+})
+
+describe('Route lifecycle — reactivation', () => {
+  it('reactivate route makes it available for new association', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    // Deactivate
+    await request(app).delete(`/api/routes/${routeId}`).set('Authorization', `Bearer ${adminToken}`)
+    // Reactivate
+    const res = await request(app)
+      .put(`/api/routes/${routeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ active: true })
+    expect(res.status).toBe(200)
+    expect(res.body.active).toBe(1)
+    // Can now associate new passenger
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day, phone, email) VALUES (?, ?, ?, ?, 'university', 'active', 300, 5, '', '')")
+      .run(pid, 'New', '222.222.222-02', '2000-01-01')
+    const upd = await request(app)
+      .put(`/api/passengers/${pid}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ route_id: routeId })
+    expect(upd.status).toBe(200)
+    expect(upd.body.route_id).toBe(routeId)
+    expect(upd.body.monthly_fee).toBe(400)
+  })
+
+  it('reactivated route: historical monthly_fees unchanged', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(pid, 'P', '111.111.111-01', '2000-01-01', routeId)
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 400, 5, '05/08/2026', 'paid')")
+      .run(feeId, pid, 'P', '111.111.111-01')
+    // Deactivate + reactivate
+    await request(app).delete(`/api/routes/${routeId}`).set('Authorization', `Bearer ${adminToken}`)
+    await request(app).put(`/api/routes/${routeId}`).set('Authorization', `Bearer ${adminToken}`).send({ active: true })
+    const fee = db.prepare('SELECT amount FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.amount).toBe(400)
+  })
+})
+
+describe('Fee generator with inactive route', () => {
+  it('generator creates fee for passenger on inactive route using passenger.monthly_fee', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id, contract_start_date) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?, '2026-01-01')")
+      .run(pid, 'P', '111.111.111-01', '2000-01-01', routeId)
+    // Deactivate route
+    db.prepare('UPDATE routes SET active = 0 WHERE id = ?').run(routeId)
+    // Import and run generator
+    const { generateMonthlyFees } = await import('../services/monthlyFeeGenerator.js')
+    const result = generateMonthlyFees({ month: 10, year: 2026, passengerIds: [pid] }, db)
+    expect(result.created).toBe(1)
+    const fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 10 AND year = 2026').get(pid) as any
+    expect(fee.amount).toBe(400) // uses passenger.monthly_fee, not route.monthly_amount
+  })
+
+  it('generator does NOT check route.active', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 500, 0)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id, contract_start_date) VALUES (?, ?, ?, ?, 'university', 'active', 500, ?, '2026-01-01')")
+      .run(pid, 'P2', '222.222.222-02', '2000-01-01', routeId)
+    const { generateMonthlyFees } = await import('../services/monthlyFeeGenerator.js')
+    const result = generateMonthlyFees({ month: 10, year: 2026, passengerIds: [pid] }, db)
+    expect(result.created).toBe(1)
   })
 })

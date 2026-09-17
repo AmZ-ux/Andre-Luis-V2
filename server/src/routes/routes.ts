@@ -144,9 +144,14 @@ router.put('/:id', requireAdmin, (req, res) => {
   params.push(req.params.id)
 
   // If monthly_amount changed, sync passengers.monthly_fee for linked passengers (transactional)
+  // Price sync is blocked on inactive routes to preserve legacy pricing for existing passengers.
   if (monthlyAmount !== undefined) {
     const amount = Number(monthlyAmount)
-    const currentRoute = db.prepare('SELECT monthly_amount FROM routes WHERE id = ?').get(req.params.id) as any
+    const currentRoute = db.prepare('SELECT monthly_amount, active FROM routes WHERE id = ?').get(req.params.id) as any
+    if (currentRoute && !currentRoute.active) {
+      res.status(400).json({ error: 'Não é possível alterar o preço de uma rota inativa' })
+      return
+    }
     if (currentRoute && Number(currentRoute.monthly_amount) !== amount) {
       const runInTransaction = db.transaction(() => {
         db.prepare(`UPDATE routes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
