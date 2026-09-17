@@ -138,119 +138,17 @@ describe('GET /api/monthly-fees/:id', () => {
 })
 
 describe('POST /api/monthly-fees', () => {
-  it('should create a new monthly fee', async () => {
-    const pid = seedPassenger()
+  it('POST /api/monthly-fees is no longer available → 404', async () => {
     const res = await request(app)
       .post('/api/monthly-fees')
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        passengerId: pid,
-        passengerName: 'Test Passenger',
-        cpf: '111.111.111-11',
-        transportType: 'university',
-        month: 7,
-        year: 2026,
-        amount: 189.90,
-        dueDay: 5,
-      })
-    expect(res.status).toBe(201)
-    expect(res.body).toHaveProperty('id')
-    expect(res.body.status).toBe('pending')
-    expect(res.body.amount).toBe(189.90)
-    expect(res.body.due_date).toBe('05/07/2026')
-  })
-
-  it('should return 400 when required fields are missing', async () => {
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({})
-    expect(res.status).toBe(400)
-    expect(res.body.error).toBe('Passageiro é obrigatório')
-  })
-
-  it('should return 400 for invalid month, year, amount or due day', async () => {
-    const pid = seedPassenger()
-    const base = {
-      passengerId: pid,
-      passengerName: 'Test Passenger',
-      cpf: '111.111.111-11',
-      transportType: 'university',
-      month: 13,
-      year: 2026,
-      amount: 189.90,
-      dueDay: 5,
-    }
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send(base)
-    expect(res.status).toBe(400)
-    expect(res.body.error).toBe('Mês inválido')
-
-    const res2 = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...base, month: 7, year: 99 })
-    expect(res2.status).toBe(400)
-    expect(res2.body.error).toBe('Ano inválido')
-
-    const res3 = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...base, month: 7, year: 2026, amount: -5 })
-    expect(res3.status).toBe(400)
-    expect(res3.body.error).toBe('Valor da mensalidade inválido')
-
-    const res4 = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ ...base, month: 7, year: 2026, amount: 189.90, dueDay: 32 })
-    expect(res4.status).toBe(400)
-    expect(res4.body.error).toBe('Dia de vencimento inválido')
-  })
-
-  it('should return 404 when passenger does not exist', async () => {
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        passengerId: 'nao-existe',
-        passengerName: 'Test',
-        cpf: '111.111.111-11',
-        transportType: 'university',
-        month: 7,
-        year: 2026,
-        amount: 100,
-        dueDay: 5,
-      })
+      .send({ passengerId: 'x', passengerName: 'X', cpf: '000', transportType: 'university', month: 1, year: 2026, amount: 100, dueDay: 5 })
     expect(res.status).toBe(404)
-    expect(res.body.error).toBe('Passageiro não encontrado')
-  })
-
-  it('should return 409 when a fee already exists for passenger and period', async () => {
-    const pid = seedPassenger()
-    seedMonthlyFee(pid)
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        passengerId: pid,
-        passengerName: 'Test Passenger',
-        cpf: '111.111.111-11',
-        transportType: 'university',
-        month: 7,
-        year: 2026,
-        amount: 189.90,
-        dueDay: 5,
-      })
-    expect(res.status).toBe(409)
-    expect(res.body.error).toContain('já existe')
   })
 })
 
 describe('PUT /api/monthly-fees/:id', () => {
-  it('should update a monthly fee', async () => {
+  it('should update dueDay and notes but NOT amount', async () => {
     const pid = seedPassenger()
     const fid = seedMonthlyFee(pid)
     const res = await request(app)
@@ -258,7 +156,7 @@ describe('PUT /api/monthly-fees/:id', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ amount: 250, dueDay: 10, status: 'cancelled' })
     expect(res.status).toBe(200)
-    expect(res.body.amount).toBe(250)
+    expect(res.body.amount).toBe(189.90) // amount is NOT editable
     expect(res.body.due_day).toBe(10)
     expect(res.body.status).toBe('cancelled')
   })
@@ -446,14 +344,14 @@ describe('Role checks on admin-only endpoints', () => {
     return jwt.sign({ userId: pid, role: 'passenger' }, 'dev-secret-change-in-production')
   }
 
-  it('should deny passenger creating a fee manually', async () => {
+  it('should deny passenger creating a fee manually (endpoint removed → 404)', async () => {
     const pid = seedPassenger()
     const passengerToken = seedPassengerToken()
     const res = await request(app)
       .post('/api/monthly-fees')
       .set('Authorization', `Bearer ${passengerToken}`)
       .send({ passengerId: pid, passengerName: 'X', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 100, dueDay: 5 })
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(404)
   })
 
   it('should deny passenger registering a payment — route removed (404)', async () => {
@@ -594,67 +492,58 @@ describe('GET /api/monthly-fees/passenger/:passengerId (legacy)', () => {
 })
 
 describe('UNIQUE fee per passenger/month/year (DB constraint)', () => {
-  it('allows creating a fee for a passenger', async () => {
+  it('allows creating a fee for a passenger (via DB)', async () => {
+    const db = getDb()
     const pid = seedPassenger()
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
-    expect(res.status).toBe(201)
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')")
+      .run(uuid(), pid, 'Test', '111.111.111-11')
+    const fee = db.prepare('SELECT id FROM monthly_fees WHERE passenger_id = ? AND month = 8 AND year = 2026').get(pid)
+    expect(fee).toBeDefined()
   })
 
-  it('rejects duplicate fee for same passenger/month/year via API', async () => {
+  it('rejects duplicate fee for same passenger/month/year via DB', async () => {
+    const db = getDb()
     const pid = seedPassenger()
-    await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
-    expect(res.status).toBe(409)
-    expect(res.body.error).toContain('já existe')
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')")
+      .run(uuid(), pid, 'Test', '111.111.111-11')
+    expect(() => {
+      db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')")
+        .run(uuid(), pid, 'Test', '111.111.111-11')
+    }).toThrow()
   })
 
   it('allows same passenger for different month', async () => {
+    const db = getDb()
     const pid = seedPassenger()
-    await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 9, year: 2026, amount: 189.9, dueDay: 5 })
-    expect(res.status).toBe(201)
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')")
+      .run(uuid(), pid, 'Test', '111.111.111-11')
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 189.9, 5, '05/09/2026', 'pending')")
+      .run(uuid(), pid, 'Test', '111.111.111-11')
+    const fees = db.prepare('SELECT id FROM monthly_fees WHERE passenger_id = ?').all(pid)
+    expect(fees).toHaveLength(2)
   })
 
   it('allows same passenger for different year', async () => {
+    const db = getDb()
     const pid = seedPassenger()
-    await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pid, passengerName: 'Test', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2027, amount: 189.9, dueDay: 5 })
-    expect(res.status).toBe(201)
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')")
+      .run(uuid(), pid, 'Test', '111.111.111-11')
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2027, 189.9, 5, '05/08/2027', 'pending')")
+      .run(uuid(), pid, 'Test', '111.111.111-11')
+    const fees = db.prepare('SELECT id FROM monthly_fees WHERE passenger_id = ?').all(pid)
+    expect(fees).toHaveLength(2)
   })
 
   it('allows different passenger for same month/year', async () => {
+    const db = getDb()
     const pidA = seedPassenger()
     const pidB = seedPassenger()
-    await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pidA, passengerName: 'Test A', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
-    const res = await request(app)
-      .post('/api/monthly-fees')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ passengerId: pidB, passengerName: 'Test B', cpf: '111.111.111-11', transportType: 'university', month: 8, year: 2026, amount: 189.9, dueDay: 5 })
-    expect(res.status).toBe(201)
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')")
+      .run(uuid(), pidA, 'Test A', '111.111.111-11')
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 189.9, 5, '05/08/2026', 'pending')")
+      .run(uuid(), pidB, 'Test B', '222.222.222-22')
+    const fees = db.prepare('SELECT id FROM monthly_fees WHERE month = 8 AND year = 2026').all()
+    expect(fees).toHaveLength(2)
   })
 
   it('rejects duplicate at DB level even if app check is bypassed', async () => {
@@ -709,5 +598,225 @@ describe('DUPLICATE_FEES fail-safe migration', () => {
 
     const pixAfter = db.prepare('SELECT id FROM pix_charges WHERE monthly_fee_id = ?').all(feeId1)
     expect(pixAfter).toHaveLength(1)
+  })
+})
+
+describe('Phase 2E.2 — Price authority closure', () => {
+  it('POST /api/monthly-fees is no longer available → 404', async () => {
+    const res = await request(app)
+      .post('/api/monthly-fees')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ passengerId: 'x', passengerName: 'X', cpf: '000', transportType: 'university', month: 1, year: 2026, amount: 100, dueDay: 5 })
+    expect(res.status).toBe(404)
+  })
+
+  it('PUT amount does NOT change amount (amount tamper protection)', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'TamperFee', '111.111.111-01', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'pending')")
+      .run(feeId, pid, 'TamperFee', '111.111.111-01')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ amount: 1 })
+    expect(res.status).toBe(200)
+    const fee = db.prepare('SELECT amount FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.amount).toBe(400)
+  })
+
+  it('PUT dueDay continues working', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'DueDay', '222.222.222-02', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'pending')")
+      .run(feeId, pid, 'DueDay', '222.222.222-02')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dueDay: 15 })
+    expect(res.status).toBe(200)
+    const fee = db.prepare('SELECT due_day FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.due_day).toBe(15)
+  })
+
+  it('PUT notes continues working', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'Notes', '333.333.333-03', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'pending')")
+      .run(feeId, pid, 'Notes', '333.333.333-03')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ notes: 'test note' })
+    expect(res.status).toBe(200)
+    const fee = db.prepare('SELECT notes FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.notes).toBe('test note')
+  })
+
+  it('exemption continues working', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'Exempt', '444.444.444-04', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'pending')")
+      .run(feeId, pid, 'Exempt', '444.444.444-04')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'exempt' })
+    expect(res.status).toBe(200)
+    const fee = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.status).toBe('exempt')
+  })
+
+  it('cancellation continues working', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'Cancel', '555.555.555-05', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'pending')")
+      .run(feeId, pid, 'Cancel', '555.555.555-05')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'cancelled' })
+    expect(res.status).toBe(200)
+    const fee = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.status).toBe('cancelled')
+  })
+
+  it('paid fee → notes rejected (409), original preserved', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'PaidFeeNotes', '666.666.666-06', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status, notes) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'paid', 'original')")
+      .run(feeId, pid, 'PaidFeeNotes', '666.666.666-06')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ notes: 'alterado' })
+    expect(res.status).toBe(409)
+    const fee = db.prepare('SELECT notes, status FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.notes).toBe('original')
+    expect(fee.status).toBe('paid')
+  })
+
+  it('paid fee → dueDay rejected (409), original preserved', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'PaidFeeDue', '777.777.777-07', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'paid')")
+      .run(feeId, pid, 'PaidFeeDue', '777.777.777-07')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dueDay: 20 })
+    expect(res.status).toBe(409)
+    const fee = db.prepare('SELECT due_day FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.due_day).toBe(5)
+  })
+
+  it('paid fee → status cancelled rejected (409), remains paid', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'PaidFeeStatus', '888.888.888-08', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'paid')")
+      .run(feeId, pid, 'PaidFeeStatus', '888.888.888-08')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'cancelled' })
+    expect(res.status).toBe(409)
+    const fee = db.prepare('SELECT status FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.status).toBe('paid')
+  })
+
+  it('pending fee → notes + dueDay still work normally', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+      .run(pid, 'PendingEdit', '999.999.999-09', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 400, 5, '05/09/2026', 'pending')")
+      .run(feeId, pid, 'PendingEdit', '999.999.999-09')
+    const res = await request(app)
+      .put(`/api/monthly-fees/${feeId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ notes: 'teste', dueDay: 15 })
+    expect(res.status).toBe(200)
+    const fee = db.prepare('SELECT notes, due_day FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.notes).toBe('teste')
+    expect(fee.due_day).toBe(15)
+  })
+
+  it('legacy passenger (route_id=NULL, monthly_fee=189.90) generates fee correctly', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pid, 'Legacy', '777.777.777-07', '2000-01-01')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 9, 2026, 189.90, 5, '05/09/2026', 'pending')")
+      .run(feeId, pid, 'Legacy', '777.777.777-07')
+    const fee = db.prepare('SELECT amount FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(fee.amount).toBe(189.90)
+  })
+
+  it('route price change affects next fee but NOT existing fee (snapshot)', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(pid, 'SnapTest', '888.888.888-08', '2000-01-01', routeId)
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 400, 5, '05/08/2026', 'pending')")
+      .run(feeId, pid, 'SnapTest', '888.888.888-08')
+    // Change route price
+    db.prepare('UPDATE routes SET monthly_amount = 450 WHERE id = ?').run(routeId)
+    db.prepare('UPDATE passengers SET monthly_fee = 450 WHERE route_id = ?').run(routeId)
+    // Existing fee unchanged
+    const existingFee = db.prepare('SELECT amount FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(existingFee.amount).toBe(400)
+    // Passenger price updated
+    const passenger = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(pid) as any
+    expect(passenger.monthly_fee).toBe(450)
+  })
+
+  it('passenger route change affects next fee but NOT existing fee', async () => {
+    const db = getDb()
+    const routeA = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeA)
+    const routeB = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'C', 'D', 500, 1)").run(routeB)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(pid, 'RouteChg', '999.999.999-09', '2000-01-01', routeA)
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 8, 2026, 400, 5, '05/08/2026', 'pending')")
+      .run(feeId, pid, 'RouteChg', '999.999.999-09')
+    // Change route
+    db.prepare('UPDATE passengers SET route_id = ?, monthly_fee = 500 WHERE id = ?').run(routeB, pid)
+    // Existing fee unchanged
+    const existingFee = db.prepare('SELECT amount FROM monthly_fees WHERE id = ?').get(feeId) as any
+    expect(existingFee.amount).toBe(400)
+    // Passenger price updated
+    const passenger = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(pid) as any
+    expect(passenger.monthly_fee).toBe(500)
   })
 })

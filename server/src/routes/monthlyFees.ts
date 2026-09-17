@@ -151,54 +151,21 @@ router.get('/:id', (req, res) => {
   res.json({ ...fee, payment: payment || null })
 })
 
-router.post('/', (req, res) => {
-  if (!requireAdmin(req, res)) return
-  const db = getDb()
-  const { passengerId, passengerName, cpf, transportType, institution, company, month, year, amount, dueDay } = req.body
-
-  const monthNum = Number(month)
-  const yearNum = Number(year)
-  const amountNum = Number(amount)
-  const dueDayNum = Number(dueDay || 5)
-
-  if (!passengerId) { res.status(400).json({ error: 'Passageiro é obrigatório' }); return }
-  if (!passengerName || !cpf || !transportType) { res.status(400).json({ error: 'Dados do passageiro incompletos' }); return }
-  if (!Number.isInteger(monthNum) || monthNum < 1 || monthNum > 12) { res.status(400).json({ error: 'Mês inválido' }); return }
-  if (!Number.isInteger(yearNum) || yearNum < 1900 || yearNum > 2100) { res.status(400).json({ error: 'Ano inválido' }); return }
-  if (!Number.isFinite(amountNum) || amountNum <= 0) { res.status(400).json({ error: 'Valor da mensalidade inválido' }); return }
-  if (!Number.isInteger(dueDayNum) || dueDayNum < 1 || dueDayNum > 31) { res.status(400).json({ error: 'Dia de vencimento inválido' }); return }
-
-  const passenger = db.prepare('SELECT id FROM passengers WHERE id = ?').get(passengerId)
-  if (!passenger) { res.status(404).json({ error: 'Passageiro não encontrado' }); return }
-
-  const dup = db.prepare('SELECT id FROM monthly_fees WHERE passenger_id = ? AND month = ? AND year = ?').get(passengerId, monthNum, yearNum)
-  if (dup) { res.status(409).json({ error: 'Mensalidade já existe para este passageiro no período' }); return }
-
-  const id = uuid()
-  const dueDate = `${String(dueDayNum).padStart(2, '0')}/${String(monthNum).padStart(2, '0')}/${yearNum}`
-
-  db.prepare(`
-    INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-  `).run(id, passengerId, passengerName, cpf, transportType, institution || '', company || '', monthNum, yearNum, amountNum, dueDayNum, dueDate)
-
-  res.status(201).json(db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(id))
-})
-
 router.put('/:id', (req, res) => {
   if (!requireAdmin(req, res)) return
   const db = getDb()
-  const existing = db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(req.params.id)
+  const existing = db.prepare('SELECT id, status FROM monthly_fees WHERE id = ?').get(req.params.id) as any
   if (!existing) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
 
-  const { amount, dueDay, notes, status } = req.body
+  if (existing.status === 'paid') {
+    res.status(409).json({ error: 'Mensalidade paga não pode ser editada. Somente o gateway de pagamento pode alterar o status.' })
+    return
+  }
+
+  const { dueDay, notes, status } = req.body
   const sets: string[] = ['updated_at = datetime(\'now\')']
   const params: any[] = []
-  if (amount !== undefined) {
-    const amountNum = Number(amount)
-    if (!Number.isFinite(amountNum) || amountNum <= 0) { res.status(400).json({ error: 'Valor da mensalidade inválido' }); return }
-    sets.push('amount = ?'); params.push(amountNum)
-  }
+  // amount is NOT editable — price is determined by the route
   if (dueDay !== undefined) {
     const dueDayNum = Number(dueDay)
     if (!Number.isInteger(dueDayNum) || dueDayNum < 1 || dueDayNum > 31) { res.status(400).json({ error: 'Dia de vencimento inválido' }); return }

@@ -160,9 +160,6 @@ export const realMonthlyFees = {
   ensureCurrent: () =>
     api.post<{ next: MonthlyFee | null; created: number }>('/monthly-fees/ensure-current'),
 
-  create: (data: any) =>
-    api.post<MonthlyFee>('/monthly-fees', data),
-
   update: (id: string, data: any) =>
     api.put<MonthlyFee>(`/monthly-fees/${id}`, data),
 

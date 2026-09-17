@@ -9,12 +9,11 @@ import type { MonthlyFee } from '../../types/monthlyFee'
 interface EditFeeModalProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: (data: { amount: string; dueDay: string; notes: string }) => Promise<void>
+  onConfirm: (data: { dueDay: string; notes: string }) => Promise<void>
   fee: MonthlyFee | null
 }
 
 export function EditFeeModal({ isOpen, onClose, onConfirm, fee }: EditFeeModalProps) {
-  const [amount, setAmount] = useState('')
   const [dueDay, setDueDay] = useState('')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -22,7 +21,6 @@ export function EditFeeModal({ isOpen, onClose, onConfirm, fee }: EditFeeModalPr
 
   useEffect(() => {
     if (fee) {
-      setAmount(fee.amount.toFixed(2).replace('.', ','))
       setDueDay(String(fee.dueDay))
       setNotes(fee.notes || '')
       setErrors({})
@@ -31,8 +29,6 @@ export function EditFeeModal({ isOpen, onClose, onConfirm, fee }: EditFeeModalPr
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {}
-    const amountErr = monthlyRules.validateAmount(amount)
-    if (amountErr) errs.amount = amountErr
     const dueErr = monthlyRules.validateDueDay(dueDay)
     if (dueErr) errs.dueDay = dueErr
     setErrors(errs)
@@ -43,7 +39,7 @@ export function EditFeeModal({ isOpen, onClose, onConfirm, fee }: EditFeeModalPr
     if (!validate()) return
     setLoading(true)
     try {
-      await onConfirm({ amount, dueDay, notes })
+      await onConfirm({ dueDay, notes })
       onClose()
     } finally {
       setLoading(false)
@@ -51,6 +47,8 @@ export function EditFeeModal({ isOpen, onClose, onConfirm, fee }: EditFeeModalPr
   }
 
   if (!fee) return null
+
+  const formattedAmount = `R$ ${fee.amount.toFixed(2).replace('.', ',')}`
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Editar Mensalidade">
@@ -62,13 +60,14 @@ export function EditFeeModal({ isOpen, onClose, onConfirm, fee }: EditFeeModalPr
           </p>
         </div>
 
-        <Input
-          label="Valor (R$)"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          error={errors.amount}
-          placeholder="0,00"
-        />
+        <div>
+          <label className="block text-sm font-medium text-text mb-1">Valor (R$)</label>
+          <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm text-text">
+            {formattedAmount}
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Valor definido pela rota</p>
+        </div>
+
         <Input
           label="Dia de vencimento"
           value={dueDay}

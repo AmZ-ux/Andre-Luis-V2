@@ -106,9 +106,8 @@ export function useMonthlyFees(pageSize = 15) {
   }, [])
 
   const updateFee = useCallback(
-    async (id: string, data: { amount: string; dueDay: string; notes: string }) => {
+    async (id: string, data: { dueDay: string; notes: string }) => {
       const updates: Partial<MonthlyFee> = {
-        amount: parseFloat(data.amount.replace(',', '.')),
         dueDay: parseInt(data.dueDay),
         notes: data.notes,
       }

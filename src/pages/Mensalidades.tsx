@@ -87,7 +87,7 @@ export function Mensalidades() {
   )
 
   const handleEditConfirm = useCallback(
-    async (data: { amount: string; dueDay: string; notes: string }) => {
+    async (data: { dueDay: string; notes: string }) => {
       if (!selectedFee) return
       await updateFee(selectedFee.id, data)
       addToast('success', 'Mensalidade atualizada com sucesso!')

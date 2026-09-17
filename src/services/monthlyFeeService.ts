@@ -289,7 +289,7 @@ export const monthlyFeeService = {
   async create(
     data: Omit<MonthlyFee, 'id' | 'status' | 'payment' | 'createdAt' | 'updatedAt' | 'dueDate'>
   ): Promise<MonthlyFee> {
-    if (config.realApi) return realMonthlyFees.create(data)
+    if (config.realApi) throw new Error('Criação manual de mensalidade não disponível via API')
     await delay(300)
     const fees = loadFees()
     const fee: MonthlyFee = {
