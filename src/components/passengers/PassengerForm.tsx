@@ -251,7 +251,7 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
         school: form.school || undefined, workplace: form.workplace || undefined,
         pickupPoint: form.pickupPoint || undefined, destination: form.destination || undefined,
         contractStartDate: form.contractStartDate || undefined,
-        monthlyFee: parseFloat(form.monthlyFee), dueDay: parseInt(form.dueDay),
+        monthlyFee: parseFloat(form.monthlyFee) || 0, dueDay: parseInt(form.dueDay),
         paymentMethod: form.paymentMethod as PaymentMethod,
         status: form.status as PassengerStatus, notes: form.notes || undefined,
         routeId: selectedRouteId,

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { requireAdmin } from '../middleware/roles.js'
+import { logger } from '../utils/logger.js'
 
 const router = Router()
 
@@ -141,7 +142,26 @@ router.put('/:id', requireAdmin, (req, res) => {
   }
 
   params.push(req.params.id)
-  db.prepare(`UPDATE routes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+
+  // If monthly_amount changed, sync passengers.monthly_fee for linked passengers (transactional)
+  if (monthlyAmount !== undefined) {
+    const amount = Number(monthlyAmount)
+    const currentRoute = db.prepare('SELECT monthly_amount FROM routes WHERE id = ?').get(req.params.id) as any
+    if (currentRoute && Number(currentRoute.monthly_amount) !== amount) {
+      const runInTransaction = db.transaction(() => {
+        db.prepare(`UPDATE routes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+        db.prepare('UPDATE passengers SET monthly_fee = ?, updated_at = datetime(\'now\') WHERE route_id = ?')
+          .run(amount, req.params.id)
+      })
+      runInTransaction()
+      const synced = (db.prepare('SELECT COUNT(*) as c FROM passengers WHERE route_id = ?').get(req.params.id) as any).c
+      if (synced > 0) logger.info({ routeId: req.params.id, newAmount: amount, synced }, 'Route price synced to linked passengers')
+    } else {
+      db.prepare(`UPDATE routes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+    }
+  } else {
+    db.prepare(`UPDATE routes SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+  }
 
   const route = db.prepare('SELECT * FROM routes WHERE id = ?').get(req.params.id)
   res.json(route)

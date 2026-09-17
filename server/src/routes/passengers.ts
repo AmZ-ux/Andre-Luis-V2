@@ -79,7 +79,7 @@ router.put('/:id', (req, res) => {
   const fields = ['name', 'rg', 'birth_date', 'phone', 'whatsapp', 'email',
     'zip_code', 'street', 'number', 'complement', 'neighborhood', 'city', 'state',
     'transport_type', 'institution', 'course', 'class', 'company', 'school', 'workplace',
-    'monthly_fee', 'due_day', 'payment_method', 'status', 'notes', 'route_id']
+    'due_day', 'payment_method', 'status', 'notes', 'route_id']
 
   const allowedStatuses = ['active', 'inactive', 'vacation', 'blocked']
   if (req.body.status !== undefined && !allowedStatuses.includes(req.body.status)) {
@@ -88,8 +88,9 @@ router.put('/:id', (req, res) => {
   }
 
   // Validate route_id if provided
+  let newRouteId: string | null | undefined = undefined
   if (req.body.route_id !== undefined && req.body.route_id !== null && req.body.route_id !== '') {
-    const route = db.prepare('SELECT id, active FROM routes WHERE id = ?').get(req.body.route_id) as any
+    const route = db.prepare('SELECT id, active, monthly_amount FROM routes WHERE id = ?').get(req.body.route_id) as any
     if (!route) {
       res.status(400).json({ error: 'Rota não encontrada' })
       return
@@ -98,11 +99,9 @@ router.put('/:id', (req, res) => {
       res.status(400).json({ error: 'Não é possível associar a uma rota inativa' })
       return
     }
-  }
-
-  // Normalize route_id: empty string → null
-  if (req.body.route_id === '') {
-    req.body.route_id = null
+    newRouteId = req.body.route_id
+  } else if (req.body.route_id === '') {
+    newRouteId = null
   }
 
   const sets: string[] = []
@@ -113,6 +112,19 @@ router.put('/:id', (req, res) => {
       params.push(typeof req.body[f] === 'string' ? sanitizeInput(req.body[f]) : req.body[f])
     }
   }
+
+  // Price authority: derive monthly_fee from route when route_id is present
+  // monthly_fee is NEVER accepted from client — always derived from route or legacy value
+  if (newRouteId !== undefined) {
+    if (newRouteId) {
+      const route = db.prepare('SELECT monthly_amount FROM routes WHERE id = ?').get(newRouteId) as any
+      sets.push('monthly_fee = ?')
+      params.push(Number(route.monthly_amount) || 0)
+    } else {
+      // Removing route — keep existing monthly_fee, do not touch it
+    }
+  }
+  // If no route_id change, do not allow client to set monthly_fee at all
 
   if (sets.length === 0) { res.status(400).json({ error: 'Nenhum campo para atualizar' }); return }
 

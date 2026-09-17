@@ -285,4 +285,66 @@ describe('Snapshot protection', () => {
     const fee = db.prepare('SELECT amount FROM monthly_fees WHERE id = ?').get(feeId) as any
     expect(fee.amount).toBe(189.90)
   })
+
+  it('atualização de preço sincroniza passengers.monthly_fee dos passageiros vinculados', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Sync', 'Test', 400, 1)").run(routeId)
+    // Two passengers linked to this route
+    const p1 = uuid()
+    const p2 = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(p1, 'Sync1', '111.111.111-01', '2000-01-01', routeId)
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(p2, 'Sync2', '222.222.222-02', '2000-01-01', routeId)
+    // Unlinked passenger — should NOT be affected
+    const p3 = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 300)")
+      .run(p3, 'Unlinked', '333.333.333-03', '2000-01-01')
+    // Change route price
+    await request(app)
+      .put(`/api/routes/${routeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ monthlyAmount: 550 })
+    // Linked passengers updated
+    const updated1 = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(p1) as any
+    const updated2 = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(p2) as any
+    expect(updated1.monthly_fee).toBe(550)
+    expect(updated2.monthly_fee).toBe(550)
+    // Unlinked passenger unchanged
+    const unlinked = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(p3) as any
+    expect(unlinked.monthly_fee).toBe(300)
+  })
+
+  it('sync de preço é atômico (transactional)', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Atom', 'Test', 400, 1)").run(routeId)
+    const p1 = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(p1, 'Atom1', '444.444.444-04', '2000-01-01', routeId)
+    await request(app)
+      .put(`/api/routes/${routeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ monthlyAmount: 600 })
+    const route = db.prepare('SELECT monthly_amount FROM routes WHERE id = ?').get(routeId) as any
+    const passenger = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(p1) as any
+    expect(route.monthly_amount).toBe(600)
+    expect(passenger.monthly_fee).toBe(600)
+  })
+
+  it('não altera passageiros quando apenas origin/destination muda (sem monthlyAmount)', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'NoSync', 'Test', 400, 1)").run(routeId)
+    const p1 = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(p1, 'NoSync1', '555.555.555-05', '2000-01-01', routeId)
+    await request(app)
+      .put(`/api/routes/${routeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ origin: 'NewOrigin' })
+    const passenger = db.prepare('SELECT monthly_fee FROM passengers WHERE id = ?').get(p1) as any
+    expect(passenger.monthly_fee).toBe(400) // unchanged
+  })
 })

@@ -140,8 +140,47 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({ name: 'Com Rota', email: 'comrota@teste.com', cpf: '111.222.333-44', password: 'Test@123', routeId })
     expect(res.status).toBe(201)
-    const passenger = db.prepare('SELECT route_id FROM passengers WHERE email = ?').get('comrota@teste.com') as any
+    const passenger = db.prepare('SELECT route_id, monthly_fee FROM passengers WHERE email = ?').get('comrota@teste.com') as any
     expect(passenger.route_id).toBe(routeId)
+    // Price derived from route.monthly_amount, NOT from settings
+    expect(passenger.monthly_fee).toBe(400)
+  })
+
+  it('REGISTER_TAMPER: route price=400, payload monthlyFee=1 → persisted=400', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-tamper-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O-T', 'D-T', 400, 1)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'TamperRegister', email: 'tampereg@teste.com', cpf: '555.666.777-88', password: 'Test@123', routeId, monthlyFee: 1 })
+    expect(res.status).toBe(201)
+    const passenger = db.prepare('SELECT monthly_fee FROM passengers WHERE email = ?').get('tampereg@teste.com') as any
+    // Price from route, NOT from tampered payload
+    expect(passenger.monthly_fee).toBe(400)
+  })
+
+  it('REGISTER_TAMPER_HIGH: route price=400, payload monthlyFee=999999 → persisted=400', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-tamper-high-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O-TH', 'D-TH', 400, 1)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'TamperHigh', email: 'tamperhigh@teste.com', cpf: '666.777.888-99', password: 'Test@123', routeId, monthlyFee: 999999 })
+    expect(res.status).toBe(201)
+    const passenger = db.prepare('SELECT monthly_fee FROM passengers WHERE email = ?').get('tamperhigh@teste.com') as any
+    expect(passenger.monthly_fee).toBe(400)
+  })
+
+  it('REGISTER_TAMPER_NEGATIVE: route price=400, payload monthlyFee=-1 → persisted=400', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-tamper-neg-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O-TN', 'D-TN', 400, 1)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'TamperNeg', email: 'tampeneg@teste.com', cpf: '777.888.999-00', password: 'Test@123', routeId, monthlyFee: -1 })
+    expect(res.status).toBe(201)
+    const passenger = db.prepare('SELECT monthly_fee FROM passengers WHERE email = ?').get('tampeneg@teste.com') as any
+    expect(passenger.monthly_fee).toBe(400)
   })
 
   it('should reject register with non-existent routeId', async () => {

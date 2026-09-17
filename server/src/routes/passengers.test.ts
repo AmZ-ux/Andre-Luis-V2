@@ -121,10 +121,10 @@ describe('PUT /api/passengers/:id', () => {
     const res = await request(app)
       .put(`/api/passengers/${id}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'Updated Name', monthly_fee: 200 })
+      .send({ name: 'Updated Name' })
     expect(res.status).toBe(200)
     expect(res.body.name).toBe('Updated Name')
-    expect(res.body.monthly_fee).toBe(200)
+    expect(res.body.monthly_fee).toBe(100)
   })
 
   it('should return 404 when passenger not found', async () => {
@@ -654,29 +654,22 @@ describe('Passenger route_id (Phase 2C.1)', () => {
     expect(res.body.route_id).toBeNull()
   })
 
-  it('changing routeId does NOT change passengers.monthly_fee', async () => {
+  it('changing routeId now DERIVES monthly_fee from the new route', async () => {
     const db = getDb()
     const id = uuid()
     db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
       .run(id, 'FeePreserved', '103.103.103-13', '2000-01-01')
-    // Route has monthly_amount=400, but passenger has monthly_fee=400
-    // Change to route with monthly_amount=300 — passenger fee should stay 400
+    // Create a second route with monthly_amount=500
+    const route2Id = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O2', 'D2', 500, 1)")
+      .run(route2Id)
     const res = await request(app)
       .put(`/api/passengers/${id}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ route_id: inactiveRouteId }) // Will be rejected because inactive
-    // So test with valid route
-    const db2 = getDb()
-    const route2Id = uuid()
-    db2.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O2', 'D2', 500, 1)")
-      .run(route2Id)
-    const res2 = await request(app)
-      .put(`/api/passengers/${id}`)
-      .set('Authorization', `Bearer ${token}`)
       .send({ route_id: route2Id })
-    expect(res2.status).toBe(200)
-    expect(res2.body.monthly_fee).toBe(400) // unchanged, NOT 500
-    expect(res2.body.route_id).toBe(route2Id)
+    expect(res.status).toBe(200)
+    expect(res.body.monthly_fee).toBe(500) // derived from new route
+    expect(res.body.route_id).toBe(route2Id)
   })
 
   it('changing routeId does NOT change monthly_fees.amount', async () => {
@@ -749,7 +742,7 @@ describe('Passenger route_id (Phase 2C.1)', () => {
     expect(res.status).toBe(403)
   })
 
-  it('TAMPER: sending monthly_fee=1 with valid route_id persists route_id but NOT the tampered fee', async () => {
+  it('TAMPER: sending monthly_fee=1 with valid route_id derives price from route, ignores tampered fee', async () => {
     const db = getDb()
     const id = uuid()
     db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
@@ -761,12 +754,11 @@ describe('Passenger route_id (Phase 2C.1)', () => {
       .send({ route_id: routeId, monthly_fee: 1 })
     expect(res.status).toBe(200)
     expect(res.body.route_id).toBe(routeId)
-    // monthly_fee IS in the fields array, so it WILL be updated
-    // This is the current behavior — backend trusts the client for monthly_fee
-    expect(res.body.monthly_fee).toBe(1)
+    // monthly_fee is derived from route.monthly_amount (400), NOT from tampered value (1)
+    expect(res.body.monthly_fee).toBe(400)
   })
 
-  it('PRICE_AUTHORITY: backend does not validate monthly_fee against route.monthly_amount', async () => {
+  it('PRICE_AUTHORITY: backend derives monthly_fee from route, ignores client monthly_fee', async () => {
     const db = getDb()
     const id = uuid()
     db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
@@ -777,7 +769,109 @@ describe('Passenger route_id (Phase 2C.1)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ route_id: routeId, monthly_fee: 9999 })
     expect(res.status).toBe(200)
-    // Backend accepts it — no price validation against route
-    expect(res.body.monthly_fee).toBe(9999)
+    // Backend derives from route, ignores client value
+    expect(res.body.monthly_fee).toBe(400)
+  })
+
+  it('TAMPER_HIGH: sending monthly_fee=999999 with valid route_id is ignored', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(id, 'TamperHigh', '700.700.700-20', '2000-01-01', routeId)
+    const res = await request(app)
+      .put(`/api/passengers/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ route_id: routeId, monthly_fee: 999999 })
+    expect(res.status).toBe(200)
+    expect(res.body.monthly_fee).toBe(400)
+  })
+
+  it('TAMPER_NEGATIVE: sending monthly_fee=-1 with valid route_id is ignored', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(id, 'TamperNeg', '700.700.700-21', '2000-01-01', routeId)
+    const res = await request(app)
+      .put(`/api/passengers/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ route_id: routeId, monthly_fee: -1 })
+    expect(res.status).toBe(200)
+    expect(res.body.monthly_fee).toBe(400)
+  })
+
+  it('TAMPER_STRING: sending monthly_fee="NaN" with valid route_id is ignored', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(id, 'TamperStr', '700.700.700-22', '2000-01-01', routeId)
+    const res = await request(app)
+      .put(`/api/passengers/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ route_id: routeId, monthly_fee: 'NaN' })
+    expect(res.status).toBe(200)
+    expect(res.body.monthly_fee).toBe(400)
+  })
+
+  it('TAMPER_NULL: sending monthly_fee=null with valid route_id is ignored', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(id, 'TamperNull', '700.700.700-23', '2000-01-01', routeId)
+    const res = await request(app)
+      .put(`/api/passengers/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ route_id: routeId, monthly_fee: null })
+    expect(res.status).toBe(200)
+    expect(res.body.monthly_fee).toBe(400)
+  })
+
+  it('UPDATE_OTHER_FIELD: sending monthly_fee=1 without route_id change does NOT alter price', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(id, 'OtherField', '700.700.700-24', '2000-01-01', routeId)
+    const res = await request(app)
+      .put(`/api/passengers/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Updated Name', monthly_fee: 1 })
+    expect(res.status).toBe(200)
+    expect(res.body.name).toBe('Updated Name')
+    // monthly_fee unchanged — client cannot set it directly
+    expect(res.body.monthly_fee).toBe(400)
+  })
+
+  it('ROUTE_CHANGE: changing route derives new price from new route', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+      .run(id, 'RouteChange', '700.700.700-25', '2000-01-01', routeId)
+    // Create a second route with different price
+    const route2Id = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O2', 'D2', 550, 1)")
+      .run(route2Id)
+    const res = await request(app)
+      .put(`/api/passengers/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ route_id: route2Id, monthly_fee: 1 })
+    expect(res.status).toBe(200)
+    expect(res.body.route_id).toBe(route2Id)
+    // Price derived from new route (550), not tampered (1)
+    expect(res.body.monthly_fee).toBe(550)
+  })
+
+  it('LEGACY_NO_ROUTE: monthly_fee is not accepted from client for legacy passengers', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 200)")
+      .run(id, 'LegacyFee', '700.700.700-26', '2000-01-01')
+    // monthly_fee is no longer in the fields array — sending it has no effect
+    const res = await request(app)
+      .put(`/api/passengers/${id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Updated', monthly_fee: 999 })
+    expect(res.status).toBe(200)
+    expect(res.body.name).toBe('Updated')
+    // monthly_fee unchanged — field is no longer accepted from client
+    expect(res.body.monthly_fee).toBe(200)
   })
 })

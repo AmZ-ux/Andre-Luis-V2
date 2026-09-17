@@ -104,19 +104,14 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
   const validTypes = ['university', 'school', 'contract']
   const type = validTypes.includes(transportType) ? transportType : 'university'
 
-  // Valor da mensalidade vem da configuração da empresa, nunca do passageiro
+  // Valor da mensalidade: vem da rota (route.monthly_amount) ou da configuração
   const settings = loadSettings(db)
-  const feeValue = Number(settings.financial.defaultMonthlyFee) || 0
-  if (feeValue <= 0) {
-    db.prepare('DELETE FROM users WHERE id = ?').run(id)
-    res.status(400).json({ error: 'Mensalidade padrão não configurada. Contate a administração.' })
-    return
-  }
+  let feeValue = Number(settings.financial.defaultMonthlyFee) || 0
 
-  // Validate routeId if provided
+  // Validate routeId if provided — route is the price authority
   let resolvedRouteId: string | null = null
   if (routeId && typeof routeId === 'string') {
-    const route = db.prepare('SELECT id, active FROM routes WHERE id = ?').get(routeId) as any
+    const route = db.prepare('SELECT id, active, monthly_amount FROM routes WHERE id = ?').get(routeId) as any
     if (!route) {
       db.prepare('DELETE FROM users WHERE id = ?').run(id)
       res.status(400).json({ error: 'Rota não encontrada' })
@@ -128,6 +123,12 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
       return
     }
     resolvedRouteId = routeId
+    feeValue = Number(route.monthly_amount) || feeValue
+  }
+  if (feeValue <= 0) {
+    db.prepare('DELETE FROM users WHERE id = ?').run(id)
+    res.status(400).json({ error: 'Mensalidade padrão não configurada. Contate a administração.' })
+    return
   }
 
   let dueDay = 5
