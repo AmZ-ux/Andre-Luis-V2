@@ -16,6 +16,7 @@ const MinhasMensalidades = lazy(() => import('./pages/MinhasMensalidades').then(
 const DisponibilidadeDetails = lazy(() => import('./pages/DisponibilidadeDetails').then((m) => ({ default: m.DisponibilidadeDetails })))
 const CentralComunicacao = lazy(() => import('./pages/CentralComunicacao').then((m) => ({ default: m.CentralComunicacao })))
 const Configuracoes = lazy(() => import('./pages/Configuracoes').then((m) => ({ default: m.Configuracoes })))
+const Rotas = lazy(() => import('./pages/Rotas').then((m) => ({ default: m.Rotas })))
 const NotFound = lazy(() => import('./pages/NotFound').then((m) => ({ default: m.NotFound })))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage').then((m) => ({ default: m.LoginPage })))
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage').then((m) => ({ default: m.RegisterPage })))
@@ -82,6 +83,7 @@ export const router = createBrowserRouter([
       { path: 'comunicacao', element: protect(lazyPage(<CentralComunicacao />), ['admin']) },
       { path: 'relatorios', element: <Navigate to="/?tab=relatorios" replace /> },
       { path: 'configuracoes', element: protect(lazyPage(<Configuracoes />), ['admin']) },
+      { path: 'rotas', element: protect(lazyPage(<Rotas />), ['admin']) },
       { path: 'perfil', element: protect(lazyPage(<ProfilePage />)) },
       { path: 'alterar-senha', element: protect(lazyPage(<ChangePasswordPage />)) },
       { path: '*', element: lazyPage(<NotFound />) },

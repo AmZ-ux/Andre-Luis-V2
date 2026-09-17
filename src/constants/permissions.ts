@@ -8,9 +8,10 @@ export type Permission =
   | 'profile'
   | 'communication'
   | 'myAvailability'
+  | 'routes'
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  admin: ['dashboard', 'passengers', 'payments', 'settings', 'profile', 'communication'],
+  admin: ['dashboard', 'passengers', 'payments', 'settings', 'profile', 'communication', 'routes'],
   passenger: ['dashboard', 'myAvailability', 'profile'],
 }
 

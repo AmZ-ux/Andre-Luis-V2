@@ -13,6 +13,7 @@ const itemPermissionMap: Record<string, Permission> = {
   '/passageiros': 'passengers',
   '/mensalidades': 'payments',
   '/comunicacao': 'communication',
+  '/rotas': 'routes',
   '/configuracoes': 'settings',
 }
 

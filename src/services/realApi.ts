@@ -7,6 +7,7 @@ import type { Passenger, PassengerFilters, SortState } from '../types/passenger'
 import type { MonthlyFee, MonthlyFeeFilters, MonthlyFeeSort } from '../types/monthlyFee'
 import type { Availability } from '../types/availability'
 import type { DashboardData } from '../types/dashboard'
+import type { Route, RouteFormData } from '../types/route'
 
 // --- Auth ---
 export const realAuth = {
@@ -320,6 +321,27 @@ export const realSettings = {
 export const realHealth = {
   check: () =>
     api.get<any>('/health', undefined, true),
+}
+
+// --- Routes ---
+export const realRoutes = {
+  list: () =>
+    api.get<Route[]>('/routes'),
+
+  listAll: () =>
+    api.get<Route[]>('/routes', { includeInactive: true }),
+
+  getById: (id: string) =>
+    api.get<Route>(`/routes/${id}`),
+
+  create: (data: RouteFormData) =>
+    api.post<Route>('/routes', data),
+
+  update: (id: string, data: Partial<RouteFormData>) =>
+    api.put<Route>(`/routes/${id}`, data),
+
+  deactivate: (id: string) =>
+    api.delete<void>(`/routes/${id}`),
 }
 
 // --- Reports ---

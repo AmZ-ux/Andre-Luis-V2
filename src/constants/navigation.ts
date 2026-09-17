@@ -5,6 +5,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Passageiros', path: '/passageiros', icon: 'Users' },
   { label: 'Mensalidades', path: '/mensalidades', icon: 'Wallet' },
   { label: 'Comunicação', path: '/comunicacao', icon: 'MessageSquare' },
+  { label: 'Rotas e Valores', path: '/rotas', icon: 'MapPin' },
   { label: 'Configurações', path: '/configuracoes', icon: 'Settings' },
 ]
 
