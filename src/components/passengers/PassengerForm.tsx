@@ -1,10 +1,10 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { Textarea } from '../ui/Textarea'
 import { Button } from '../ui/Button'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, MapPin, AlertTriangle } from 'lucide-react'
 import {
   formatCPF,
   formatPhone,
@@ -16,6 +16,8 @@ import {
   statusOptions,
 } from '../../validators/passengerValidators'
 import type { Passenger, PassengerFormData, PassengerStatus, TransportType, PaymentMethod } from '../../types/passenger'
+import type { Route } from '../../types/route'
+import { routeService } from '../../services/routeService'
 import { useToast } from '../../contexts/ToastContext'
 
 interface PassengerFormProps {
@@ -56,12 +58,92 @@ const emptyForm: PassengerFormData = {
   monthlyFee: '', dueDay: '', paymentMethod: 'pix', status: 'active', notes: '',
 }
 
+function formatBRL(value: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+}
+
 export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: PassengerFormProps) {
   const { addToast } = useToast()
   const [form, setForm] = useState<PassengerFormData>(emptyForm)
   const [errors, setErrors] = useState<Partial<Record<keyof PassengerFormData, string>>>({})
   const [saving, setSaving] = useState(false)
 
+  // Route state
+  const [allRoutes, setAllRoutes] = useState<Route[]>([])
+  const [routesLoading, setRoutesLoading] = useState(false)
+  const [routesError, setRoutesError] = useState(false)
+  const [selectedOrigin, setSelectedOrigin] = useState('')
+  const [selectedDestination, setSelectedDestination] = useState('')
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
+  const [inactiveRouteInfo, setInactiveRouteInfo] = useState<Route | null>(null)
+
+  // Fetch all routes (active + inactive) on mount
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    setRoutesLoading(true)
+    setRoutesError(false)
+    routeService.listAll()
+      .then((routes) => { if (!cancelled) setAllRoutes(routes) })
+      .catch(() => { if (!cancelled) setRoutesError(true) })
+      .finally(() => { if (!cancelled) setRoutesLoading(false) })
+    return () => { cancelled = true }
+  }, [isOpen])
+
+  // Unique active origins (sorted)
+  const activeOrigins = useMemo(() => {
+    const set = new Set(allRoutes.filter((r) => r.active).map((r) => r.origin))
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [allRoutes])
+
+  // Active destinations for selected origin
+  const activeDestinations = useMemo(() => {
+    if (!selectedOrigin) return []
+    return allRoutes
+      .filter((r) => r.active && r.origin === selectedOrigin)
+      .map((r) => r.destination)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [allRoutes, selectedOrigin])
+
+  // Resolve selected route
+  const selectedRoute = useMemo(() => {
+    if (!selectedOrigin || !selectedDestination) return null
+    return allRoutes.find(
+      (r) => r.origin === selectedOrigin && r.destination === selectedDestination && r.active
+    ) || null
+  }, [allRoutes, selectedOrigin, selectedDestination])
+
+  // Pre-select route when editing
+  useEffect(() => {
+    if (!editPassenger || allRoutes.length === 0) return
+
+    if (editPassenger.routeId) {
+      const route = allRoutes.find((r) => r.id === editPassenger.routeId)
+      if (route) {
+        setSelectedOrigin(route.origin)
+        setSelectedDestination(route.destination)
+        setSelectedRouteId(route.id)
+        if (!route.active) {
+          setInactiveRouteInfo(route)
+        }
+      }
+    }
+  }, [editPassenger, allRoutes])
+
+  // Update form when route changes
+  useEffect(() => {
+    if (selectedRoute) {
+      setForm((prev) => ({ ...prev, monthlyFee: String(selectedRoute.monthlyAmount) }))
+      setSelectedRouteId(selectedRoute.id)
+      setInactiveRouteInfo(null)
+    } else if (selectedOrigin && selectedDestination && !selectedRoute) {
+      // Destination selected but no matching route (shouldn't happen with valid UI)
+      setForm((prev) => ({ ...prev, monthlyFee: '' }))
+      setSelectedRouteId(null)
+    }
+  }, [selectedRoute, selectedOrigin, selectedDestination])
+
+  // Initialize form with edit passenger data
   useEffect(() => {
     if (editPassenger) {
       setForm({
@@ -85,6 +167,10 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
     } else {
       setForm(emptyForm)
     }
+    setSelectedOrigin('')
+    setSelectedDestination('')
+    setSelectedRouteId(null)
+    setInactiveRouteInfo(null)
     setErrors({})
   }, [editPassenger, isOpen])
 
@@ -99,6 +185,20 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 
+  const handleOriginChange = (value: string) => {
+    setSelectedOrigin(value)
+    setSelectedDestination('')
+    setSelectedRouteId(null)
+    setInactiveRouteInfo(null)
+    setForm((prev) => ({ ...prev, monthlyFee: '' }))
+    if (errors.monthlyFee) setErrors((prev) => ({ ...prev, monthlyFee: undefined }))
+  }
+
+  const handleDestinationChange = (value: string) => {
+    setSelectedDestination(value)
+    if (errors.monthlyFee) setErrors((prev) => ({ ...prev, monthlyFee: undefined }))
+  }
+
   const validate = (): boolean => {
     const errs: typeof errors = {}
     if (!form.name.trim()) errs.name = 'Nome obrigatório'
@@ -106,6 +206,17 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
     else if (!isValidCPF(form.cpf)) errs.cpf = 'CPF inválido'
     if (!form.phone.trim()) errs.phone = 'Telefone obrigatório'
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email inválido'
+    // Route validation: required for new passengers
+    if (!editPassenger) {
+      if (!selectedOrigin) errs.monthlyFee = 'Selecione um ponto de saída'
+      else if (!selectedDestination) errs.monthlyFee = 'Selecione um destino'
+      else if (!selectedRoute) errs.monthlyFee = 'Rota inválida'
+    } else {
+      // For editing, validate if route is selected
+      if (selectedOrigin && selectedDestination && !selectedRoute) {
+        errs.monthlyFee = 'Rota inválida'
+      }
+    }
     const fee = parseFloat(form.monthlyFee)
     if (!form.monthlyFee || isNaN(fee) || fee <= 0) errs.monthlyFee = 'Valor deve ser maior que zero'
     const day = parseInt(form.dueDay)
@@ -143,6 +254,7 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
         monthlyFee: parseFloat(form.monthlyFee), dueDay: parseInt(form.dueDay),
         paymentMethod: form.paymentMethod as PaymentMethod,
         status: form.status as PassengerStatus, notes: form.notes || undefined,
+        routeId: selectedRouteId,
       })
       onClose()
     } catch {
@@ -151,6 +263,8 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
       setSaving(false)
     }
   }
+
+  const noActiveRoutes = !routesLoading && !routesError && activeOrigins.length === 0
 
   return (
     <Modal
@@ -211,17 +325,85 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
           )}
         </FormSection>
 
-        <FormSection title="Trajeto do Contrato">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Ponto de saída" value={form.pickupPoint} onChange={(e) => handleChange('pickupPoint', e.target.value)} placeholder="Ex.: Terminal Central" />
-            <Input label="Destino" value={form.destination} onChange={(e) => handleChange('destination', e.target.value)} placeholder="Ex.: USP - Cidade Universitária" />
-            <Input label="Data de início do contrato" type="date" value={form.contractStartDate} onChange={(e) => handleChange('contractStartDate', e.target.value)} className="sm:col-span-2" />
-          </div>
+        <FormSection title="Rota e Mensalidade">
+          {routesLoading && (
+            <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Carregando rotas...
+            </div>
+          )}
+          {routesError && (
+            <div className="flex items-center gap-2 text-sm text-error py-2">
+              <AlertTriangle className="h-4 w-4" />
+              Erro ao carregar rotas. Tente novamente.
+            </div>
+          )}
+          {noActiveRoutes && (
+            <div className="flex items-center gap-2 text-sm text-amber-600 py-2">
+              <MapPin className="h-4 w-4" />
+              Nenhuma rota ativa cadastrada. Cadastre uma rota em Rotas e Valores.
+            </div>
+          )}
+          {!routesLoading && !routesError && activeOrigins.length > 0 && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Select
+                  label="Ponto de saída *"
+                  options={activeOrigins.map((o) => ({ value: o, label: o }))}
+                  value={selectedOrigin}
+                  onChange={(e) => handleOriginChange(e.target.value)}
+                  placeholder="Selecione..."
+                  disabled={routesLoading}
+                />
+                <Select
+                  label="Destino *"
+                  options={activeDestinations.map((d) => ({ value: d, label: d }))}
+                  value={selectedDestination}
+                  onChange={(e) => handleDestinationChange(e.target.value)}
+                  placeholder={selectedOrigin ? 'Selecione...' : 'Selecione primeiro o ponto de saída'}
+                  disabled={routesLoading || !selectedOrigin}
+                />
+              </div>
+
+              {/* Inactive route warning for existing passenger */}
+              {inactiveRouteInfo && editPassenger?.routeId && (
+                <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>
+                    Rota atual: <strong>{inactiveRouteInfo.origin} → {inactiveRouteInfo.destination}</strong> ({formatBRL(inactiveRouteInfo.monthlyAmount)})
+                    {' '}— <span className="font-medium">Rota inativa</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Monthly amount display */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl px-4 py-3">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Mensalidade</p>
+                {selectedRoute ? (
+                  <p className="text-lg font-bold text-text">{formatBRL(selectedRoute.monthlyAmount)}</p>
+                ) : (
+                  <p className="text-lg text-gray-400">— Selecione uma rota —</p>
+                )}
+              </div>
+
+              {errors.monthlyFee && (
+                <p className="text-sm text-error" role="alert">{errors.monthlyFee}</p>
+              )}
+            </div>
+          )}
+
+          <Input label="Data de início do contrato" type="date" value={form.contractStartDate} onChange={(e) => handleChange('contractStartDate', e.target.value)} />
         </FormSection>
 
         <FormSection title="Informações Financeiras">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Input label="Valor da mensalidade *" value={form.monthlyFee} onChange={(e) => handleChange('monthlyFee', e.target.value)} error={errors.monthlyFee} placeholder="0,00" />
+            <Input
+              label="Valor da mensalidade *"
+              value={form.monthlyFee ? formatBRL(parseFloat(form.monthlyFee) || 0) : ''}
+              readOnly
+              className="bg-gray-50 dark:bg-gray-800/50 cursor-not-allowed"
+              placeholder="Selecione uma rota"
+            />
             <Input label="Dia do vencimento *" value={form.dueDay} onChange={(e) => handleChange('dueDay', e.target.value)} error={errors.dueDay} placeholder="1-31" maxLength={2} />
             <Select label="Forma de pagamento" options={paymentMethodOptions} value={form.paymentMethod} onChange={(e) => handleChange('paymentMethod', e.target.value)} />
           </div>
@@ -241,7 +423,7 @@ export function PassengerForm({ isOpen, onClose, onSave, editPassenger }: Passen
           <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button type="submit" loading={saving}>
+          <Button type="submit" loading={saving} disabled={routesLoading || routesError || noActiveRoutes}>
             {editPassenger ? 'Salvar alterações' : 'Cadastrar passageiro'}
           </Button>
         </div>

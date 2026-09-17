@@ -17,7 +17,7 @@ router.get('/me', requireAuth, (req, res) => {
            zip_code, street, number, complement, neighborhood, city, state,
            transport_type, institution, course, class, company, school, workplace,
            monthly_fee, due_day, payment_method, status,
-           pickup_point, destination, contract_start_date, created_at
+           pickup_point, destination, contract_start_date, route_id, created_at
     FROM passengers WHERE id = ?
   `).get(req.user.userId)
   if (!passenger) { res.status(404).json({ error: 'Cadastro de passageiro não encontrado' }); return }
@@ -79,12 +79,30 @@ router.put('/:id', (req, res) => {
   const fields = ['name', 'rg', 'birth_date', 'phone', 'whatsapp', 'email',
     'zip_code', 'street', 'number', 'complement', 'neighborhood', 'city', 'state',
     'transport_type', 'institution', 'course', 'class', 'company', 'school', 'workplace',
-    'monthly_fee', 'due_day', 'payment_method', 'status', 'notes']
+    'monthly_fee', 'due_day', 'payment_method', 'status', 'notes', 'route_id']
 
   const allowedStatuses = ['active', 'inactive', 'vacation', 'blocked']
   if (req.body.status !== undefined && !allowedStatuses.includes(req.body.status)) {
     res.status(400).json({ error: 'Status inválido. Valores permitidos: active, inactive, vacation, blocked.' })
     return
+  }
+
+  // Validate route_id if provided
+  if (req.body.route_id !== undefined && req.body.route_id !== null && req.body.route_id !== '') {
+    const route = db.prepare('SELECT id, active FROM routes WHERE id = ?').get(req.body.route_id) as any
+    if (!route) {
+      res.status(400).json({ error: 'Rota não encontrada' })
+      return
+    }
+    if (!route.active) {
+      res.status(400).json({ error: 'Não é possível associar a uma rota inativa' })
+      return
+    }
+  }
+
+  // Normalize route_id: empty string → null
+  if (req.body.route_id === '') {
+    req.body.route_id = null
   }
 
   const sets: string[] = []

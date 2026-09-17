@@ -131,6 +131,47 @@ describe('POST /api/auth/register', () => {
     expect(res.status).toBe(201)
     expect(res.body.user.emailVerified).toBe(false)
   })
+
+  it('should register with valid routeId', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-valid-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O-V', 'D-V', 400, 1)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Com Rota', email: 'comrota@teste.com', cpf: '111.222.333-44', password: 'Test@123', routeId })
+    expect(res.status).toBe(201)
+    const passenger = db.prepare('SELECT route_id FROM passengers WHERE email = ?').get('comrota@teste.com') as any
+    expect(passenger.route_id).toBe(routeId)
+  })
+
+  it('should reject register with non-existent routeId', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Rota Ruim', email: 'rotaruim@teste.com', cpf: '222.333.444-55', password: 'Test@123', routeId: 'non-existent-route' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('Rota não encontrada')
+  })
+
+  it('should reject register with inactive routeId', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-inactive-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O-I', 'D-I', 400, 0)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Rota Inativa', email: 'rotainativa@teste.com', cpf: '333.444.555-66', password: 'Test@123', routeId })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('rota inativa')
+  })
+
+  it('should register without routeId (legacy flow)', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Sem Rota', email: 'semrota@teste.com', cpf: '444.555.666-77', password: 'Test@123' })
+    expect(res.status).toBe(201)
+    const db = (await import('../database/connection.js')).getDb()
+    const passenger = db.prepare('SELECT route_id FROM passengers WHERE email = ?').get('semrota@teste.com') as any
+    expect(passenger.route_id).toBeNull()
+  })
 })
 
 describe('Email verification flow', () => {

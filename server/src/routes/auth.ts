@@ -84,7 +84,7 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
 })
 
 router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req, res) => {
-  const { name, email, cpf, password, phone, transportType, pickupPoint, destination, contractStartDate, birthDate } = req.body
+  const { name, email, cpf, password, phone, transportType, pickupPoint, destination, contractStartDate, birthDate, routeId } = req.body
   const db = getDb()
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ? OR cpf = ?').get(email, cpf)
@@ -113,6 +113,23 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
     return
   }
 
+  // Validate routeId if provided
+  let resolvedRouteId: string | null = null
+  if (routeId && typeof routeId === 'string') {
+    const route = db.prepare('SELECT id, active FROM routes WHERE id = ?').get(routeId) as any
+    if (!route) {
+      db.prepare('DELETE FROM users WHERE id = ?').run(id)
+      res.status(400).json({ error: 'Rota não encontrada' })
+      return
+    }
+    if (!route.active) {
+      db.prepare('DELETE FROM users WHERE id = ?').run(id)
+      res.status(400).json({ error: 'Não é possível associar a uma rota inativa' })
+      return
+    }
+    resolvedRouteId = routeId
+  }
+
   let dueDay = 5
   if (contractStartDate && /^\d{4}-\d{2}-\d{2}$/.test(contractStartDate)) {
     dueDay = Number(contractStartDate.slice(8, 10))
@@ -123,14 +140,15 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
   db.prepare(`
     INSERT INTO passengers (
       id, name, cpf, birth_date, phone, email, transport_type, status,
-      pickup_point, destination, contract_start_date, due_day, monthly_fee
+      pickup_point, destination, contract_start_date, due_day, monthly_fee, route_id
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
   `).run(
     id, name, cpf,
     (birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate)) ? birthDate : '2000-01-01',
     phone || '', email, type,
-    pickupPoint || '', destination || '', contractStartDate || '', dueDay, feeValue
+    pickupPoint || '', destination || '', contractStartDate || '', dueDay, feeValue,
+    resolvedRouteId
   )
 
   // Primeira mensalidade: competencia derivada do inicio do contrato (1 mes

@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS passengers (
   workplace TEXT DEFAULT '',
   monthly_fee REAL NOT NULL DEFAULT 0,
   due_day INTEGER NOT NULL DEFAULT 5,
+  route_id TEXT DEFAULT NULL,
   payment_method TEXT NOT NULL DEFAULT 'pix',
   status TEXT NOT NULL DEFAULT 'active',
   notes TEXT DEFAULT '',
@@ -256,6 +257,7 @@ export async function runMigrations(): Promise<void> {
   try { db.exec('ALTER TABLE users ADD COLUMN verify_token_expires INTEGER DEFAULT NULL') } catch {}
   try { db.exec('ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0') } catch {}
   try { db.exec('ALTER TABLE users ADD COLUMN locked_until INTEGER DEFAULT NULL') } catch {}
+  try { db.exec("ALTER TABLE passengers ADD COLUMN route_id TEXT DEFAULT NULL") } catch {}
   try { db.exec('ALTER TABLE passengers ADD COLUMN pickup_point TEXT DEFAULT \'\'') } catch {}
   try { db.exec('ALTER TABLE passengers ADD COLUMN destination TEXT DEFAULT \'\'') } catch {}
   try { db.exec('ALTER TABLE passengers ADD COLUMN contract_start_date TEXT DEFAULT \'\'') } catch {}

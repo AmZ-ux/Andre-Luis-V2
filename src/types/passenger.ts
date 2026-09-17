@@ -37,6 +37,7 @@ export interface Passenger {
   pickupPoint?: string
   destination?: string
   contractStartDate?: string
+  routeId?: string | null
   notes?: string
   createdAt: string
   updatedAt: string

@@ -104,7 +104,7 @@ function toPassengerAddress(p: any): Passenger {
 
 function flattenPassenger(data: any): any {
   const { address, ...rest } = data
-  return {
+  const flat: any = {
     ...rest,
     zipCode: address?.zipCode || '',
     street: address?.street || '',
@@ -114,6 +114,11 @@ function flattenPassenger(data: any): any {
     city: address?.city || '',
     state: address?.state || '',
   }
+  // Ensure routeId is passed as route_id for the backend
+  if ('routeId' in rest) {
+    flat.route_id = rest.routeId
+  }
+  return flat
 }
 
 export const realPassengers = {
