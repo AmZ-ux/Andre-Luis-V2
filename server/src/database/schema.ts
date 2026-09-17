@@ -199,6 +199,16 @@ CREATE TABLE IF NOT EXISTS pix_charges (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS routes (
+  id TEXT PRIMARY KEY,
+  origin TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  monthly_amount REAL NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS message_templates (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -356,6 +366,11 @@ export async function runMigrations(): Promise<void> {
   // Only created when no duplicates exist (safe).
   try {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_fee_per_passenger ON monthly_fees(passenger_id, month, year)")
+  } catch {}
+
+  // --- Routes: unique origin+destination index ---
+  try {
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_routes_origin_destination ON routes(origin, destination)")
   } catch {}
 
   // Bump default billing tolerance from 5 to 0 days (fees flip to overdue right after the due date)

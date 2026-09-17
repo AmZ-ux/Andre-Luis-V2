@@ -22,6 +22,7 @@ import reportsRoutes from './routes/reports.js'
 import clientErrorRoutes from './routes/clientError.js'
 import { paymentsRouter, paymentsWebhookRouter } from './routes/payments.js'
 import adminRoutes from './routes/admin.js'
+import routesRoutes from './routes/routes.js'
 import { startScheduler } from './services/scheduler.js'
 import { markOverdueFees } from './services/feeAutomation.js'
 
@@ -96,6 +97,7 @@ app.use('/api/communication', authMiddleware, communicationRoutes)
 app.use('/api/settings', settingsPublicRouter)
 app.use('/api/settings', authMiddleware, settingsRoutes)
 app.use('/api/reports', authMiddleware, reportsRoutes)
+app.use('/api/routes', authMiddleware, routesRoutes)
 app.use('/api/payments', paymentsWebhookRouter)
 app.use('/api/payments', authMiddleware, paymentsRouter)
 
