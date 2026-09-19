@@ -189,8 +189,14 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   if (!requireAdmin(req, res)) return
   const db = getDb()
-  const existing = db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(req.params.id)
+  const existing = db.prepare('SELECT id, status FROM monthly_fees WHERE id = ?').get(req.params.id) as any
   if (!existing) { res.status(404).json({ error: 'Mensalidade não encontrada' }); return }
+
+  if (existing.status === 'paid') {
+    res.status(409).json({ error: 'Mensalidades pagas não podem ser excluídas' })
+    return
+  }
+
   db.prepare('DELETE FROM payments WHERE monthly_fee_id = ?').run(req.params.id)
   db.prepare('DELETE FROM monthly_fees WHERE id = ?').run(req.params.id)
   res.status(204).end()
