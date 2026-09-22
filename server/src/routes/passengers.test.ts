@@ -330,7 +330,44 @@ describe('DELETE /api/passengers/:id', () => {
     expect(db.prepare('SELECT id FROM users WHERE id = ?').get(id)).toBeDefined()
   })
 
-  it('should cascade delete related data when superAdmin deletes', async () => {
+  it('should cascade delete related data when superAdmin deletes passenger WITHOUT financial history', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super Admin', 'super-cascade@test.com', '666.666.666-00', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(id, 'Cascade', '999.888.777-66', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'Cascade', 'cascade@teste.com', '999.888.777-66')
+
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 189.90, 5, '07/2026', 'pending')")
+      .run(feeId, id, 'Cascade', '999.888.777-66')
+    // No payments, no pix_charges - no financial history
+
+    const avId = uuid()
+    db.prepare("INSERT INTO availabilities (id, passenger_id, passenger_name, cpf, transport_type, type, start_date, end_date, status) VALUES (?, ?, ?, ?, 'university', 'vacation', '2026-08-01', '2026-08-15', 'scheduled')")
+      .run(avId, id, 'Cascade', '999.888.777-66')
+    db.prepare("INSERT INTO availability_history (id, availability_id, action, performed_by, performed_by_id) VALUES (?, ?, 'created', 'admin', 'admin')")
+      .run(uuid(), avId)
+    db.prepare("INSERT INTO notifications (id, user_id, title, message) VALUES (?, ?, 'T', 'M')").run(uuid(), id)
+
+    await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+
+    expect(db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(feeId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM payments WHERE monthly_fee_id = ?').get(feeId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM pix_charges WHERE monthly_fee_id = ?').get(feeId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM availabilities WHERE id = ?').get(avId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM availability_history WHERE availability_id = ?').get(avId)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM notifications WHERE user_id = ?').get(id)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM users WHERE id = ?').get(id)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM passengers WHERE id = ?').get(id)).toBeUndefined()
+  })
+
+  it('should block cascade delete when superAdmin deletes passenger WITH financial history (payment)', async () => {
     const db = getDb()
     const superAdminId = uuid()
     db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
@@ -358,16 +395,293 @@ describe('DELETE /api/passengers/:id', () => {
       .run(uuid(), avId)
     db.prepare("INSERT INTO notifications (id, user_id, title, message) VALUES (?, ?, 'T', 'M')").run(uuid(), id)
 
-    await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toContain('histórico financeiro')
 
-    expect(db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(feeId)).toBeUndefined()
-    expect(db.prepare('SELECT id FROM payments WHERE monthly_fee_id = ?').get(feeId)).toBeUndefined()
-    expect(db.prepare('SELECT id FROM pix_charges WHERE monthly_fee_id = ?').get(feeId)).toBeUndefined()
-    expect(db.prepare('SELECT id FROM availabilities WHERE id = ?').get(avId)).toBeUndefined()
-    expect(db.prepare('SELECT id FROM availability_history WHERE availability_id = ?').get(avId)).toBeUndefined()
-    expect(db.prepare('SELECT id FROM notifications WHERE user_id = ?').get(id)).toBeUndefined()
-    expect(db.prepare('SELECT id FROM users WHERE id = ?').get(id)).toBeUndefined()
-    expect(db.prepare('SELECT id FROM passengers WHERE id = ?').get(id)).toBeUndefined()
+    // Everything preserved
+    expect(db.prepare('SELECT id FROM monthly_fees WHERE id = ?').get(feeId)).toBeDefined()
+    expect(db.prepare('SELECT id FROM payments WHERE monthly_fee_id = ?').get(feeId)).toBeDefined()
+    expect(db.prepare('SELECT id FROM pix_charges WHERE monthly_fee_id = ?').get(feeId)).toBeDefined()
+    expect(db.prepare('SELECT id FROM availabilities WHERE id = ?').get(avId)).toBeDefined()
+    expect(db.prepare('SELECT id FROM availability_history WHERE availability_id = ?').get(avId)).toBeDefined()
+    expect(db.prepare('SELECT id FROM notifications WHERE user_id = ?').get(id)).toBeDefined()
+    expect(db.prepare('SELECT id FROM users WHERE id = ?').get(id)).toBeDefined()
+    expect(db.prepare('SELECT id FROM passengers WHERE id = ?').get(id)).toBeDefined()
+  })
+
+  it('passenger with paid monthly_fee → DELETE 409, all preserved', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super@test.com', '111.111.111-00', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+      .run(id, 'PaidFee', '222.222.222-00', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'PaidFee', 'paidfee@test.com', '222.222.222-00')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 400, 5, '07/2026', 'paid')")
+      .run(feeId, id, 'PaidFee', '222.222.222-00')
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toContain('histórico financeiro')
+
+    expect(db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)).toBeDefined()
+    expect(db.prepare('SELECT * FROM users WHERE id = ?').get(id)).toBeDefined()
+    expect(db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(feeId)).toBeDefined()
+    expect(db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(feeId)?.status).toBe('paid')
+  })
+
+  it('passenger with pending fee + SUBPAYMENT → DELETE 409, all preserved', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super2@test.com', '333.333.333-00', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+      .run(id, 'SubPay', '444.444.444-00', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'SubPay', 'subpay@test.com', '444.444.444-00')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 400, 5, '07/2026', 'pending')")
+      .run(feeId, id, 'SubPay', '444.444.444-00')
+    db.prepare("INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, entry_type) VALUES (?, ?, 200, '05/07/2026', 'pix', 'SUBPAYMENT')")
+      .run(uuid(), feeId)
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(409)
+
+    expect(db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)).toBeDefined()
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(feeId)
+    expect(fee).toBeDefined()
+    expect(fee?.status).toBe('pending')
+    const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(feeId)
+    expect(payment).toBeDefined()
+    expect(payment?.entry_type).toBe('SUBPAYMENT')
+  })
+
+  it('passenger with pending fee + NORMAL payment → DELETE 409, all preserved', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super3@test.com', '555.555.555-00', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+      .run(id, 'NormPay', '666.666.666-00', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'NormPay', 'normpay@test.com', '666.666.666-00')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 400, 5, '07/2026', 'pending')")
+      .run(feeId, id, 'NormPay', '666.666.666-00')
+    db.prepare("INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, entry_type) VALUES (?, ?, 400, '05/07/2026', 'pix', 'NORMAL')")
+      .run(uuid(), feeId)
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(409)
+
+    expect(db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)).toBeDefined()
+    const fee = db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(feeId)
+    expect(fee).toBeDefined()
+    expect(fee?.status).toBe('pending')
+  })
+
+  it('passenger with OVERPAYMENT → DELETE 409, all preserved', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super4@test.com', '777.777.777-00', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+      .run(id, 'OverPay', '888.888.888-00', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'OverPay', 'overpay@test.com', '888.888.888-00')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 400, 5, '07/2026', 'paid')")
+      .run(feeId, id, 'OverPay', '888.888.888-00')
+    db.prepare("INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, entry_type) VALUES (?, ?, 500, '05/07/2026', 'pix', 'OVERPAYMENT')")
+      .run(uuid(), feeId)
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(409)
+
+    expect(db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)).toBeDefined()
+    const payment = db.prepare('SELECT * FROM payments WHERE monthly_fee_id = ?').get(feeId)
+    expect(payment).toBeDefined()
+    expect(payment?.entry_type).toBe('OVERPAYMENT')
+  })
+
+  it('passenger with succeeded pix_charge → DELETE 409, all preserved', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super5@test.com', '999.999.999-00', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+      .run(id, 'PixSucc', '111.111.111-11', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'PixSucc', 'pixsucc@test.com', '111.111.111-11')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 400, 5, '07/2026', 'pending')")
+      .run(feeId, id, 'PixSucc', '111.111.111-11')
+    db.prepare("INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status) VALUES (?, 'pi_test', ?, 400, 'succeeded')")
+      .run(uuid(), feeId)
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(409)
+
+    expect(db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)).toBeDefined()
+    const pix = db.prepare('SELECT * FROM pix_charges WHERE monthly_fee_id = ?').get(feeId)
+    expect(pix).toBeDefined()
+    expect(pix?.status).toBe('succeeded')
+  })
+
+  it('passenger with succeeded_underpaid pix_charge → DELETE 409', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super6@test.com', '222.222.222-11', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+      .run(id, 'PixUnder', '333.333.333-11', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'PixUnder', 'pixunder@test.com', '333.333.333-11')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 400, 5, '07/2026', 'pending')")
+      .run(feeId, id, 'PixUnder', '333.333.333-11')
+    db.prepare("INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status) VALUES (?, 'pi_test', ?, 200, 'succeeded_underpaid')")
+      .run(uuid(), feeId)
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(409)
+
+    const pix = db.prepare('SELECT * FROM pix_charges WHERE monthly_fee_id = ?').get(feeId)
+    expect(pix?.status).toBe('succeeded_underpaid')
+  })
+
+  it('passenger with succeeded_overpaid pix_charge → DELETE 409', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super7@test.com', '444.444.444-11', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+      .run(id, 'PixOver', '555.555.555-11', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'PixOver', 'pixover@test.com', '555.555.555-11')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 400, 5, '07/2026', 'paid')")
+      .run(feeId, id, 'PixOver', '555.555.555-11')
+    db.prepare("INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status) VALUES (?, 'pi_test', ?, 500, 'succeeded_overpaid')")
+      .run(uuid(), feeId)
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(409)
+
+    const pix = db.prepare('SELECT * FROM pix_charges WHERE monthly_fee_id = ?').get(feeId)
+    expect(pix?.status).toBe('succeeded_overpaid')
+  })
+
+  it('passenger with ONLY pending fee (no payment, no pix) → DELETE allowed (200)', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super8@test.com', '666.666.666-11', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+      .run(id, 'NoHistory', '777.777.777-11', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'NoHistory', 'nohist@test.com', '777.777.777-11')
+    const feeId = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 7, 2026, 400, 5, '07/2026', 'pending')")
+      .run(feeId, id, 'NoHistory', '777.777.777-11')
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+
+    expect(db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)).toBeUndefined()
+    expect(db.prepare('SELECT * FROM monthly_fees WHERE id = ?').get(feeId)).toBeUndefined()
+  })
+
+  it('passenger with NO fees at all → DELETE allowed (200)', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super9@test.com', '888.888.888-11', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(id, 'Empty', '999.999.999-11', '2000-01-01')
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, '', 'passenger', 'x')")
+      .run(id, 'Empty', 'empty@test.com', '999.999.999-11')
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(200)
+
+    expect(db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)).toBeUndefined()
+    expect(db.prepare('SELECT * FROM users WHERE id = ?').get(id)).toBeUndefined()
+  })
+
+  it('non-existent passenger ID → 404', async () => {
+    const db = getDb()
+    const superAdminId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash, super_admin) VALUES (?, ?, ?, ?, ?, 'admin', ?, 1)")
+      .run(superAdminId, 'Super', 'super10@test.com', '111.111.111-11', '', bcrypt.hashSync('password', 10))
+    const superAdminToken = jwt.sign({ userId: superAdminId, role: 'admin' }, 'dev-secret-change-in-production')
+
+    const res = await request(app).delete(`/api/passengers/${uuid()}`).set('Authorization', `Bearer ${superAdminToken}`)
+    expect(res.status).toBe(404)
+  })
+
+  it('regular admin (not superAdmin) → 403 even for passenger without history', async () => {
+    const db = getDb()
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(id, 'Test', '222.222.222-22', '2000-01-01')
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toBe('Apenas o super administrador')
+    expect(db.prepare('SELECT * FROM passengers WHERE id = ?').get(id)).toBeDefined()
+  })
+
+  it('passenger role → 403', async () => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Pass', 'pass@test.com', '333.333.333-22', '', bcrypt.hashSync('password', 10))
+    const passengerToken = jwt.sign({ userId: passengerId, role: 'passenger' }, 'dev-secret-change-in-production')
+
+    const id = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status) VALUES (?, ?, ?, ?, 'university', 'active')")
+      .run(id, 'Target', '444.444.444-22', '2000-01-01')
+
+    const res = await request(app).delete(`/api/passengers/${id}`).set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(403)
+  })
+
+  it('unauthorized → 401', async () => {
+    const res = await request(app).delete('/api/passengers/some-id')
+    expect(res.status).toBe(401)
   })
 
   it('should not regress other admin operations on passengers', async () => {

@@ -139,6 +139,36 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', requireSuperAdmin, (req, res) => {
   const db = getDb()
 
+  // Check passenger exists
+  const passenger = db.prepare('SELECT id FROM passengers WHERE id = ?').get(req.params.id)
+  if (!passenger) {
+    res.status(404).json({ error: 'Passageiro não encontrado' })
+    return
+  }
+
+  // Check for financial history before any destructive operation
+  // Financial history = any paid fee, any payment (NORMAL/SUBPAYMENT/OVERPAYMENT), any succeeded pix_charge
+  const hasFinancialHistory = db.prepare(`
+    SELECT 1
+    FROM monthly_fees mf
+    WHERE mf.passenger_id = ?
+      AND (
+        mf.status = 'paid'
+        OR EXISTS (SELECT 1 FROM payments p WHERE p.monthly_fee_id = mf.id)
+        OR EXISTS (
+          SELECT 1 FROM pix_charges pc
+          WHERE pc.monthly_fee_id = mf.id
+            AND pc.status IN ('succeeded', 'succeeded_underpaid', 'succeeded_overpaid')
+        )
+      )
+    LIMIT 1
+  `).get(req.params.id)
+
+  if (hasFinancialHistory) {
+    res.status(409).json({ error: 'Passageiros com histórico financeiro não podem ser excluídos' })
+    return
+  }
+
   const feeIds = (db.prepare('SELECT id FROM monthly_fees WHERE passenger_id = ?').all(req.params.id) as any[]).map((f) => f.id)
   for (const feeId of feeIds) {
     db.prepare('DELETE FROM pix_charges WHERE monthly_fee_id = ?').run(feeId)
