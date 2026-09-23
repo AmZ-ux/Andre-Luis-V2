@@ -679,7 +679,206 @@ describe('buildDailySummary & notifyDailySummaryToAdmins', () => {
   })
 })
 
-describe('notifyPaymentReceived', () => {
+// === Phase 2F.2 atomicity audit ===
+
+describe('ensureContractFees atomicity audit', () => {
+  it('generates multiple months in sequence', () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day, contract_start_date) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5, '2026-01-01')")
+      .run(pid, 'Audit', '111.111.111-10', '2000-01-01')
+
+    // Test multiple months sequentially
+    const result1 = generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    const result2 = generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    const result3 = generateMonthlyFees({ month: 3, year: 2026, passengerIds: [pid] }, db)
+    const result4 = generateMonthlyFees({ month: 4, year: 2026, passengerIds: [pid] }, db)
+    
+    expect(result1.created).toBe(1)
+    expect(result2.created).toBe(1)
+    expect(result3.created).toBe(1)
+    expect(result4.created).toBe(1)
+    
+    const fees = db.prepare('SELECT month, year, amount FROM monthly_fees WHERE passenger_id = ? ORDER BY year, month').all(pid)
+    expect(fees).toHaveLength(4)
+    expect(fees.map(f => `${f.month}/${f.year}`)).toEqual(['1/2026', '2/2026', '3/2026', '4/2026'])
+    expect(fees.every(f => f.amount === 400)).toBe(true)
+  })
+
+  it('partial failure: months before failure are committed', () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day, contract_start_date) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5, '2026-01-01')")
+      .run(pid, 'Partial', '222.222.222-10', '2000-01-01')
+    
+    // Generate months 1, 2
+    generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    
+    // Verify they exist
+    let fees = db.prepare('SELECT month FROM monthly_fees WHERE passenger_id = ? ORDER BY month').all(pid)
+    expect(fees.map(f => f.month)).toEqual([1, 2])
+    
+    // Simulate failure by pre-existing entry for month 3
+    // We'll insert a pre-existing entry for month 3
+    const feeId3 = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 3, 2026, 999, 5, '05/03/2026', 'pending')")
+      .run(feeId3, pid, 'Partial', '222.222.222-10')
+    
+    // Now generate month 3 - should skip due to UNIQUE constraint
+    const result3 = generateMonthlyFees({ month: 3, year: 2026, passengerIds: [pid] }, db)
+    expect(result3.created).toBe(0)
+    expect(result3.skippedExisting).toBe(1)
+    
+    // Month 4 should still work
+    const result4 = generateMonthlyFees({ month: 4, year: 2026, passengerIds: [pid] }, db)
+    expect(result4.created).toBe(1)
+    
+    // Verify state: months 1, 2, 4 created; month 3 has pre-existing entry (amount 999)
+    const allFees1 = db.prepare('SELECT month, amount FROM monthly_fees WHERE passenger_id = ? ORDER BY month').all(pid)
+    expect(allFees1.map(f => f.month)).toEqual([1, 2, 3, 4])
+    expect(allFees1.find(f => f.month === 3)?.amount).toBe(999) // pre-existing entry
+  })
+
+  it('retry after partial failure recovers missing months', () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day, contract_start_date) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5, '2026-01-01')")
+      .run(pid, 'Retry', '333.333.333-10', '2000-01-01')
+    
+    // Generate months 1, 2
+    generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    
+    // Pre-existing entry for month 3 (simulate partial failure after month 2)
+    const feeId3 = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 3, 2026, 999, 5, '05/03/2026', 'pending')")
+      .run(feeId3, pid, 'Retry', '333.333.333-10')
+    
+    // Now "retry" by calling generateMonthlyFees for all months 1-4 again
+    const r1 = generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    const r2 = generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    const r3 = generateMonthlyFees({ month: 3, year: 2026, passengerIds: [pid] }, db)
+    const r4 = generateMonthlyFees({ month: 4, year: 2026, passengerIds: [pid] }, db)
+    
+    // Months 1,2 should be skipped; month 3 should still be skipped (pre-existing); month 4 created
+    expect(r1.created).toBe(0); expect(r1.skippedExisting).toBe(1)
+    expect(r2.created).toBe(0); expect(r2.skippedExisting).toBe(1)
+    expect(r3.created).toBe(0); expect(r3.skippedExisting).toBe(1)
+    expect(r4.created).toBe(1)
+    
+    // Verify month 3 still has pre-existing amount (not fixed by retry)
+    const fee3 = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 3 AND year = 2026').get(pid)
+    expect(fee3.amount).toBe(999)
+  })
+
+  it('UNIQUE index prevents duplicates on retry', () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day, contract_start_date) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5, '2026-01-01')")
+      .run(pid, 'Unique', '444.444.444-10', '2000-01-01')
+    
+    // Generate all 4 months
+    generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 3, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 4, year: 2026, passengerIds: [pid] }, db)
+    
+    // Run again - should skip all
+    const r1 = generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    const r2 = generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    const r3 = generateMonthlyFees({ month: 3, year: 2026, passengerIds: [pid] }, db)
+    const r4 = generateMonthlyFees({ month: 4, year: 2026, passengerIds: [pid] }, db)
+    
+    expect(r1.created).toBe(0); expect(r1.skippedExisting).toBe(1)
+    expect(r2.created).toBe(0); expect(r2.skippedExisting).toBe(1)
+    expect(r3.created).toBe(0); expect(r3.skippedExisting).toBe(1)
+    expect(r4.created).toBe(0); expect(r4.skippedExisting).toBe(1)
+    
+    const fees1 = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ?').all(pid)
+    expect(fees1).toHaveLength(4)
+  })
+
+  it('existing snapshots preserved when passenger.price changes between failure and retry', () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day, contract_start_date) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5, '2026-01-01')")
+      .run(pid, 'PriceRecovery', '555.555.555-10', '2000-01-01')
+    
+    // Generate months 1, 2 at price 400
+    generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    
+    // Change passenger price BEFORE retry
+    db.prepare('UPDATE passengers SET monthly_fee = 450 WHERE id = ?').run(pid)
+    
+    // Pre-existing entry for month 3
+    const feeId3 = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 3, 2026, 999, 5, '05/03/2026', 'pending')")
+      .run(feeId3, pid, 'PriceRecovery', '555.555.555-10')
+    
+    // Retry all months 1-4
+    generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 3, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 4, year: 2026, passengerIds: [pid] }, db)
+    
+    // Month 1, 2 should be preserved at 400 (snapshots)
+    const fee1 = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 1 AND year = 2026').get(pid)
+    const fee2 = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 2 AND year = 2026').get(pid)
+    expect(fee1.amount).toBe(400)
+    expect(fee2.amount).toBe(400)
+    
+    // Month 3 remains pre-existing (999) - not fixed by retry
+    const fee3 = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 3 AND year = 2026').get(pid)
+    expect(fee3.amount).toBe(999)
+    
+    // Month 4 uses CURRENT passenger.monthly_fee (450)
+    const fee4 = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 4 AND year = 2026').get(pid)
+    expect(fee4.amount).toBe(450)
+  })
+
+  it('due_day change between failure and retry uses current due_day for new months', () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day, contract_start_date) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5, '2026-01-01')")
+      .run(pid, 'DueDayRecovery', '666.666.666-10', '2000-01-01')
+    
+    // Generate months 1, 2 with due_day=5
+    generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    
+    // Change due_day BEFORE retry
+    db.prepare('UPDATE passengers SET due_day = 15 WHERE id = ?').run(pid)
+    
+    // Pre-existing entry for month 3
+    const feeId3 = uuid()
+    db.prepare("INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, month, year, amount, due_day, due_date, status) VALUES (?, ?, ?, ?, 'university', 3, 2026, 400, 99, '99/03/2026', 'pending')")
+      .run(feeId3, pid, 'DueDayRecovery', '666.666.666-10')
+    
+    // Retry
+    generateMonthlyFees({ month: 1, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 2, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 3, year: 2026, passengerIds: [pid] }, db)
+    generateMonthlyFees({ month: 4, year: 2026, passengerIds: [pid] }, db)
+    
+    // Month 1, 2 due_date preserved
+    const fee1 = db.prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ? AND month = 1 AND year = 2026').get(pid)
+    const fee2 = db.prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ? AND month = 2 AND year = 2026').get(pid)
+    expect(fee1.due_date).toBe('05/01/2026')
+    expect(fee2.due_date).toBe('05/02/2026')
+    
+    // Month 3 remains pre-existing
+    const fee3 = db.prepare('SELECT due_day, due_date FROM monthly_fees WHERE passenger_id = ? AND month = 3 AND year = 2026').get(pid)
+    expect(fee3.due_day).toBe(99)
+    expect(fee3.due_date).toBe('99/03/2026')
+    
+    // Month 4 uses CURRENT due_day (15)
+    const fee4 = db.prepare('SELECT due_day, due_date FROM monthly_fees WHERE passenger_id = ? AND month = 4 AND year = 2026').get(pid)
+    expect(fee4.due_day).toBe(15)
+    expect(fee4.due_date).toBe('15/04/2026')
+  })
+})
   it('notifies the passenger and all admins', () => {
     const db = getDb()
     const outerAdmin = uuid()
@@ -698,5 +897,4 @@ describe('notifyPaymentReceived', () => {
     expect(adminNotif.length).toBe(1)
 expect(adminNotif[0].title).toContain('Cliente Exemplo')
   })
-})
 })
