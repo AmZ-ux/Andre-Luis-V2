@@ -190,7 +190,418 @@ describe('generateMonthlyFees', () => {
     const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
     expect(result.created).toBe(1)
   })
-})
+
+  // === Phase 2F.1 hardening tests ===
+
+  describe('due_date: last valid day of month', () => {
+    it('due_day 31 in January -> 31/01', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 1, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('31/01/2026')
+    })
+
+    it('due_day 31 in February 2026 (non-leap) -> 28/02', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('28/02/2026')
+    })
+
+    it('due_day 29 in February 2028 (leap) -> 29/02', () => {
+      const pid = seedPassenger({ dueDay: 29 })
+      generateMonthlyFees({ month: 2, year: 2028 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('29/02/2028')
+    })
+
+    it('due_day 29 in February 2026 (non-leap) -> 28/02', () => {
+      const pid = seedPassenger({ dueDay: 29 })
+      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('28/02/2026')
+    })
+
+    it('due_day 30 in February -> 28/02 (non-leap)', () => {
+      const pid = seedPassenger({ dueDay: 30 })
+      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('28/02/2026')
+    })
+
+    it('due_day 31 in April -> 30/04', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 4, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('30/04/2026')
+    })
+
+    it('due_day 31 in June -> 30/06', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 6, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('30/06/2026')
+    })
+
+    it('due_day 31 in September -> 30/09', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 9, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('30/09/2026')
+    })
+
+    it('due_day 31 in November -> 30/11', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 11, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('30/11/2026')
+    })
+
+    it('due_day 31 in month with 31 days -> 31', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 3, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('31/03/2026')
+    })
+
+    it('due_day 1 -> 01', () => {
+      const pid = seedPassenger({ dueDay: 1 })
+      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('01/02/2026')
+    })
+
+    it('due_day 28 -> 28', () => {
+      const pid = seedPassenger({ dueDay: 28 })
+      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('28/02/2026')
+    })
+  })
+
+  describe('invalid due_day validation', () => {
+    it('due_day 0 -> skips passenger, reports skippedInvalidDueDay', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 0)")
+        .run(pid, 'InvalidDue', '111.111.111-01', '2000-01-01')
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(0)
+      expect(result.skippedInvalidDueDay).toBe(1)
+    })
+
+    it('due_day -1 -> skips passenger', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, -1)")
+        .run(pid, 'InvalidDue2', '222.222.222-02', '2000-01-01')
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(0)
+      expect(result.skippedInvalidDueDay).toBe(1)
+    })
+
+    it('due_day 32 -> skips passenger', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 32)")
+        .run(pid, 'InvalidDue3', '333.333.333-03', '2000-01-01')
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(0)
+      expect(result.skippedInvalidDueDay).toBe(1)
+    })
+  })
+
+  describe('price validation', () => {
+    it('monthly_fee = 0 -> skips passenger, reports skippedInvalidPrice', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 0, 5)")
+        .run(pid, 'ZeroPrice', '111.111.111-01', '2000-01-01')
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(0)
+      expect(result.skippedInvalidPrice).toBe(1)
+    })
+
+    it('monthly_fee = -100 -> skips passenger', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', -100, 5)")
+        .run(pid, 'NegPrice', '222.222.222-02', '2000-01-01')
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(0)
+      expect(result.skippedInvalidPrice).toBe(1)
+    })
+
+    it('monthly_fee = NULL -> skips passenger', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 5)")
+        .run(pid, 'NullPrice', '333.333.333-03', '2000-01-01')
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(0)
+      expect(result.skippedInvalidPrice).toBe(1)
+    })
+
+    it('monthly_fee = -Infinity -> skips passenger', async () => {
+      // SQLite doesn't support -Infinity, test the validation logic directly
+      const { isValidPrice } = await import('./monthlyFeeGenerator.js')
+      expect(isValidPrice(-Infinity)).toBe(false)
+      expect(isValidPrice(Infinity)).toBe(false)
+      expect(isValidPrice(NaN)).toBe(false)
+    })
+
+    it('valid positive price -> generates fee', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+        .run(pid, 'ValidPrice', '444.444.444-04', '2000-01-01')
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(1)
+      expect(result.skippedInvalidPrice).toBe(0)
+      const fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.amount).toBe(189.90)
+    })
+  })
+
+  describe('failure isolation: invalid passenger does not block others', () => {
+    it('invalid price passenger does not block valid passengers', () => {
+      const db = getDb()
+      const pidA = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+        .run(pidA, 'ValidA', '111.111.111-01', '2000-01-01')
+      const pidB = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 0, 5)")
+        .run(pidB, 'InvalidB', '222.222.222-02', '2000-01-01')
+      const pidC = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 500, 5)")
+        .run(pidC, 'ValidC', '333.333.333-03', '2000-01-01')
+
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(2)
+      expect(result.skippedInvalidPrice).toBe(1)
+      const fees = db.prepare('SELECT passenger_id FROM monthly_fees WHERE month = 7 AND year = 2026').all()
+      expect(fees.map(f => f.passenger_id).sort()).toEqual([pidA, pidC].sort())
+    })
+
+    it('invalid due_day passenger does not block valid passengers', () => {
+      const db = getDb()
+      const pidA = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+        .run(pidA, 'ValidA', '555.555.555-04', '2000-01-01')
+      const pidB = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 0)")
+        .run(pidB, 'InvalidB', '666.666.666-05', '2000-01-01')
+      const pidC = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+        .run(pidC, 'ValidC', '777.777.777-06', '2000-01-01')
+
+      const result = generateMonthlyFees({ month: 7, year: 2026 }, db)
+      expect(result.created).toBe(2)
+      expect(result.skippedInvalidDueDay).toBe(1)
+    })
+  })
+
+  describe('active route price snapshot & changes', () => {
+    it('active route price change affects future fee only', () => {
+      const db = getDb()
+      const routeId = uuid()
+      db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+        .run(pid, 'PriceTest', '111.111.111-10', '2000-01-01', routeId)
+
+      // Month 1 at price 400
+      generateMonthlyFees({ month: 7, year: 2026, passengerIds: [pid] }, db)
+      let fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(fee.amount).toBe(400)
+
+      // Change route price
+      db.prepare('UPDATE routes SET monthly_amount = 450 WHERE id = ?').run(routeId)
+      db.prepare('UPDATE passengers SET monthly_fee = 450 WHERE route_id = ?').run(routeId)
+
+      // Month 2 at new price
+      generateMonthlyFees({ month: 8, year: 2026, passengerIds: [pid] }, db)
+      let fee2 = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 8').get(pid) as any
+      expect(fee2.amount).toBe(450)
+
+      // Month 1 unchanged
+      fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(fee.amount).toBe(400)
+    })
+  })
+
+  describe('route migration', () => {
+    it('migrating passenger to new route affects future fee only', () => {
+      const db = getDb()
+      const routeA = uuid()
+      db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeA)
+      const routeB = uuid()
+      db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'C', 'D', 500, 1)").run(routeB)
+
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+        .run(pid, 'MigTest', '111.111.111-20', '2000-01-01', routeA)
+
+      // Month 1 on route A
+      generateMonthlyFees({ month: 7, year: 2026, passengerIds: [pid] }, db)
+      let fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(fee.amount).toBe(400)
+
+      // Migrate to route B
+      db.prepare('UPDATE passengers SET route_id = ?, monthly_fee = 500 WHERE id = ?').run(routeB, pid)
+
+      // Month 2 on route B
+      generateMonthlyFees({ month: 8, year: 2026, passengerIds: [pid] }, db)
+      let fee2 = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 8').get(pid) as any
+      expect(fee2.amount).toBe(500)
+
+      // Month 1 unchanged
+      fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(fee.amount).toBe(400)
+    })
+  })
+
+  describe('inactive route: existing passenger continues generation', () => {
+    it('passenger on inactive route continues generating fees at preserved monthly_fee', () => {
+      const db = getDb()
+      const routeId = uuid()
+      db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+        .run(pid, 'InactiveRoute', '111.111.111-30', '2000-01-01', routeId)
+
+      // Month 1 while active
+      generateMonthlyFees({ month: 7, year: 2026, passengerIds: [pid] }, db)
+      let fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(fee.amount).toBe(400)
+
+      // Deactivate route
+      db.prepare('UPDATE routes SET active = 0 WHERE id = ?').run(routeId)
+
+      // Month 2 after deactivation
+      generateMonthlyFees({ month: 8, year: 2026, passengerIds: [pid] }, db)
+      let fee2 = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 8').get(pid) as any
+      expect(fee2.amount).toBe(400) // preserved monthly_fee
+    })
+
+    it('new passengers cannot be associated with inactive route (enforced elsewhere)', () => {
+      const db = getDb()
+      const routeId = uuid()
+      db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 0)").run(routeId) // inactive
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee) VALUES (?, ?, ?, ?, 'university', 'active', 400)")
+        .run(pid, 'NewPass', '222.222.222-40', '2000-01-01')
+
+      // Generator would process but passenger has no route_id
+      // This test documents that generator doesn't enforce route.active
+      generateMonthlyFees({ month: 7, year: 2026, passengerIds: [pid] }, db)
+      const fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(fee).toBeDefined()
+      expect(fee.amount).toBe(400)
+      // If passenger has monthly_fee set, it will generate
+      // This is the current behavior - generator ignores route.active
+    })
+  })
+
+  describe('legacy route_id=NULL', () => {
+    it('passenger with NULL route_id and valid monthly_fee generates fee', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5, NULL)")
+        .run(pid, 'Legacy', '333.333.333-50', '2000-01-01')
+
+      generateMonthlyFees({ month: 7, year: 2026, passengerIds: [pid] }, db)
+      const fee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee).toBeDefined()
+      expect(fee.amount).toBe(189.90)
+    })
+  })
+
+  describe('historical snapshot immutability', () => {
+    it('route price change does not alter existing monthly_fee', () => {
+      const db = getDb()
+      const routeId = uuid()
+      db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeId)
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+        .run(pid, 'SnapTest', '111.111.111-40', '2000-01-01', routeId)
+
+      generateMonthlyFees({ month: 7, year: 2026, passengerIds: [pid] }, db)
+
+      db.prepare('UPDATE routes SET monthly_amount = 999 WHERE id = ?').run(routeId)
+      db.prepare('UPDATE passengers SET monthly_fee = 999 WHERE route_id = ?').run(routeId)
+
+      const existingFee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(existingFee.amount).toBe(400)
+    })
+
+    it('route migration does not alter existing monthly_fee', () => {
+      const db = getDb()
+      const routeA = uuid()
+      db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'A', 'B', 400, 1)").run(routeA)
+      const routeB = uuid()
+      db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'C', 'D', 500, 1)").run(routeB)
+
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, route_id) VALUES (?, ?, ?, ?, 'university', 'active', 400, ?)")
+        .run(pid, 'SnapMig', '222.222.222-41', '2000-01-01', routeA)
+
+      generateMonthlyFees({ month: 7, year: 2026, passengerIds: [pid] }, db)
+
+      db.prepare('UPDATE passengers SET route_id = ?, monthly_fee = 500 WHERE id = ?').run(routeB, pid)
+
+      const existingFee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(existingFee.amount).toBe(400)
+    })
+
+    it('passenger.monthly_fee change does not alter existing monthly_fee', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+        .run(pid, 'SnapFee', '333.333.333-60', '2000-01-01')
+
+      generateMonthlyFees({ month: 7, year: 2026, passengerIds: [pid] }, db)
+
+      db.prepare('UPDATE passengers SET monthly_fee = 999 WHERE id = ?').run(pid)
+
+      const existingFee = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ? AND month = 7').get(pid) as any
+      expect(existingFee.amount).toBe(400)
+    })
+  })
+
+  describe('idempotency', () => {
+    it('multiple runs produce single fee per passenger/month/year', () => {
+      const pid = seedPassenger()
+      generateMonthlyFees({ month: 7, year: 2026 }, getDb())
+      generateMonthlyFees({ month: 7, year: 2026 }, getDb())
+      generateMonthlyFees({ month: 7, year: 2026 }, getDb())
+
+      const fees = getDb().prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? AND month = 7 AND year = 2026').all(pid)
+      expect(fees).toHaveLength(1)
+    })
+  })
+
+  describe('year rollover', () => {
+    it('December -> January increments year', () => {
+      const db = getDb()
+      const pid = uuid()
+      db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 400, 5)")
+        .run(pid, 'YearRoll', '999.999.999-99', '2000-01-01')
+
+      generateMonthlyFees({ month: 12, year: 2026, passengerIds: [pid] }, db)
+      generateMonthlyFees({ month: 1, year: 2027, passengerIds: [pid] }, db)
+
+      const feeDec = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? AND month = 12 AND year = 2026').get(pid) as any
+      const feeJan = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? AND month = 1 AND year = 2027').get(pid) as any
+
+      expect(feeDec).toBeDefined()
+      expect(feeJan).toBeDefined()
+      expect(feeDec.month).toBe(12)
+      expect(feeDec.year).toBe(2026)
+      expect(feeJan.month).toBe(1)
+      expect(feeJan.year).toBe(2027)
+    })
+  })
 
 describe('sendPaymentReminders', () => {
   const today = new Date(2026, 7, 15)
@@ -287,4 +698,5 @@ describe('notifyPaymentReceived', () => {
     expect(adminNotif.length).toBe(1)
 expect(adminNotif[0].title).toContain('Cliente Exemplo')
   })
+})
 })

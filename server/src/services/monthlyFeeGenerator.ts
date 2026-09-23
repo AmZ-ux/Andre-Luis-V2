@@ -14,6 +14,8 @@ export interface GenerationResult {
   skippedExisting: number
   skippedInactive: number
   skippedVacation: number
+  skippedInvalidPrice: number
+  skippedInvalidDueDay: number
 }
 
 export function parseBrDate(value: string): Date | null {
@@ -38,13 +40,41 @@ function isMonthContained(
   return start <= monthEnd && end >= monthStart
 }
 
+export function isValidPrice(amount: unknown): amount is number {
+  if (typeof amount !== 'number') return false
+  if (!Number.isFinite(amount)) return false
+  if (amount <= 0) return false
+  return true
+}
+
+function isValidDueDay(dueDay: unknown): dueDay is number {
+  if (typeof dueDay !== 'number') return false
+  if (!Number.isInteger(dueDay)) return false
+  if (dueDay < 1 || dueDay > 31) return false
+  return true
+}
+
+function lastDayOfMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate()
+}
+
+function effectiveDueDay(dueDay: number, year: number, month: number): number {
+  const lastDay = lastDayOfMonth(year, month)
+  return Math.min(dueDay, lastDay)
+}
+
+function formatDueDate(dueDay: number, month: number, year: number): string {
+  const eff = effectiveDueDay(dueDay, year, month)
+  return `${String(eff).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`
+}
+
 const FIXED_VACATION_MONTHS = [1, 7, 12]
 
 export function generateMonthlyFees(request: GenerationRequest, db: any = getDb()): GenerationResult {
   const { month, year, passengerIds } = request
   const settings = loadSettings(db)
   const vacationPolicy = settings.billing.vacationPolicy
-  const result: GenerationResult = { created: 0, skippedExisting: 0, skippedInactive: 0, skippedVacation: 0 }
+  const result: GenerationResult = { created: 0, skippedExisting: 0, skippedInactive: 0, skippedVacation: 0, skippedInvalidPrice: 0, skippedInvalidDueDay: 0 }
 
   const rows = db.prepare('SELECT * FROM passengers').all() as any[]
   let candidates = rows
@@ -74,6 +104,20 @@ export function generateMonthlyFees(request: GenerationRequest, db: any = getDb(
     )
     if (onVacation) { result.skippedVacation++; continue }
 
+    // Validate price
+    if (!isValidPrice(passenger.monthly_fee)) {
+      logger.warn({ passengerId: passenger.id, monthlyFee: passenger.monthly_fee, month, year }, 'Skipping passenger: invalid monthly_fee')
+      result.skippedInvalidPrice++
+      continue
+    }
+
+    // Validate due_day
+    if (!isValidDueDay(passenger.due_day)) {
+      logger.warn({ passengerId: passenger.id, dueDay: passenger.due_day, month, year }, 'Skipping passenger: invalid due_day')
+      result.skippedInvalidDueDay++
+      continue
+    }
+
     insert.run(
       uuid(),
       passenger.id,
@@ -84,9 +128,9 @@ export function generateMonthlyFees(request: GenerationRequest, db: any = getDb(
       passenger.company || '',
       month,
       year,
-      Number(passenger.monthly_fee) || 0,
-      Number(passenger.due_day) || 1,
-      `${String(Number(passenger.due_day) || 1).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`
+      Number(passenger.monthly_fee),
+      Number(passenger.due_day),
+      formatDueDate(Number(passenger.due_day), month, year)
     )
     result.created++
   }
@@ -104,7 +148,7 @@ const MAX_CONTRACT_CYCLES = 60
 // a primeira competencia e o mes do inicio do contrato (o mes de entrada ja e
 // cobrado), e as demais sao criadas um ciclo por mes ate o mes corrente.
 export function ensureContractFees(passengerId: string, db: any = getDb()): GenerationResult {
-  const result: GenerationResult = { created: 0, skippedExisting: 0, skippedInactive: 0, skippedVacation: 0 }
+  const result: GenerationResult = { created: 0, skippedExisting: 0, skippedInactive: 0, skippedVacation: 0, skippedInvalidPrice: 0, skippedInvalidDueDay: 0 }
 
   const passenger = db.prepare('SELECT * FROM passengers WHERE id = ?').get(passengerId) as any
   if (!passenger || passenger.status === 'inactive' || passenger.status === 'blocked') {
@@ -138,6 +182,8 @@ export function ensureContractFees(passengerId: string, db: any = getDb()): Gene
     result.skippedExisting += r.skippedExisting
     result.skippedInactive += r.skippedInactive
     result.skippedVacation += r.skippedVacation
+    result.skippedInvalidPrice += r.skippedInvalidPrice
+    result.skippedInvalidDueDay += r.skippedInvalidDueDay
     m++
     if (m > 12) { m = 1; y++ }
     cycles++
