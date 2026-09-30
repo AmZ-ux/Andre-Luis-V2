@@ -57,10 +57,20 @@ async function mpRequest<T>(method: string, path: string, body?: unknown, idempo
     let message = `Erro do Mercado Pago (HTTP ${res.status})`
     const errBody = data as MpErrorBody | null
     if (errBody?.message) message = errBody.message
-    if (Array.isArray(errBody?.cause) && errBody.cause.length > 0) {
-      message = errBody.cause.map((c) => c.description || c.code || 'erro desconhecido').join('. ')
+    const causeList = Array.isArray(errBody?.cause) ? errBody.cause : []
+    if (causeList.length > 0) {
+      message = causeList.map((c) => c.description || c.code || 'erro desconhecido').join('. ')
     }
-    logger.error({ status: res.status, path, message }, 'Erro na API do Mercado Pago')
+    // Observabilidade sanitizada: somente metadados de erro (sem payload, PII ou credenciais).
+    logger.error({
+      status: res.status,
+      path,
+      message: errBody?.message || message,
+      error: errBody?.error,
+      cause_codes: causeList.map((c) => c.code).filter(Boolean),
+      cause_descriptions: causeList.map((c) => c.description).filter(Boolean),
+      request_id: res.headers?.get?.('x-request-id') || undefined,
+    }, 'Erro na API do Mercado Pago')
     throw new MpError(message, res.status)
   }
 
