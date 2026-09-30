@@ -10,6 +10,29 @@ function normalizeString(value: string): string {
   return value.trim()
 }
 
+// Rotas de homologação/não-comerciais ficam ocultas do cadastro público.
+// Regra textual (o modelo não possui flag de categoria): origem/destino com
+// marcador "HOMOLOGAÇÃO" ou "NÃO COMERCIAL". Não altera nem exclui registros.
+function isNonCommercial(route: { origin: string; destination: string }): boolean {
+  return /HOMOLOGA|N[ÃA]O COMERCIAL/i.test(`${route.origin} ${route.destination}`)
+}
+
+// GET /api/routes/registration — público (sem token): usado pelo cadastro de
+// passageiros. Somente rotas ativas e comerciais, com preço oficial.
+// Exceção restrita: enquanto NÃO existir nenhuma rota comercial ativa (fase
+// pré-lançamento, ex.: teste PIX), expõe todas as ativas para o cadastro
+// não ficar travado. Havendo qualquer rota comercial ativa, as não-comerciais
+// voltam a ficar ocultas. Regra decidida inteiramente pelo backend.
+export const registrationRoutes = Router()
+registrationRoutes.get('/', (_req, res) => {
+  const db = getDb()
+  const rows = db.prepare(
+    "SELECT * FROM routes WHERE active = 1 ORDER BY origin ASC, destination ASC"
+  ).all() as Array<{ origin: string; destination: string }>
+  const commercial = rows.filter((r) => !isNonCommercial(r))
+  res.json(commercial.length > 0 ? commercial : rows)
+})
+
 function isValidAmount(value: unknown): value is number {
   if (typeof value !== 'number') return false
   if (!Number.isFinite(value)) return false

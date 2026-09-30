@@ -8,7 +8,7 @@ import { runMigrations } from '../database/schema.js'
 import { sanitizeBody } from '../middleware/validation.js'
 import { resetDb, getDb } from '../database/connection.js'
 import { authMiddleware } from '../middleware/auth.js'
-import routesRoutes from '../routes/routes.js'
+import routesRoutes, { registrationRoutes } from '../routes/routes.js'
 import passengersRoutes from '../routes/passengers.js'
 
 process.env.DATABASE_PATH = ':memory:'
@@ -16,6 +16,7 @@ process.env.DATABASE_PATH = ':memory:'
 const app = express()
 app.use(express.json({ limit: '10mb' }))
 app.use(sanitizeBody)
+app.use('/api/routes/registration', registrationRoutes)
 app.use('/api/routes', authMiddleware, routesRoutes)
 app.use('/api/passengers', authMiddleware, passengersRoutes)
 
@@ -168,6 +169,111 @@ describe('GET /api/routes', () => {
     const res = await request(app).get('/api/routes?includeInactive=true').set('Authorization', `Bearer ${adminToken}`)
     expect(res.status).toBe(200)
     expect(res.body).toHaveLength(2)
+  })
+})
+
+describe('GET /api/routes/registration (cadastro público)', () => {
+  it('responde 200 sem token', async () => {
+    const res = await request(app).get('/api/routes/registration')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+  })
+
+  it('retorna somente rotas ativas', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Ativa', 'Destino Ativo', 100, 1)").run(uuid())
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Inativa', 'Destino Inativo', 200, 0)").run(uuid())
+    const res = await request(app).get('/api/routes/registration')
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].origin).toBe('Ativa')
+  })
+
+  it('filtra rota de homologação sem excluí-la do banco', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'HOMOLOGAÇÃO PIX — NÃO COMERCIAL', 'NÃO COMERCIAL', 1, 1)").run(uuid())
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Ipiranga do Piauí', 'IFPI', 450, 1)").run(uuid())
+    const res = await request(app).get('/api/routes/registration')
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].origin).toBe('Ipiranga do Piauí')
+
+    const homologation = db.prepare("SELECT id FROM routes WHERE origin LIKE 'HOMOLOGAÇÃO%'").get()
+    expect(homologation).toBeDefined()
+
+    const authRes = await request(app).get('/api/routes').set('Authorization', `Bearer ${adminToken}`)
+    expect(authRes.body).toHaveLength(2)
+  })
+
+  it('retorna o preço oficial da rota', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Origem', 'Destino', 450, 1)").run(uuid())
+    const res = await request(app).get('/api/routes/registration')
+    expect(res.body[0].monthly_amount).toBe(450)
+  })
+
+  it('fase pré-lançamento (nenhuma rota comercial): expõe as rotas ativas para o cadastro não travar', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'HOMOLOGAÇÃO PIX — NÃO COMERCIAL', 'NÃO COMERCIAL', 1, 1)").run(uuid())
+    const res = await request(app).get('/api/routes/registration')
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].origin).toBe('HOMOLOGAÇÃO PIX — NÃO COMERCIAL')
+    expect(res.body[0].monthly_amount).toBe(1)
+  })
+
+  it('ao criar a primeira rota comercial, a homologação volta a ficar oculta', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'HOMOLOGAÇÃO PIX — NÃO COMERCIAL', 'NÃO COMERCIAL', 1, 1)").run(uuid())
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Centro', 'IFPI', 450, 1)").run(uuid())
+    const res = await request(app).get('/api/routes/registration')
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].origin).toBe('Centro')
+  })
+
+  it('somente rotas inativas: cadastro público recebe lista vazia', async () => {
+    const db = getDb()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Origem', 'Destino', 100, 0)").run(uuid())
+    const res = await request(app).get('/api/routes/registration')
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(0)
+  })
+
+  it('GET /api/routes continua exigindo autenticação', async () => {
+    const res = await request(app).get('/api/routes')
+    expect(res.status).toBe(401)
+  })
+})
+
+describe('Homologação — fluxo administrativo de associação', () => {
+  it('admin associa passageiro à rota de homologação e o preço é derivado pelo backend', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'HOMOLOGAÇÃO PIX — NÃO COMERCIAL', 'NÃO COMERCIAL', 1, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pid, 'Homologa Teste', '777.777.777-77', '2000-01-01')
+    const res = await request(app)
+      .put(`/api/passengers/${pid}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ route_id: routeId })
+    expect(res.status).toBe(200)
+    expect(res.body.route_id).toBe(routeId)
+    expect(res.body.monthly_fee).toBe(1)
+  })
+
+  it('passageiro não pode associar rota de homologação (403)', async () => {
+    const db = getDb()
+    const routeId = uuid()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'HOMOLOGAÇÃO PIX — NÃO COMERCIAL', 'NÃO COMERCIAL', 1, 1)").run(routeId)
+    const pid = uuid()
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pid, 'Outro Teste', '888.888.888-88', '2000-01-01')
+    const res = await request(app)
+      .put(`/api/passengers/${pid}`)
+      .set('Authorization', `Bearer ${passengerToken}`)
+      .send({ route_id: routeId })
+    expect(res.status).toBe(403)
   })
 })
 

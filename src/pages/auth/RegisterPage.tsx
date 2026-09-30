@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Navigate, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -8,7 +8,7 @@ import { Select } from '../../components/ui/Select'
 import { Checkbox } from '../../components/ui/Checkbox'
 import { PasswordInput } from '../../components/auth/PasswordInput'
 import { Button } from '../../components/ui/Button'
-import { UserPlus, ArrowRight, ArrowLeft, MapPin, CalendarClock, Wallet } from 'lucide-react'
+import { UserPlus, ArrowRight, ArrowLeft, CalendarClock, Wallet } from 'lucide-react'
 import {
   validateEmail,
   validateNewPassword,
@@ -17,6 +17,14 @@ import {
 } from '../../validators/authValidators'
 import { isValidCPF, formatCPF, formatPhone } from '../../validators/passengerValidators'
 import { validatePhone } from '../../utils/validators'
+import { routeService } from '../../services/routeService'
+import {
+  getUniqueActiveOrigins,
+  getActiveDestinations,
+  resolveRoute,
+  formatBRL,
+} from '../../utils/routeSelection'
+import type { Route } from '../../types/route'
 import type { RegisterCredentials } from '../../types/auth'
 
 const transportOptions = [
@@ -54,14 +62,61 @@ export function RegisterPage() {
     destination: '',
     contractStartDate: '',
     monthlyFee: '',
+    routeId: '',
   })
   const [confirmPassword, setConfirmPassword] = useState('')
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [errors, setErrors] = useState<RegisterErrors>({})
   const [termsError, setTermsError] = useState('')
 
+  const [routes, setRoutes] = useState<Route[]>([])
+  const [routesLoading, setRoutesLoading] = useState(false)
+  const [routesError, setRoutesError] = useState('')
+
+  const loadRoutes = async () => {
+    setRoutesLoading(true)
+    setRoutesError('')
+    try {
+      const data = await routeService.listForRegistration()
+      setRoutes(data)
+    } catch {
+      setRoutesError('Não foi possível carregar as rotas disponíveis. Verifique sua conexão.')
+    } finally {
+      setRoutesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadRoutes()
+  }, [])
+
   if (isAuthenticated) {
     return <Navigate to="/" replace />
+  }
+
+  const originOptions = getUniqueActiveOrigins(routes).map((o) => ({ value: o, label: o }))
+  const destinationOptions = getActiveDestinations(routes, form.pickupPoint).map((d) => ({
+    value: d,
+    label: d,
+  }))
+
+  const handleOriginChange = (value: string) => {
+    // Trocar origem limpa destino, rota e valor calculado
+    setForm((prev) => ({ ...prev, pickupPoint: value, destination: '', routeId: '', monthlyFee: '' }))
+    setErrors((prev) => ({ ...prev, pickupPoint: undefined, destination: undefined, monthlyFee: undefined }))
+    clearError()
+  }
+
+  const handleDestinationChange = (value: string) => {
+    const route = resolveRoute(routes, form.pickupPoint, value)
+    setForm((prev) => ({
+      ...prev,
+      destination: value,
+      routeId: route?.id ?? '',
+      monthlyFee: route ? String(route.monthlyAmount) : '',
+    }))
+    setErrors((prev) => ({ ...prev, destination: undefined, monthlyFee: undefined }))
+    clearError()
   }
 
   const handleChange = (field: keyof RegisterCredentials, value: string) => {
@@ -89,13 +144,16 @@ export function RegisterPage() {
 
   const validateStep2 = (): boolean => {
     const nextErrors: RegisterErrors = {}
-    if (!form.pickupPoint.trim()) nextErrors.pickupPoint = 'Informe o ponto de saída'
-    if (!form.destination.trim()) nextErrors.destination = 'Informe o destino'
-    if (!form.contractStartDate) nextErrors.contractStartDate = 'Informe a data de início'
-    const feeValue = Number(String(form.monthlyFee).replace(',', '.'))
-    if (!form.monthlyFee || !Number.isFinite(feeValue) || feeValue <= 0) {
-      nextErrors.monthlyFee = 'Informe o valor da mensalidade'
+    if (!form.pickupPoint) nextErrors.pickupPoint = 'Selecione o ponto de saída'
+    if (!form.destination) {
+      nextErrors.destination = 'Selecione o destino'
+    } else if (!form.routeId) {
+      nextErrors.destination = 'Origem e destino não correspondem a uma rota disponível'
     }
+    if (form.routeId && (!form.monthlyFee || !(Number(form.monthlyFee) > 0))) {
+      nextErrors.monthlyFee = 'Não foi possível calcular o valor da mensalidade'
+    }
+    if (!form.contractStartDate) nextErrors.contractStartDate = 'Informe a data de início'
 
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -254,23 +312,39 @@ export function RegisterPage() {
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
+              <Select
                 label="Ponto de saída"
-                placeholder="Ex.: Terminal Central"
+                options={originOptions}
                 value={form.pickupPoint}
-                onChange={(e) => handleChange('pickupPoint', e.target.value)}
+                onChange={(e) => handleOriginChange(e.target.value)}
                 error={errors.pickupPoint}
-                icon={<MapPin className="h-4 w-4" />}
+                placeholder={routesLoading ? 'Carregando rotas…' : 'Selecione a origem'}
+                disabled={routesLoading}
               />
-              <Input
+              <Select
                 label="Destino"
-                placeholder="Ex.: USP - Cidade Universitária"
+                options={destinationOptions}
                 value={form.destination}
-                onChange={(e) => handleChange('destination', e.target.value)}
+                onChange={(e) => handleDestinationChange(e.target.value)}
                 error={errors.destination}
-                icon={<MapPin className="h-4 w-4" />}
+                placeholder={form.pickupPoint ? 'Selecione o destino' : 'Selecione a origem primeiro'}
+                disabled={routesLoading || !form.pickupPoint}
               />
             </div>
+
+            {routesError && (
+              <div className="bg-error/5 border border-error/20 rounded-xl px-4 py-3 flex items-center justify-between gap-3" role="alert">
+                <p className="text-sm text-error font-medium">{routesError}</p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void loadRoutes()}
+                >
+                  Tentar novamente
+                </Button>
+              </div>
+            )}
 
             <Input
               label="Data de início do contrato"
@@ -283,14 +357,14 @@ export function RegisterPage() {
 
             <Input
               label="Valor da mensalidade (R$)"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Ex.: 189,90"
-              value={form.monthlyFee}
-              onChange={(e) => handleChange('monthlyFee', e.target.value)}
+              type="text"
+              readOnly
+              value={form.monthlyFee ? formatBRL(Number(form.monthlyFee)) : formatBRL(0)}
+              placeholder="Selecione origem e destino"
               error={errors.monthlyFee}
               icon={<Wallet className="h-4 w-4" />}
+              className="bg-gray-50 dark:bg-gray-800/50 cursor-default"
+              autoComplete="off"
             />
 
             <div className="bg-primary/5 border border-primary/10 rounded-xl px-4 py-3 flex items-start gap-2">

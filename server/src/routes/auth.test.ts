@@ -211,6 +211,71 @@ describe('POST /api/auth/register', () => {
     const passenger = db.prepare('SELECT route_id FROM passengers WHERE email = ?').get('semrota@teste.com') as any
     expect(passenger.route_id).toBeNull()
   })
+
+  it('should register with matching origin/destination combination', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-combo-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Ipiranga do Piauí', 'IFPI', 450, 1)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        name: 'Combo Ok', email: 'combook@teste.com', cpf: '999.888.777-66', password: 'Test@123',
+        routeId, pickupPoint: 'Ipiranga do Piauí', destination: 'IFPI',
+      })
+    expect(res.status).toBe(201)
+    const passenger = db.prepare('SELECT route_id, monthly_fee, pickup_point, destination FROM passengers WHERE email = ?').get('combook@teste.com') as any
+    expect(passenger.route_id).toBe(routeId)
+    expect(passenger.monthly_fee).toBe(450)
+    expect(passenger.pickup_point).toBe('Ipiranga do Piauí')
+    expect(passenger.destination).toBe('IFPI')
+  })
+
+  it('should reject register when origin does not match the selected route', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-bad-origin-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Origem Valida', 'Destino Valido', 450, 1)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        name: 'Combo Ruim', email: 'comborum@teste.com', cpf: '123.123.123-12', password: 'Test@123',
+        routeId, pickupPoint: 'Outra Origem', destination: 'Destino Valido',
+      })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('não corresponde')
+    const user = db.prepare('SELECT id FROM users WHERE email = ?').get('comborum@teste.com')
+    expect(user).toBeUndefined()
+  })
+
+  it('should reject register when destination does not match the selected route', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-bad-dest-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Origem Combo', 'Destino Combo', 450, 1)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        name: 'Combo Dest', email: 'combodest@teste.com', cpf: '321.321.321-98', password: 'Test@123',
+        routeId, pickupPoint: 'Origem Combo', destination: 'UFPI',
+      })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('não corresponde')
+  })
+
+  it('REGISTER_TAMPER_COMBO: payload com outra combinação de rota é rejeitado', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeA = 'test-route-tamper-a-' + Date.now()
+    const routeB = 'test-route-tamper-b-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Origem A', 'Destino A', 400, 1)").run(routeA)
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'Origem B', 'Destino B', 900, 1)").run(routeB)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        name: 'Tamper Combo', email: 'tampercombo@teste.com', cpf: '654.654.654-32', password: 'Test@123',
+        routeId: routeA, pickupPoint: 'Origem B', destination: 'Destino B',
+      })
+    expect(res.status).toBe(400)
+    const user = db.prepare('SELECT id FROM users WHERE email = ?').get('tampercombo@teste.com')
+    expect(user).toBeUndefined()
+  })
 })
 
 describe('Email verification flow', () => {

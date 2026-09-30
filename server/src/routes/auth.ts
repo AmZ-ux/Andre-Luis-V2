@@ -111,7 +111,7 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
   // Validate routeId if provided — route is the price authority
   let resolvedRouteId: string | null = null
   if (routeId && typeof routeId === 'string') {
-    const route = db.prepare('SELECT id, active, monthly_amount FROM routes WHERE id = ?').get(routeId) as any
+    const route = db.prepare('SELECT id, active, monthly_amount, origin, destination FROM routes WHERE id = ?').get(routeId) as any
     if (!route) {
       db.prepare('DELETE FROM users WHERE id = ?').run(id)
       res.status(400).json({ error: 'Rota não encontrada' })
@@ -120,6 +120,14 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
     if (!route.active) {
       db.prepare('DELETE FROM users WHERE id = ?').run(id)
       res.status(400).json({ error: 'Não é possível associar a uma rota inativa' })
+      return
+    }
+    // A combinacao origem/destino enviada deve corresponder a rota selecionada
+    const normPickup = String(pickupPoint ?? '').trim()
+    const normDest = String(destination ?? '').trim()
+    if ((normPickup && normPickup !== route.origin) || (normDest && normDest !== route.destination)) {
+      db.prepare('DELETE FROM users WHERE id = ?').run(id)
+      res.status(400).json({ error: 'A combinação de ponto de saída e destino não corresponde à rota selecionada' })
       return
     }
     resolvedRouteId = routeId

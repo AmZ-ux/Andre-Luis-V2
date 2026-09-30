@@ -22,7 +22,7 @@ import reportsRoutes from './routes/reports.js'
 import clientErrorRoutes from './routes/clientError.js'
 import { paymentsRouter, paymentsWebhookRouter } from './routes/payments.js'
 import adminRoutes from './routes/admin.js'
-import routesRoutes from './routes/routes.js'
+import routesRoutes, { registrationRoutes } from './routes/routes.js'
 import { startScheduler } from './services/scheduler.js'
 import { markOverdueFees } from './services/feeAutomation.js'
 
@@ -87,6 +87,7 @@ if (process.env.SEED === 'true') {
 // Public routes
 app.use('/api/auth', authRoutes)
 app.use('/api/client-error', clientErrorRoutes)
+app.use('/api/routes/registration', registrationRoutes)
 
 // Protected routes
 app.use('/api/passengers', authMiddleware, passengerRoutes)

@@ -39,6 +39,7 @@ export interface RegisterCredentials {
   destination: string
   contractStartDate: string
   monthlyFee: string
+  routeId?: string
 }
 
 export interface ForgotPasswordData {

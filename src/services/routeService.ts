@@ -24,6 +24,13 @@ export const routeService = {
     return [...mockRoutes]
   },
 
+  // Cadastro público: somente rotas ativas e comerciais (sem homologação)
+  async listForRegistration(): Promise<Route[]> {
+    if (config.realApi) return realRoutes.listForRegistration()
+    await delay(300)
+    return mockRoutes.filter((r) => r.active)
+  },
+
   async getById(id: string): Promise<Route> {
     if (config.realApi) return realRoutes.getById(id)
     await delay(200)

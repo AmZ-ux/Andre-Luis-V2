@@ -333,6 +333,9 @@ export const realRoutes = {
   listAll: () =>
     api.get<Route[]>('/routes', { includeInactive: true }),
 
+  listForRegistration: () =>
+    api.get<Route[]>('/routes/registration', undefined, true),
+
   getById: (id: string) =>
     api.get<Route>(`/routes/${id}`),
 

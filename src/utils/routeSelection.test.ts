@@ -1,35 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import type { Route } from '../types/route'
+import {
+  getUniqueActiveOrigins,
+  getActiveDestinations,
+  resolveRoute,
+  formatBRL,
+} from './routeSelection'
 
-// --- Pure route selection logic extracted from PassengerForm ---
-
-/** Unique active origins from routes, sorted alphabetically (pt-BR) */
-function getUniqueActiveOrigins(routes: Route[]): string[] {
-  const set = new Set(routes.filter((r) => r.active).map((r) => r.origin))
-  return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-}
-
-/** Active destinations for a given origin */
-function getActiveDestinations(routes: Route[], origin: string): string[] {
-  if (!origin) return []
-  return routes
-    .filter((r) => r.active && r.origin === origin)
-    .map((r) => r.destination)
-    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-}
-
-/** Resolve route from origin + destination */
-function resolveRoute(routes: Route[], origin: string, destination: string): Route | null {
-  if (!origin || !destination) return null
-  return routes.find(
-    (r) => r.origin === origin && r.destination === destination && r.active
-  ) || null
-}
-
-/** Format BRL currency */
-function formatBRL(value: number): string {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-}
+// --- Helpers locais de teste ---
 
 /** Normalizes BRL string for comparison (replaces non-breaking spaces) */
 function normalizeBRL(s: string): string {
