@@ -74,9 +74,11 @@ describe('POST /api/auth/register', () => {
     }
   })
 
-  it('should create the current month fee with due day from the contract', async () => {
+  it('should create exactly one fee for the current applicable competence without anticipating the next month', async () => {
     const db = (await import('../database/connection.js')).getDb()
     db.prepare("INSERT OR REPLACE INTO settings (id, category, data) VALUES ('test-financial', 'financial', ?)").run(JSON.stringify({ defaultMonthlyFee: 249.9 }))
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 8, 15)) // 15/09/2026
     try {
       const res = await request(app)
         .post('/api/auth/register')
@@ -93,18 +95,71 @@ describe('POST /api/auth/register', () => {
       expect(passenger.due_day).toBe(10)
       expect(passenger.monthly_fee).toBe(249.9)
 
-      // Competencia derivada do inicio do contrato: 1 mes apos a data informada
-      const fee = db.prepare(
-        'SELECT amount, due_day, due_date, status, month, year FROM monthly_fees WHERE passenger_id = ? AND month = ? AND year = ?'
-      ).get(passenger.id, 10, 2026) as { amount: number; due_day: number; due_date: string; status: string; month: number; year: number } | undefined
-      expect(fee).toBeDefined()
-      expect(fee?.amount).toBe(249.9)
-      expect(fee?.due_day).toBe(10)
-      expect(fee?.due_date).toBe('10/10/2026')
-      expect(fee?.status).toBe('pending')
+      // Regra do proprietário: EXATAMENTE UMA mensalidade (competência corrente
+      // = mês do início do contrato), sem duplicidade e sem antecipação.
+      const fees = db.prepare(
+        'SELECT amount, due_day, due_date, status, month, year FROM monthly_fees WHERE passenger_id = ?'
+      ).all(passenger.id) as Array<{ amount: number; due_day: number; due_date: string; status: string; month: number; year: number }>
+      expect(fees).toHaveLength(1)
+      expect(fees[0].month).toBe(9)
+      expect(fees[0].year).toBe(2026)
+      expect(fees[0].amount).toBe(249.9)
+      expect(fees[0].due_day).toBe(10)
+      expect(fees[0].due_date).toBe('10/09/2026')
+      expect(fees[0].status).toBe('pending')
+
+      // Regra do proprietário: NÃO gera competência futura antecipadamente
+      const future = db.prepare(
+        'SELECT COUNT(*) as c FROM monthly_fees WHERE passenger_id = ? AND (year > 2026 OR (year = 2026 AND month > 9))'
+      ).get(passenger.id) as { c: number }
+      expect(future.c).toBe(0)
     } finally {
       db.prepare('DELETE FROM settings WHERE id = ?').run('test-financial')
+      vi.useRealTimers()
     }
+  })
+
+  it('should not create any fee when the contract starts in the future', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 8, 15)) // 15/09/2026
+    try {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Inicio Futuro',
+          email: 'iniciofuturo@teste.com',
+          cpf: '101.202.303-44',
+          password: 'Test@123',
+          contractStartDate: '2026-10-01',
+        })
+      expect(res.status).toBe(201)
+
+      const passenger = db.prepare('SELECT id, due_day FROM passengers WHERE email = ?').get('iniciofuturo@teste.com') as { id: string; due_day: number }
+      expect(passenger.due_day).toBe(1)
+      // Regra do proprietário: não antecipa outubro em setembro — a competência
+      // futura só é criada quando o mês chegar (scheduler diário).
+      const fees = db.prepare('SELECT COUNT(*) as c FROM monthly_fees WHERE passenger_id = ?').get(passenger.id) as { c: number }
+      expect(fees.c).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('REGISTER_FEE_FROM_ROUTE: created fee uses route price even when payload tampers it', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const routeId = 'test-route-fee-price-' + Date.now()
+    db.prepare("INSERT INTO routes (id, origin, destination, monthly_amount, active) VALUES (?, 'O-FP', 'D-FP', 400, 1)").run(routeId)
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Fee Price', email: 'feeprice@teste.com', cpf: '202.303.404-55', password: 'Test@123', routeId, monthlyFee: 1 })
+    expect(res.status).toBe(201)
+    const passenger = db.prepare('SELECT id, monthly_fee FROM passengers WHERE email = ?').get('feeprice@teste.com') as { id: string; monthly_fee: number }
+    expect(passenger.monthly_fee).toBe(400)
+    // A mensalidade criada no cadastro também usa o preço da rota (sem manipulação)
+    const fees = db.prepare('SELECT amount FROM monthly_fees WHERE passenger_id = ?').all(passenger.id) as Array<{ amount: number }>
+    expect(fees).toHaveLength(1)
+    expect(fees[0].amount).toBe(400)
   })
 
   it('should fall back to day 5 when contract start date is invalid', async () => {

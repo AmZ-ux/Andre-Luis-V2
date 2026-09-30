@@ -192,13 +192,16 @@ export function RegisterPage() {
     const [y, m, d] = iso.split('-')
     return `${d}/${m}/${y}`
   }
-  const firstDueDateLabel = (() => {
+  const firstCompetenceLabel = (() => {
     if (!form.contractStartDate) return '-'
-    const [y, m, d] = form.contractStartDate.split('-').map(Number)
-    let nextMonth = m + 1
-    let nextYear = y
-    if (nextMonth > 12) { nextMonth = 1; nextYear++ }
-    return `${String(d).padStart(2, '0')}/${String(nextMonth).padStart(2, '0')}/${nextYear}`
+    const [y, m] = form.contractStartDate.split('-')
+    return `${m}/${y}`
+  })()
+  const contractStartInFuture = (() => {
+    if (!form.contractStartDate) return false
+    const d = new Date()
+    const todayIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return form.contractStartDate > todayIso
   })()
 
   return (
@@ -372,9 +375,9 @@ export function RegisterPage() {
               <p className="text-xs text-gray-600 dark:text-gray-300">
                 {form.contractStartDate ? (
                   <>
-                    Contrato iniciando em <strong className="text-text">{formatBRDate(form.contractStartDate)}</strong>.
-                    Sua primeira mensalidade vencerá 1 mês após o início, em{' '}
-                    <strong className="text-text">{firstDueDateLabel}</strong>, e depois todo dia{' '}
+                    Contrato iniciando em <strong className="text-text">{formatBRDate(form.contractStartDate)}</strong>.{' '}
+                    Sua primeira mensalidade {contractStartInFuture ? 'será gerada em' : 'é a de'}{' '}
+                    <strong className="text-text">{firstCompetenceLabel}</strong> e vence dia{' '}
                     <strong className="text-text">{Number(form.contractStartDate.slice(8, 10))}</strong> de cada mês.
                   </>
                 ) : (

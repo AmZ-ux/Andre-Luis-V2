@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { v4 as uuid } from 'uuid'
 import { runMigrations } from '../database/schema.js'
 import { resetDb, getDb } from '../database/connection.js'
 import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySummaryToAdmins, notifyPaymentReceived } from './feeAutomation.js'
 import { DEFAULT_SETTINGS } from './settingsService.js'
-import { generateMonthlyFees } from './monthlyFeeGenerator.js'
+import { generateMonthlyFees, ensureContractFees } from './monthlyFeeGenerator.js'
 
 process.env.DATABASE_PATH = ':memory:'
 
@@ -896,5 +896,97 @@ describe('ensureContractFees atomicity audit', () => {
     expect(passengerNotif[0].title).toBe('Pagamento registrado')
     expect(adminNotif.length).toBe(1)
 expect(adminNotif[0].title).toContain('Cliente Exemplo')
+  })
+})
+
+// Regra definitiva do proprietário: ao cadastrar, EXATAMENTE UMA competência
+// corrente aplicável; série mensal idempotente; nunca antecipar futuro.
+describe('Regra do proprietário — competências da mensalidade', () => {
+  afterEach(() => { vi.useRealTimers() })
+
+  function freezeDate(year: number, month: number, day: number): void {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(year, month - 1, day))
+  }
+
+  function seedContractPassenger(startIso: string, status = 'active', cpf = '111.111.111-11'): string {
+    const id = seedPassenger({ status, cpf })
+    getDb().prepare('UPDATE passengers SET contract_start_date = ? WHERE id = ?').run(startIso, id)
+    return id
+  }
+
+  function feeMonths(passengerId: string): string[] {
+    return (getDb().prepare('SELECT month, year FROM monthly_fees WHERE passenger_id = ? ORDER BY year, month').all(passengerId) as Array<{ month: number; year: number }>)
+      .map((f) => `${String(f.month).padStart(2, '0')}/${f.year}`)
+  }
+
+  it('1. cadastro em um mês → exatamente uma mensalidade da competência corrente', () => {
+    freezeDate(2026, 9, 30)
+    const pid = seedContractPassenger('2026-09-30')
+    const r = ensureContractFees(pid, getDb())
+    expect(r.created).toBe(1)
+    expect(feeMonths(pid)).toEqual(['09/2026'])
+  })
+
+  it('2. scheduler no mesmo mês → continua com 1', () => {
+    freezeDate(2026, 9, 30)
+    const pid = seedContractPassenger('2026-09-30')
+    ensureContractFees(pid, getDb())
+    const r = ensureContractFees(pid, getDb())
+    expect(r.created).toBe(0)
+    expect(feeMonths(pid)).toEqual(['09/2026'])
+  })
+
+  it('3. scheduler executado várias vezes → continua com 1', () => {
+    freezeDate(2026, 9, 30)
+    const pid = seedContractPassenger('2026-09-30')
+    ensureContractFees(pid, getDb())
+    for (let i = 0; i < 3; i++) ensureContractFees(pid, getDb())
+    expect(feeMonths(pid)).toEqual(['09/2026'])
+  })
+
+  it('4. virada para o próximo mês → cria somente a nova competência', () => {
+    freezeDate(2026, 9, 30)
+    const pid = seedContractPassenger('2026-09-30')
+    ensureContractFees(pid, getDb())
+    expect(feeMonths(pid)).toEqual(['09/2026'])
+    freezeDate(2026, 10, 5)
+    const r = ensureContractFees(pid, getDb())
+    expect(r.created).toBe(1)
+    expect(feeMonths(pid)).toEqual(['09/2026', '10/2026'])
+  })
+
+  it('5. segunda execução no próximo mês → não duplica', () => {
+    freezeDate(2026, 9, 30)
+    const pid = seedContractPassenger('2026-09-30')
+    ensureContractFees(pid, getDb())
+    freezeDate(2026, 10, 5)
+    ensureContractFees(pid, getDb())
+    const r = ensureContractFees(pid, getDb())
+    expect(r.created).toBe(0)
+    expect(feeMonths(pid)).toEqual(['09/2026', '10/2026'])
+  })
+
+  it('6. nunca cria mês futuro antecipadamente', () => {
+    freezeDate(2026, 9, 30)
+    const pid = seedContractPassenger('2026-09-30')
+    ensureContractFees(pid, getDb())
+    expect(feeMonths(pid)).toEqual(['09/2026'])
+    // Contrato iniciando no mês seguinte → zero mensalidades em setembro
+    const futurePid = seedContractPassenger('2026-10-01', 'active', '222.222.222-22')
+    ensureContractFees(futurePid, getDb())
+    expect(feeMonths(futurePid)).toEqual([])
+    // Quando outubro chegar, nasce apenas outubro
+    freezeDate(2026, 10, 5)
+    ensureContractFees(futurePid, getDb())
+    expect(feeMonths(futurePid)).toEqual(['10/2026'])
+  })
+
+  it('7. passageiro inativo → nenhuma mensalidade (regra existente)', () => {
+    freezeDate(2026, 9, 30)
+    const pid = seedContractPassenger('2026-09-30', 'inactive')
+    const r = ensureContractFees(pid, getDb())
+    expect(r.created).toBe(0)
+    expect(feeMonths(pid)).toEqual([])
   })
 })

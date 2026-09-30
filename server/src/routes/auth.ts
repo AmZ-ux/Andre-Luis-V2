@@ -4,6 +4,7 @@ import { v4 as uuid } from 'uuid'
 import rateLimit from 'express-rate-limit'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from '../services/settingsService.js'
+import { ensureContractFees } from '../services/monthlyFeeGenerator.js'
 import { signToken, authMiddleware } from '../middleware/auth.js'
 import { validateBody } from '../middleware/validation.js'
 import { sendEmail, emailDisabled } from '../services/emailService.js'
@@ -160,27 +161,11 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
     resolvedRouteId
   )
 
-  // Primeira mensalidade: competencia derivada do inicio do contrato (1 mes
-  // apos a data informada, como o preview do cadastro promete). Sem data
-  // informada, usa o mes atual. Assim datas retroativas/futuras sao respeitadas.
-  let feeMonth = new Date().getMonth() + 1
-  let feeYear = new Date().getFullYear()
-  if (contractStartDate && /^\d{4}-\d{2}-\d{2}$/.test(contractStartDate)) {
-    const y = Number(contractStartDate.slice(0, 4))
-    const m = Number(contractStartDate.slice(5, 7))
-    feeMonth = m + 1
-    feeYear = y
-    if (feeMonth > 12) { feeMonth = 1; feeYear++ }
-  }
-
-  db.prepare(`
-    INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)
-    VALUES (?, ?, ?, ?, ?, '', '', ?, ?, ?, ?, ?, 'pending')
-  `).run(
-    uuid(), id, name, cpf, type,
-    feeMonth, feeYear, feeValue, dueDay,
-    `${String(dueDay).padStart(2, '0')}/${String(feeMonth).padStart(2, '0')}/${feeYear}`
-  )
+  // Primeira competencia: exatamente a competencia corrente aplicavel (mes do
+  // inicio do contrato, limitada ao mes corrente; sem data, o mes atual).
+  // NUNCA antecipa o proximo mes. A serie e idempotente (1 fee por
+  // passageiro+mes+ano) e o mesmo fluxo do dashboard/cron usa esta funcao.
+  ensureContractFees(id, db)
 
   const token = signToken({ userId: id, role: 'passenger' })
   res.status(201).json({
