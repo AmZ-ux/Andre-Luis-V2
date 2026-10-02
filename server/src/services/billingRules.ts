@@ -14,8 +14,21 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100
 }
 
+// Regra contratual do proprietário: o vencimento da competência ocorre UM MÊS
+// APÓS a competência (início 05/10 → competência 10 → vence 05/11/2026; dia
+// maior que o último dia do mês-alvo usa o último dia válido; virada de ano
+// respeitada).
 export function buildDueDate(year: number, month: number, dueDay: number): Date {
-  return new Date(year, month - 1, dueDay)
+  const dueMonth = month === 12 ? 1 : month + 1
+  const dueYear = month === 12 ? year + 1 : year
+  const lastDay = new Date(dueYear, dueMonth, 0).getDate()
+  return new Date(dueYear, dueMonth - 1, Math.min(dueDay, lastDay))
+}
+
+// due_date no formato BR derivado da competência (vencimento = competência + 1).
+export function formatDueDateBR(year: number, month: number, dueDay: number): string {
+  const d = buildDueDate(year, month, dueDay)
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
 }
 
 export function parseBrDate(value: string): Date | null {

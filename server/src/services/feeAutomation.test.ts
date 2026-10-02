@@ -46,7 +46,8 @@ describe('markOverdueFees', () => {
 
   it('marks pending fees past due as overdue with zero tolerance', () => {
     const pid = seedPassenger()
-    seedFee(pid, { month: 8, year: 2026, dueDay: 10 }) // due 10/08 => 5 days late
+    // competência 07 com due_day 10 → vence 10/08 (regra contratual) => 5 dias de atraso
+    seedFee(pid, { month: 7, year: 2026, dueDay: 10 })
     const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
     expect(updated).toBe(1)
     const fee = getDb().prepare('SELECT status FROM monthly_fees').get() as any
@@ -55,8 +56,8 @@ describe('markOverdueFees', () => {
 
   it('keeps fees due on or after today as pending', () => {
     const pid = seedPassenger()
-    seedFee(pid, { month: 8, year: 2026, dueDay: 15 }) // due 15/08 => 0 days late
-    seedFee(pid, { month: 9, year: 2026, dueDay: 5, cpf: '111.111.111-22' })
+    seedFee(pid, { month: 8, year: 2026, dueDay: 15 }) // vence 15/09 (regra contratual) => pendente
+    seedFee(pid, { month: 9, year: 2026, dueDay: 5, cpf: '111.111.111-22' }) // vence 05/10
     const updated = markOverdueFees(getDb(), DEFAULT_SETTINGS, today)
     expect(updated).toBe(0)
     const fees = getDb().prepare('SELECT status FROM monthly_fees').all()
@@ -65,7 +66,8 @@ describe('markOverdueFees', () => {
 
   it('respects a custom tolerance setting', () => {
     const pid = seedPassenger()
-    seedFee(pid, { month: 8, year: 2026, dueDay: 10 }) // due 10/08 => 5 days late
+    // competência 07, vence 10/08 => 5 dias de atraso; tolerância 5 => permanece pending
+    seedFee(pid, { month: 7, year: 2026, dueDay: 10 })
     const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
     settings.billing.toleranceDays = 5
     const updated = markOverdueFees(getDb(), settings, today)
@@ -84,7 +86,8 @@ describe('markOverdueFees', () => {
 
   it('marks fee as overdue even with SUBPAYMENT', () => {
     const pid = seedPassenger()
-    const feeId = seedFee(pid, { month: 8, year: 2026, dueDay: 10 }) // due 10/08, today=15/08
+    // competência 07 → vence 10/08 (regra contratual); today 15/08 => atrasado
+    const feeId = seedFee(pid, { month: 7, year: 2026, dueDay: 10 })
     getDb().prepare(
       "INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, late_fee, interest, entry_type) VALUES (?, ?, ?, ?, 'pix', 'sub', 0, 0, 'SUBPAYMENT')"
     ).run(uuid(), feeId, 50, '12/08/2026')
@@ -193,89 +196,103 @@ describe('generateMonthlyFees', () => {
 
   // === Phase 2F.1 hardening tests ===
 
-  describe('due_date: last valid day of month', () => {
-    it('due_day 31 in January -> 31/01', () => {
+  describe('due_date: vencimento um mês após a competência (regra contratual)', () => {
+    it('competência 01 (due_day 31) → vence 28/02 (fev não-bissexto)', () => {
       const pid = seedPassenger({ dueDay: 31 })
       generateMonthlyFees({ month: 1, year: 2026 }, getDb())
       const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('31/01/2026')
-    })
-
-    it('due_day 31 in February 2026 (non-leap) -> 28/02', () => {
-      const pid = seedPassenger({ dueDay: 31 })
-      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
-      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
       expect(fee.due_date).toBe('28/02/2026')
     })
 
-    it('due_day 29 in February 2028 (leap) -> 29/02', () => {
-      const pid = seedPassenger({ dueDay: 29 })
-      generateMonthlyFees({ month: 2, year: 2028 }, getDb())
-      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('29/02/2028')
-    })
-
-    it('due_day 29 in February 2026 (non-leap) -> 28/02', () => {
-      const pid = seedPassenger({ dueDay: 29 })
+    it('competência 02 (due_day 31) → vence 31/03', () => {
+      const pid = seedPassenger({ dueDay: 31 })
       generateMonthlyFees({ month: 2, year: 2026 }, getDb())
-      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('28/02/2026')
-    })
-
-    it('due_day 30 in February -> 28/02 (non-leap)', () => {
-      const pid = seedPassenger({ dueDay: 30 })
-      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
-      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('28/02/2026')
-    })
-
-    it('due_day 31 in April -> 30/04', () => {
-      const pid = seedPassenger({ dueDay: 31 })
-      generateMonthlyFees({ month: 4, year: 2026 }, getDb())
-      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('30/04/2026')
-    })
-
-    it('due_day 31 in June -> 30/06', () => {
-      const pid = seedPassenger({ dueDay: 31 })
-      generateMonthlyFees({ month: 6, year: 2026 }, getDb())
-      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('30/06/2026')
-    })
-
-    it('due_day 31 in September -> 30/09', () => {
-      const pid = seedPassenger({ dueDay: 31 })
-      generateMonthlyFees({ month: 9, year: 2026 }, getDb())
-      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('30/09/2026')
-    })
-
-    it('due_day 31 in November -> 30/11', () => {
-      const pid = seedPassenger({ dueDay: 31 })
-      generateMonthlyFees({ month: 11, year: 2026 }, getDb())
-      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('30/11/2026')
-    })
-
-    it('due_day 31 in month with 31 days -> 31', () => {
-      const pid = seedPassenger({ dueDay: 31 })
-      generateMonthlyFees({ month: 3, year: 2026 }, getDb())
       const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
       expect(fee.due_date).toBe('31/03/2026')
     })
 
-    it('due_day 1 -> 01', () => {
+    it('6. ano bissexto: competência 01/2028 (due_day 31) → vence 29/02/2028', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 1, year: 2028 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('29/02/2028')
+    })
+
+    it('due_day 29 na competência 02/2026 (não-bissexto) → 29/03/2026', () => {
+      const pid = seedPassenger({ dueDay: 29 })
+      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('29/03/2026')
+    })
+
+    it('due_day 30 na competência 02 → vence 30/03', () => {
+      const pid = seedPassenger({ dueDay: 30 })
+      generateMonthlyFees({ month: 2, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('30/03/2026')
+    })
+
+    it('due_day 31 na competência 04 → vence 31/05', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 4, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('31/05/2026')
+    })
+
+    it('due_day 31 na competência 06 → vence 31/07', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 6, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('31/07/2026')
+    })
+
+    it('due_day 31 na competência 09 → vence 31/10', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 9, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('31/10/2026')
+    })
+
+    it('due_day 31 na competência 11 → vence 31/12', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 11, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('31/12/2026')
+    })
+
+    it('4. competência 12 → vence 05/01 do próximo ano (due_day 5)', () => {
+      const pid = seedPassenger({ dueDay: 5 })
+      generateMonthlyFees({ month: 12, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('05/01/2027')
+    })
+
+    it('3. competência 11 → vence 05/12 (due_day 5)', () => {
+      const pid = seedPassenger({ dueDay: 5 })
+      generateMonthlyFees({ month: 11, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('05/12/2026')
+    })
+
+    it('due_day 31 na competência 03 → vence 30/04 (último dia válido)', () => {
+      const pid = seedPassenger({ dueDay: 31 })
+      generateMonthlyFees({ month: 3, year: 2026 }, getDb())
+      const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+      expect(fee.due_date).toBe('30/04/2026')
+    })
+
+    it('due_day 1 na competência 02 → vence 01/03', () => {
       const pid = seedPassenger({ dueDay: 1 })
       generateMonthlyFees({ month: 2, year: 2026 }, getDb())
       const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('01/02/2026')
+      expect(fee.due_date).toBe('01/03/2026')
     })
 
-    it('due_day 28 -> 28', () => {
+    it('due_day 28 na competência 02 → vence 28/03', () => {
       const pid = seedPassenger({ dueDay: 28 })
       generateMonthlyFees({ month: 2, year: 2026 }, getDb())
       const fee = getDb().prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
-      expect(fee.due_date).toBe('28/02/2026')
+      expect(fee.due_date).toBe('28/03/2026')
     })
   })
 
@@ -616,7 +633,8 @@ describe('sendPaymentReminders', () => {
 
   it('sends reminders for fees due in reminderDaysBefore days and creates notifications', async () => {
     const pid = seedPassenger()
-    seedFee(pid, { month: 8, year: 2026, dueDay: 20 }) // due 20/08, reminderDaysBefore=5
+    // competência 07 → vence 20/08 (regra contratual); today 15/08 = exatamente 5 dias antes
+    seedFee(pid, { month: 7, year: 2026, dueDay: 20 })
     const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
     settings.communication.autoMessages = true
     const result = await sendPaymentReminders(getDb(), settings, today)
@@ -865,18 +883,18 @@ describe('ensureContractFees atomicity audit', () => {
     // Month 1, 2 due_date preserved
     const fee1 = db.prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ? AND month = 1 AND year = 2026').get(pid)
     const fee2 = db.prepare('SELECT due_date FROM monthly_fees WHERE passenger_id = ? AND month = 2 AND year = 2026').get(pid)
-    expect(fee1.due_date).toBe('05/01/2026')
-    expect(fee2.due_date).toBe('05/02/2026')
+    expect(fee1.due_date).toBe('05/02/2026')
+    expect(fee2.due_date).toBe('05/03/2026')
     
     // Month 3 remains pre-existing
     const fee3 = db.prepare('SELECT due_day, due_date FROM monthly_fees WHERE passenger_id = ? AND month = 3 AND year = 2026').get(pid)
     expect(fee3.due_day).toBe(99)
     expect(fee3.due_date).toBe('99/03/2026')
     
-    // Month 4 uses CURRENT due_day (15)
+    // Month 4 uses CURRENT due_day (15) — vencimento um mês após a competência
     const fee4 = db.prepare('SELECT due_day, due_date FROM monthly_fees WHERE passenger_id = ? AND month = 4 AND year = 2026').get(pid)
     expect(fee4.due_day).toBe(15)
-    expect(fee4.due_date).toBe('15/04/2026')
+    expect(fee4.due_date).toBe('15/05/2026')
   })
 })
   it('notifies the passenger and all admins', () => {
@@ -918,6 +936,11 @@ describe('Regra do proprietário — competências da mensalidade', () => {
   function feeMonths(passengerId: string): string[] {
     return (getDb().prepare('SELECT month, year FROM monthly_fees WHERE passenger_id = ? ORDER BY year, month').all(passengerId) as Array<{ month: number; year: number }>)
       .map((f) => `${String(f.month).padStart(2, '0')}/${f.year}`)
+  }
+
+  function feeStatus(passengerId: string): string | undefined {
+    const row = getDb().prepare('SELECT status FROM monthly_fees WHERE passenger_id = ?').get(passengerId) as { status: string } | undefined
+    return row?.status
   }
 
   it('1. cadastro em um mês → exatamente uma mensalidade da competência corrente', () => {
@@ -988,5 +1011,35 @@ describe('Regra do proprietário — competências da mensalidade', () => {
     const r = ensureContractFees(pid, getDb())
     expect(r.created).toBe(0)
     expect(feeMonths(pid)).toEqual([])
+  })
+
+  it('1+2. cadastro com início 05/10/2026 → competência outubro e vencimento 05/11/2026', () => {
+    freezeDate(2026, 10, 1)
+    const pid = seedContractPassenger('2026-10-05')
+    const r = ensureContractFees(pid, getDb())
+    expect(r.created).toBe(1)
+    expect(feeMonths(pid)).toEqual(['10/2026'])
+    const fee = getDb().prepare('SELECT month, year, due_day, due_date FROM monthly_fees WHERE passenger_id = ?').get(pid) as any
+    expect(fee.month).toBe(10)
+    expect(fee.year).toBe(2026)
+    expect(fee.due_day).toBe(5)
+    expect(fee.due_date).toBe('05/11/2026')
+  })
+
+  it('10. inadimplência calculada pelo vencimento correto (competência + 1 mês)', () => {
+    freezeDate(2026, 9, 30)
+    const pid = seedContractPassenger('2026-09-30')
+    ensureContractFees(pid, getDb()) // competência 09, due_day 30 → vence 30/10/2026
+
+    // 01/10/2026: pela regra antiga (venc 30/09) seria overdue; pela nova NÃO.
+    freezeDate(2026, 10, 1)
+    const updatedEarly = markOverdueFees(getDb(), DEFAULT_SETTINGS, new Date(2026, 9, 1))
+    expect(updatedEarly).toBe(0)
+    expect(feeStatus(pid)).toBe('pending')
+
+    // 31/10/2026: vencimento 30/10 ultrapassado → overdue.
+    const updatedLate = markOverdueFees(getDb(), DEFAULT_SETTINGS, new Date(2026, 9, 31))
+    expect(updatedLate).toBe(1)
+    expect(feeStatus(pid)).toBe('overdue')
   })
 })

@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings, type AppSettings } from './settingsService.js'
-import { buildDueDate, daysLate, calculateDueFromFee } from './billingRules.js'
+import { buildDueDate, daysLate, calculateDueFromFee, formatDueDateBR } from './billingRules.js'
 import { whatsappService } from './whatsapp.js'
 import { pushService } from './push.js'
 import { getAdminIds } from './notificationService.js'
@@ -14,7 +14,8 @@ function fmt(value: number): string {
 }
 
 function formatDueDate(fee: any): string {
-  return `${String(fee.due_day).padStart(2, '0')}/${String(fee.month).padStart(2, '0')}/${fee.year}`
+  // Vencimento = competência + 1 mês (regra contratual do proprietário).
+  return formatDueDateBR(Number(fee.year), Number(fee.month), Number(fee.due_day))
 }
 
 function addNotification(db: any, userId: string, title: string, message: string, link = ''): void {

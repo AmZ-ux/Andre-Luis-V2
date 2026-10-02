@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { loadSettings } from './settingsService.js'
+import { formatDueDateBR } from './billingRules.js'
 import { logger } from '../utils/logger.js'
 
 export interface GenerationRequest {
@@ -52,20 +53,6 @@ function isValidDueDay(dueDay: unknown): dueDay is number {
   if (!Number.isInteger(dueDay)) return false
   if (dueDay < 1 || dueDay > 31) return false
   return true
-}
-
-function lastDayOfMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate()
-}
-
-function effectiveDueDay(dueDay: number, year: number, month: number): number {
-  const lastDay = lastDayOfMonth(year, month)
-  return Math.min(dueDay, lastDay)
-}
-
-function formatDueDate(dueDay: number, month: number, year: number): string {
-  const eff = effectiveDueDay(dueDay, year, month)
-  return `${String(eff).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`
 }
 
 const FIXED_VACATION_MONTHS = [1, 7, 12]
@@ -130,7 +117,7 @@ export function generateMonthlyFees(request: GenerationRequest, db: any = getDb(
       year,
       Number(passenger.monthly_fee),
       Number(passenger.due_day),
-      formatDueDate(Number(passenger.due_day), month, year)
+      formatDueDateBR(year, month, Number(passenger.due_day))
     )
     result.created++
   }

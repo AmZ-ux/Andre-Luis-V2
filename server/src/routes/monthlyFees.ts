@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid'
 import { getDb } from '../database/connection.js'
 import { ensureContractFees } from '../services/monthlyFeeGenerator.js'
 import { markOverdueFees } from '../services/feeAutomation.js'
+import { formatDueDateBR } from '../services/billingRules.js'
 import { requireAdmin as requireAdminRole } from '../middleware/roles.js'
 
 const router = Router()
@@ -170,6 +171,9 @@ router.put('/:id', (req, res) => {
     const dueDayNum = Number(dueDay)
     if (!Number.isInteger(dueDayNum) || dueDayNum < 1 || dueDayNum > 31) { res.status(400).json({ error: 'Dia de vencimento inválido' }); return }
     sets.push('due_day = ?'); params.push(dueDayNum)
+    // Recalcula due_date pela regra contratual (vencimento = competência + 1 mês).
+    const fullFee = db.prepare('SELECT month, year FROM monthly_fees WHERE id = ?').get(req.params.id) as any
+    sets.push('due_date = ?'); params.push(formatDueDateBR(Number(fullFee.year), Number(fullFee.month), dueDayNum))
   }
   if (notes !== undefined) { sets.push('notes = ?'); params.push(notes) }
   if (status !== undefined) {

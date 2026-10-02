@@ -264,7 +264,15 @@ export async function runMigrations(): Promise<void> {
   try { db.exec('ALTER TABLE payments ADD COLUMN late_fee REAL NOT NULL DEFAULT 0') } catch {}
   try { db.exec('ALTER TABLE payments ADD COLUMN interest REAL NOT NULL DEFAULT 0') } catch {}
   try {
-    db.exec("UPDATE monthly_fees SET due_date = printf('%02d/%02d/%04d', due_day, month, year) WHERE length(due_date) <= 7")
+    // Normaliza due_date legado aplicando a regra contratual: vencimento =
+    // competência + 1 mês, com clamp para o último dia válido do mês-alvo.
+    db.exec(`UPDATE monthly_fees SET due_date = printf('%02d/%02d/%04d',
+      MIN(due_day, CAST(strftime('%d', date(printf('%04d-%02d-01',
+        year + CASE WHEN month = 12 THEN 1 ELSE 0 END,
+        (month % 12) + 1), '+1 month', '-1 day')) AS INTEGER)),
+      (month % 12) + 1,
+      year + CASE WHEN month = 12 THEN 1 ELSE 0 END
+    ) WHERE length(due_date) <= 7`)
   } catch {}
 
   // --- P1: multi-charge prevention migration ---

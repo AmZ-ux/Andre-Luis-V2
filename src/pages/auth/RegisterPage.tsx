@@ -17,6 +17,7 @@ import {
 } from '../../validators/authValidators'
 import { isValidCPF, formatCPF, formatPhone } from '../../validators/passengerValidators'
 import { validatePhone } from '../../utils/validators'
+import { firstDueDateBR } from '../../utils/contractDue'
 import { routeService } from '../../services/routeService'
 import {
   getUniqueActiveOrigins,
@@ -197,6 +198,7 @@ export function RegisterPage() {
     const [y, m] = form.contractStartDate.split('-')
     return `${m}/${y}`
   })()
+  const firstDueLabel = firstDueDateBR(form.contractStartDate) || '-'
   const contractStartInFuture = (() => {
     if (!form.contractStartDate) return false
     const d = new Date()
@@ -377,11 +379,12 @@ export function RegisterPage() {
                   <>
                     Contrato iniciando em <strong className="text-text">{formatBRDate(form.contractStartDate)}</strong>.{' '}
                     Sua primeira mensalidade {contractStartInFuture ? 'será gerada em' : 'é a de'}{' '}
-                    <strong className="text-text">{firstCompetenceLabel}</strong> e vence dia{' '}
+                    <strong className="text-text">{firstCompetenceLabel}</strong> e vence em{' '}
+                    <strong className="text-text">{firstDueLabel}</strong>, depois todo dia{' '}
                     <strong className="text-text">{Number(form.contractStartDate.slice(8, 10))}</strong> de cada mês.
                   </>
                 ) : (
-                  <>A data de início define o dia de vencimento da mensalidade todo mês.</>
+                  <>A data de início define o dia de vencimento da mensalidade todo mês, sempre um mês após o início da competência.</>
                 )}
               </p>
             </div>

@@ -17,10 +17,18 @@ describe('billingRules', () => {
     })
   })
 
-  it('builds due date from year, month and day', () => {
+  it('builds due date one month after the competence month (contract rule)', () => {
+    // Regra contratual: competência 08 → vencimento 05/09/2026
     const due = buildDueDate(2026, 8, 5)
     expect(due.getFullYear()).toBe(2026)
-    expect(due.getMonth()).toBe(7)
+    expect(due.getMonth()).toBe(8)
+    expect(due.getDate()).toBe(5)
+  })
+
+  it('builds due date with year rollover (competence 12 → due in January)', () => {
+    const due = buildDueDate(2026, 12, 5)
+    expect(due.getFullYear()).toBe(2027)
+    expect(due.getMonth()).toBe(0)
     expect(due.getDate()).toBe(5)
   })
 
@@ -52,8 +60,8 @@ describe('billingRules', () => {
     settings.billing.toleranceDays = 5
     settings.billing.lateFeePercent = 2
     settings.billing.interestRatePerDay = 0.033
-    // due 05/08, paid 20/08 => 15 days late, 10 overdue days
-    const result = calculateDueBreakdown(189.9, 8, 2026, 5, settings, new Date(2026, 7, 20))
+    // competência 08 → vence 05/09 (regra contratual); pago 20/09 => 15 dias atraso, 10 acima da tolerância
+    const result = calculateDueBreakdown(189.9, 8, 2026, 5, settings, new Date(2026, 8, 20))
     expect(result.daysLate).toBe(15)
     expect(result.lateFee).toBe(3.8)
     expect(result.interest).toBe(0.63) // 189.9 * 0.00033 * 10

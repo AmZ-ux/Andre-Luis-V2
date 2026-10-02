@@ -105,7 +105,9 @@ describe('POST /api/auth/register', () => {
       expect(fees[0].year).toBe(2026)
       expect(fees[0].amount).toBe(249.9)
       expect(fees[0].due_day).toBe(10)
-      expect(fees[0].due_date).toBe('10/09/2026')
+      // Regra contratual: competência 09 (mês do início) com vencimento UM MÊS
+      // APÓS a competência → 10/10/2026 (nunca antecipa o próximo mês).
+      expect(fees[0].due_date).toBe('10/10/2026')
       expect(fees[0].status).toBe('pending')
 
       // Regra do proprietário: NÃO gera competência futura antecipadamente
@@ -682,10 +684,11 @@ describe('POST /api/auth/end-contract', () => {
 
     const { token, id } = await registerPassenger('encerrar@teste.com', '777.888.999-00')
 
-    // Segunda mensalidade pendente e primeira quitada (nenhuma em aberto)
+    // Segunda mensalidade quitada em competência que não colide com a
+    // competência corrente criada no register (mês atual).
     db.prepare(`
       INSERT INTO monthly_fees (id, passenger_id, passenger_name, cpf, transport_type, institution, company, month, year, amount, due_day, due_date, status)
-      VALUES (?, ?, ?, ?, 'university', '', '', 10, 2026, 189.9, 5, '05/10/2026', 'paid')
+      VALUES (?, ?, ?, ?, 'university', '', '', 1, 2030, 189.9, 5, '05/01/2030', 'paid')
     `).run('fee-encerrar-2', id, 'Passageiro Encerrar', '777.888.999-00')
     db.prepare("UPDATE monthly_fees SET status = 'paid' WHERE passenger_id = ?").run(id)
 
