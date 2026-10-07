@@ -452,6 +452,53 @@ describe('PUT /api/auth/profile', () => {
   })
 })
 
+describe('PUT /api/auth/change-password', () => {
+  let token = ''
+
+  beforeAll(async () => {
+    resetDb()
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Change Password', email: 'changepw@teste.com', cpf: '654.987.321-00', password: 'Old@123' })
+    token = res.body.token
+  })
+
+  it('should change the password with PUT and allow login with the new one', async () => {
+    const res = await request(app)
+      .put('/api/auth/change-password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: 'Old@123', newPassword: 'New@123' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ success: true })
+
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'changepw@teste.com', password: 'New@123' })
+    expect(loginRes.status).toBe(200)
+
+    const oldRes = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'changepw@teste.com', password: 'Old@123' })
+    expect(oldRes.status).toBe(401)
+  })
+
+  it('should reject an incorrect current password', async () => {
+    const res = await request(app)
+      .put('/api/auth/change-password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: 'Wrong@123', newPassword: 'New@456' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Senha atual incorreta')
+  })
+
+  it('should require authentication', async () => {
+    const res = await request(app)
+      .put('/api/auth/change-password')
+      .send({ currentPassword: 'Old@123', newPassword: 'New@123' })
+    expect(res.status).toBe(401)
+  })
+})
+
 describe('POST /api/auth/login', () => {
   beforeAll(async () => {
     resetDb()

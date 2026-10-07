@@ -36,7 +36,7 @@ export const realAuth = {
     api.post<{ success: boolean }>('/auth/verify-email/confirm-public', { email, code }, true),
 
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    api.post<{ success: boolean }>('/auth/change-password', data),
+    api.put<{ success: boolean }>('/auth/change-password', data),
 
   endContract: () =>
     api.post<{ success: boolean; status: string }>('/auth/end-contract'),
