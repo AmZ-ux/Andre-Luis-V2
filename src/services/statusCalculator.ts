@@ -8,6 +8,7 @@ function parseDateBR(dateStr: string): number {
 export function calculateStatus(fee: MonthlyFee, payment?: Payment | null): MonthlyFeeStatus {
   if (fee.status === 'cancelled') return 'cancelled'
   if (fee.status === 'exempt') return 'exempt'
+  if (fee.status === 'paid') return 'paid'
   if (payment) return 'paid'
 
   const dueDate = parseDateBR(fee.dueDate)
