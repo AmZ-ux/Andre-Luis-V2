@@ -128,7 +128,25 @@ router.get('/me', (req, res) => {
   if (!req.user) { res.status(401).json({ error: 'Não autenticado' }); return }
   const db = getDb()
   markOverdueFees(db)
-  const data = db.prepare('SELECT * FROM monthly_fees WHERE passenger_id = ? ORDER BY year DESC, month DESC').all(req.user.userId)
+  // Relação payments.monthly_fee_id → monthly_fees.id. Retorna apenas a data
+  // do pagamento (campo já existente em payments.payment_date) para o
+  // dashboard exibir "Paga em <data>". Preferência ao lançamento NORMAL
+  // (entry_type 'NORMAL' ou legado NULL) caso exista também um EXCEDENTE.
+  const rows = db.prepare(`
+    SELECT mf.*,
+      (SELECT p.payment_date FROM payments p
+        WHERE p.monthly_fee_id = mf.id
+        ORDER BY CASE WHEN p.entry_type = 'NORMAL' OR p.entry_type IS NULL THEN 0 ELSE 1 END,
+                 p.created_at DESC
+        LIMIT 1) AS payment_date
+    FROM monthly_fees mf
+    WHERE mf.passenger_id = ?
+    ORDER BY mf.year DESC, mf.month DESC
+  `).all(req.user.userId) as any[]
+  const data = rows.map(({ payment_date, ...fee }) => ({
+    ...fee,
+    payment: payment_date ? { payment_date } : null,
+  }))
   res.json(data)
 })
 

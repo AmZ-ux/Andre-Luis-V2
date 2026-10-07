@@ -26,3 +26,12 @@ export function batchCalculateStatuses(fees: MonthlyFee[], payments: Record<stri
     status: calculateStatus(fee, payments[fee.id] || null),
   }))
 }
+
+// Texto da linha de status do dashboard: "Paga em <data>" quando o pagamento
+// traz a data; "Paga" quando não há pagamento disponível (não exibe "-").
+// Retorna null para qualquer status diferente de 'paid' (não exibe data).
+export function paidStatusText(fee: MonthlyFee, payment?: Payment | null): string | null {
+  const source = payment ?? fee.payment ?? null
+  if (calculateStatus(fee, source) !== 'paid') return null
+  return source?.paymentDate ? `Paga em ${source.paymentDate}` : 'Paga'
+}

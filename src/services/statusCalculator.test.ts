@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculateStatus, batchCalculateStatuses } from './statusCalculator'
+import { calculateStatus, batchCalculateStatuses, paidStatusText } from './statusCalculator'
 import type { MonthlyFee, Payment } from '../types/monthlyFee'
 
 function makeFee(overrides: Partial<MonthlyFee> = {}): MonthlyFee {
@@ -74,6 +74,46 @@ describe('calculateStatus', () => {
   it('mantém o comportamento legado: overdue + payment existente → paid', () => {
     const fee = makeFee({ status: 'overdue', dueDate: '01/01/2020', payment: makePayment() })
     expect(calculateStatus(fee, makePayment())).toBe('paid')
+  })
+})
+
+describe('paidStatusText (linha "Paga em ..." do dashboard)', () => {
+  it('1. mensalidade paga com payment_date → exibe a data', () => {
+    const fee = makeFee({ status: 'paid', dueDate: '28/10/2026', payment: makePayment() })
+    expect(paidStatusText(fee)).toBe('Paga em 07/10/2026')
+    expect(paidStatusText(fee, makePayment())).toBe('Paga em 07/10/2026')
+  })
+
+  it('2. mensalidade paga sem payment → não quebra (sem "-")', () => {
+    const fee = makeFee({ status: 'paid', dueDate: '28/10/2026' })
+    expect(paidStatusText(fee)).toBe('Paga')
+    expect(paidStatusText(fee, null)).toBe('Paga')
+  })
+
+  it('3. mensalidade pendente → não exibe data de pagamento', () => {
+    const fee = makeFee({ status: 'pending', dueDate: '31/12/2099' })
+    expect(paidStatusText(fee)).toBeNull()
+    expect(paidStatusText(fee, null)).toBeNull()
+  })
+
+  it('4. mensalidade paga mantém badge Paga (status segue paid)', () => {
+    const semPayment = makeFee({ status: 'paid', dueDate: '28/10/2026' })
+    const comPayment = makeFee({ status: 'paid', dueDate: '28/10/2026', payment: makePayment() })
+    expect(calculateStatus(semPayment, undefined)).toBe('paid')
+    expect(calculateStatus(comPayment, makePayment())).toBe('paid')
+    expect(paidStatusText(semPayment)).toMatch(/^Paga/)
+    expect(paidStatusText(comPayment)).toMatch(/^Paga em/)
+  })
+
+  it('overdue, cancelled e exempt → não exibem data de pagamento', () => {
+    expect(paidStatusText(makeFee({ status: 'pending', dueDate: '01/01/2020' }))).toBeNull()
+    expect(paidStatusText(makeFee({ status: 'cancelled', dueDate: '01/01/2020' }))).toBeNull()
+    expect(paidStatusText(makeFee({ status: 'exempt', dueDate: '01/01/2020' }))).toBeNull()
+  })
+
+  it('pagamento sem data (payload legado) → exibe apenas "Paga"', () => {
+    const fee = makeFee({ status: 'paid', dueDate: '28/10/2026' })
+    expect(paidStatusText(fee, { ...makePayment(), paymentDate: '' } as Payment)).toBe('Paga')
   })
 })
 

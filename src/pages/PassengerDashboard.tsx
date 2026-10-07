@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
 import { passengerService } from '../services/passengerService'
 import { monthlyFeeService } from '../services/monthlyFeeService'
-import { calculateStatus } from '../services/statusCalculator'
+import { calculateStatus, paidStatusText } from '../services/statusCalculator'
 import { FeeCheckoutModal } from '../components/monthlyFees/FeeCheckoutModal'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -166,7 +166,7 @@ export function PassengerDashboard() {
                 {feeStatus === 'paid' ? (
                   <span className="inline-flex items-center gap-1.5 text-emerald-200 text-sm font-semibold">
                     <CheckCircle2 className="h-4 w-4" />
-                    Paga em {currentFee.payment?.paymentDate || '-'}
+                    {paidStatusText(currentFee)}
                   </span>
                 ) : feeStatus === 'overdue' ? (
                   <span className="inline-flex items-center gap-1.5 text-red-200 text-sm font-semibold">

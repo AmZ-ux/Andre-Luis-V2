@@ -451,6 +451,76 @@ describe('GET /api/monthly-fees/me', () => {
     expect(res.status).toBe(200)
     expect(Array.isArray(res.body)).toBe(true)
   })
+
+  function seedPassengerWithFee(): { pid: string; feeId: string; passengerToken: string } {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pid, 'Passenger Pay', 'pass-pay-me@test.com', '555.555.555-01', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pid, 'Passenger Pay', '555.555.555-01', '2000-01-01')
+    const passengerToken = jwt.sign({ userId: pid, role: 'passenger' }, 'dev-secret-change-in-production')
+    const feeId = seedMonthlyFee(pid, { month: 10, year: 2026, status: 'paid' })
+    return { pid, feeId, passengerToken }
+  }
+
+  it('paid fee with payment → returns payment.payment_date (payments.monthly_fee_id)', async () => {
+    const db = getDb()
+    const { feeId, passengerToken } = seedPassengerWithFee()
+    db.prepare("INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, entry_type) VALUES (?, ?, ?, ?, 'pix', 'NORMAL')")
+      .run(uuid(), feeId, 189.9, '07/10/2026')
+
+    const res = await request(app)
+      .get('/api/monthly-fees/me')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].payment).toEqual({ payment_date: '07/10/2026' })
+  })
+
+  it('paid fee without payment → payment is null (no crash)', async () => {
+    const { passengerToken } = seedPassengerWithFee()
+    const res = await request(app)
+      .get('/api/monthly-fees/me')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body[0].payment).toBeNull()
+  })
+
+  it('pending fee without payment → payment is null (no payment date)', async () => {
+    const db = getDb()
+    const pid = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, phone, role, password_hash) VALUES (?, ?, ?, ?, ?, 'passenger', ?)")
+      .run(pid, 'Passenger Pend', 'pass-pend-me@test.com', '666.666.666-01', '', bcrypt.hashSync('password', 10))
+    db.prepare("INSERT INTO passengers (id, name, cpf, birth_date, transport_type, status, monthly_fee, due_day) VALUES (?, ?, ?, ?, 'university', 'active', 189.90, 5)")
+      .run(pid, 'Passenger Pend', '666.666.666-01', '2000-01-01')
+    const passengerToken = jwt.sign({ userId: pid, role: 'passenger' }, 'dev-secret-change-in-production')
+    seedMonthlyFee(pid, { month: 10, year: 2026, status: 'pending' })
+
+    const res = await request(app)
+      .get('/api/monthly-fees/me')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].status).toBe('pending')
+    expect(res.body[0].payment).toBeNull()
+  })
+
+  it('prefers the NORMAL payment and does not duplicate fees when an OVERPAYMENT exists', async () => {
+    const db = getDb()
+    const { feeId, passengerToken } = seedPassengerWithFee()
+    db.prepare("INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, entry_type) VALUES (?, ?, ?, ?, 'pix', 'NORMAL')")
+      .run(uuid(), feeId, 189.9, '07/10/2026')
+    db.prepare("INSERT INTO payments (id, monthly_fee_id, amount, payment_date, payment_method, notes, entry_type) VALUES (?, ?, ?, ?, 'pix', 'OVERPAYMENT', 'OVERPAYMENT')")
+      .run(uuid(), feeId, 10, '08/10/2026')
+
+    const res = await request(app)
+      .get('/api/monthly-fees/me')
+      .set('Authorization', `Bearer ${passengerToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].payment).toEqual({ payment_date: '07/10/2026' })
+  })
 })
 
 describe('GET /api/monthly-fees/passenger/:passengerId (legacy)', () => {
