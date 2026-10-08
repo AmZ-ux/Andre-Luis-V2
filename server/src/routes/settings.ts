@@ -5,7 +5,7 @@ import { loadSettings } from '../services/settingsService.js'
 import { requireAdmin, requireSuperAdmin } from '../middleware/roles.js'
 import { addLog } from '../services/appLogService.js'
 import { alertIntegrationIssue } from '../services/integrationAlert.js'
-import { createBackup, listBackups, getBackupPath, restoreBackup, deleteBackup, pruneBackups, isValidBackupId, uploadBackupOffsite } from '../services/backupService.js'
+import { createBackup, listBackups, getBackupPath, restoreBackup, deleteBackup, pruneBackups, isValidBackupId, uploadBackupOffsite, maxBackups } from '../services/backupService.js'
 import { logger } from '../utils/logger.js'
 
 export const settingsPublicRouter = Router()
@@ -155,7 +155,7 @@ router.delete('/backups/:id', requireSuperAdmin, (req, res) => {
   const db = getDb()
   deleteBackup(id)
   addLog(db, 'backup_delete', `Backup removido: ${id}`, req.user!, 'backup')
-  pruneBackups(30)
+  pruneBackups(maxBackups())
   res.status(204).end()
 })
 

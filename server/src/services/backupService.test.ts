@@ -32,7 +32,7 @@ vi.mock('@aws-sdk/client-s3', () => {
   return { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand }
 })
 
-import { createBackup, restoreBackup, uploadBackupOffsite, isOffsiteConfigured } from './backupService.js'
+import { createBackup, restoreBackup, uploadBackupOffsite, isOffsiteConfigured, pruneBackups, listBackups, maxBackups } from './backupService.js'
 
 describe('backupService off-site', () => {
   beforeAll(async () => {
@@ -200,5 +200,100 @@ describe('restoreBackup atomicity', () => {
     const isFullyEmpty = userCount === 0 && passengerCount === 0 && feeCount === 0
     const isFullyRestored = userCount > 0 && passengerCount > 0
     expect(isFullyEmpty || isFullyRestored).toBe(true)
+  })
+})
+
+describe('backupService retenção', () => {
+  // UUIDs escolhidos para que a ordem lexicográfica seja o POSTO da ordem cronológica:
+  // ffffffff (maior no lex) é o mais antigo; 00000000 (menor no lex) é o mais recente.
+  const idOldest = 'ffffffff-0000-4000-8000-000000000001'
+  const idMiddle = '55555555-0000-4000-8000-000000000002'
+  const idNewest = '00000000-0000-4000-8000-000000000003'
+
+  function writeBackup(id: string, createdAt: string): void {
+    fs.writeFileSync(
+      path.join(BACKUP_DIR, `backup_${id}.json`),
+      JSON.stringify({ _meta: { createdAt, type: 'manual' } })
+    )
+  }
+
+  function resetBackupDir(): void {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true })
+    for (const f of fs.readdirSync(BACKUP_DIR)) {
+      if (f.endsWith('.json')) fs.unlinkSync(path.join(BACKUP_DIR, f))
+    }
+  }
+
+  function seedThree(): void {
+    resetBackupDir()
+    writeBackup(idOldest, '2026-01-01T00:00:00.000Z')
+    writeBackup(idMiddle, '2026-01-02T00:00:00.000Z')
+    writeBackup(idNewest, '2026-01-03T00:00:00.000Z')
+  }
+
+  function currentFiles(): string[] {
+    return fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.json')).sort()
+  }
+
+  beforeEach(() => {
+    delete process.env.MAX_BACKUPS
+  })
+
+  afterAll(() => {
+    delete process.env.MAX_BACKUPS
+  })
+
+  it('pruneBackups remove o mais antigo pela data real, ignorando a ordem do UUID', () => {
+    seedThree()
+    pruneBackups(2)
+    const restantes = currentFiles()
+    expect(restantes).toHaveLength(2)
+    expect(restantes).not.toContain(`backup_${idOldest}.json`)
+    expect(restantes).toContain(`backup_${idMiddle}.json`)
+    expect(restantes).toContain(`backup_${idNewest}.json`)
+  })
+
+  it('pruneBackups não apaga arquivos quando a quantidade está abaixo do limite', () => {
+    seedThree()
+    pruneBackups(30)
+    expect(currentFiles()).toHaveLength(3)
+    expect(currentFiles()).toContain(`backup_${idOldest}.json`)
+    expect(currentFiles()).toContain(`backup_${idNewest}.json`)
+  })
+
+  it('o backup mais recente não é removido por causa da ordem do UUID', () => {
+    seedThree()
+    pruneBackups(2)
+    // Pelo bug antigo (sort lexicográfico) o 00000000 seria o primeiro apagado.
+    expect(currentFiles()).toContain(`backup_${idNewest}.json`)
+  })
+
+  it('MAX_BACKUPS é respeitado no prune via maxBackups()', () => {
+    seedThree()
+    process.env.MAX_BACKUPS = '1'
+    pruneBackups(maxBackups())
+    expect(currentFiles()).toEqual([`backup_${idNewest}.json`])
+    delete process.env.MAX_BACKUPS
+  })
+
+  it('maxBackups() usa 30 como default e ignora valores inválidos', () => {
+    delete process.env.MAX_BACKUPS
+    expect(maxBackups()).toBe(30)
+    process.env.MAX_BACKUPS = '5'
+    expect(maxBackups()).toBe(5)
+    process.env.MAX_BACKUPS = 'invalido'
+    expect(maxBackups()).toBe(30)
+    delete process.env.MAX_BACKUPS
+  })
+
+  it('listBackups() retorna ordem cronológica consistente (mais recente primeiro)', () => {
+    seedThree()
+    const lista = listBackups()
+    expect(lista.map((b) => b.id)).toEqual([idNewest, idMiddle, idOldest])
+    expect(lista.map((b) => b.timestamp)).toEqual([
+      '2026-01-03T00:00:00.000Z',
+      '2026-01-02T00:00:00.000Z',
+      '2026-01-01T00:00:00.000Z',
+    ])
   })
 })

@@ -43,24 +43,37 @@ export function createBackup(db: DatabaseWrapper, type: 'manual' | 'automatic'):
   return { id, timestamp, size: fs.statSync(filePath).size, type }
 }
 
-export function listBackups(): BackupInfo[] {
+/** Lista os arquivos de backup em ordem cronologica crescente (mais antigo primeiro).
+ * Data real de criacao vem de `_meta.createdAt`; se ausente/invalido, usa o mtime. */
+function backupFilesOldestFirst(): { file: string; id: string; createdAt: string; size: number; type: 'manual' | 'automatic' }[] {
   ensureBackupDir()
-  const files = fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.json')).sort().reverse()
-  return files.map((f) => {
-    const id = f.replace(/^backup_/, '').replace(/\.json$/, '')
-    const filePath = path.join(BACKUP_DIR, f)
-    const stat = fs.statSync(filePath)
-    let meta: { createdAt?: string; type?: string } = {}
-    try {
-      meta = JSON.parse(fs.readFileSync(filePath, 'utf8'))._meta || {}
-    } catch {}
-    return {
-      id,
-      timestamp: meta.createdAt || stat.mtime.toISOString(),
-      size: stat.size,
-      type: meta.type === 'automatic' ? 'automatic' : 'manual',
-    }
-  })
+  return fs.readdirSync(BACKUP_DIR)
+    .filter((f) => f.endsWith('.json'))
+    .map((file): { file: string; id: string; createdAt: string; size: number; type: 'manual' | 'automatic' } => {
+      const filePath = path.join(BACKUP_DIR, file)
+      const stat = fs.statSync(filePath)
+      let meta: { createdAt?: string; type?: string } = {}
+      try {
+        meta = JSON.parse(fs.readFileSync(filePath, 'utf8'))._meta || {}
+      } catch {}
+      const createdAt = meta.createdAt && !Number.isNaN(Date.parse(meta.createdAt))
+        ? meta.createdAt
+        : stat.mtime.toISOString()
+      return {
+        file,
+        id: file.replace(/^backup_/, '').replace(/\.json$/, ''),
+        createdAt,
+        size: stat.size,
+        type: meta.type === 'automatic' ? 'automatic' : 'manual',
+      }
+    })
+    .sort((a, b) => (Date.parse(a.createdAt) - Date.parse(b.createdAt)) || a.file.localeCompare(b.file))
+}
+
+export function listBackups(): BackupInfo[] {
+  return backupFilesOldestFirst()
+    .reverse()
+    .map(({ id, createdAt, size, type }) => ({ id, timestamp: createdAt, size, type }))
 }
 
 export function getBackupPath(id: string): string | null {
@@ -99,12 +112,16 @@ export function deleteBackup(id: string): void {
 }
 
 export function pruneBackups(maxKeep: number): void {
-  ensureBackupDir()
-  const files = fs.readdirSync(BACKUP_DIR).filter((f) => f.endsWith('.json')).sort()
+  const files = backupFilesOldestFirst()
   while (files.length > maxKeep) {
-    fs.unlinkSync(path.join(BACKUP_DIR, files[0]))
+    fs.unlinkSync(path.join(BACKUP_DIR, files[0].file))
     files.shift()
   }
+}
+
+/** Limite central de retencao: MAX_BACKUPS quando definido, 30 como default. */
+export function maxBackups(): number {
+  return Number(process.env.MAX_BACKUPS) || 30
 }
 
 export function isOffsiteConfigured(): boolean {
@@ -144,7 +161,7 @@ export async function uploadBackupOffsite(id: string): Promise<boolean> {
     ContentType: 'application/json',
     ContentEncoding: 'gzip',
   }))
-  const maxKeep = Number(process.env.MAX_BACKUPS) || 30
+  const maxKeep = maxBackups()
   const listed = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: `${offsitePrefix()}/` }))
   const keys = (listed.Contents || [])
     .filter((o) => o.Key)

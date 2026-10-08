@@ -4,7 +4,7 @@ import { getDb } from '../database/connection.js'
 import { loadSettings } from './settingsService.js'
 import { ensureContractFees } from './monthlyFeeGenerator.js'
 import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySummaryToAdmins } from './feeAutomation.js'
-import { createBackup, pruneBackups, uploadBackupOffsite } from './backupService.js'
+import { createBackup, pruneBackups, uploadBackupOffsite, maxBackups } from './backupService.js'
 import { getPayment, mpStatus } from './mercadopagoService.js'
 import { finalizePayment, recordOverpayment } from './paymentService.js'
 import { alertIntegrationIssue } from './integrationAlert.js'
@@ -73,7 +73,7 @@ function runAutoBackup(): void {
   try {
     const info = createBackup(db, 'automatic')
     addLog(db, 'backup_create', `Backup automático criado: ${info.id}`, { userId: 'scheduler', role: 'admin' }, 'backup')
-    pruneBackups(30)
+    pruneBackups(maxBackups())
     logger.info({ id: info.id, size: info.size }, 'Automatic backup created')
     uploadBackupOffsite(info.id)
       .then((uploaded: boolean) => {
