@@ -85,7 +85,7 @@ describe('mock login (realApi=false)', () => {
     const { authService } = await loadAuthService(false)
     await flush()
 
-    const res = await authService.login({ login: 'admin@transporte.com', password: 'Admin@123' })
+    const res = await authService.login({ login: 'admin@transporte.com', password: 'Admin@123', rememberMe: false })
 
     expect(res.user.email).toBe('admin@transporte.com')
     expect(res.user.role).toBe('admin')
@@ -99,7 +99,7 @@ describe('mock login (realApi=false)', () => {
     await flush()
 
     await expect(
-      authService.login({ login: 'admin@transporte.com', password: 'Wrong@123' })
+      authService.login({ login: 'admin@transporte.com', password: 'Wrong@123', rememberMe: false })
     ).rejects.toThrow('Credenciais inválidas')
   })
 })
@@ -114,9 +114,9 @@ describe('real API authentication (realApi=true)', () => {
     const { authService } = await loadAuthService(true)
     await flush()
 
-    const res = await authService.login({ login: 'real@x.com', password: 'Real@123' })
+    const res = await authService.login({ login: 'real@x.com', password: 'Real@123', rememberMe: false })
 
-    expect(mocks.realAuth.login).toHaveBeenCalledWith({ login: 'real@x.com', password: 'Real@123' })
+    expect(mocks.realAuth.login).toHaveBeenCalledWith({ login: 'real@x.com', password: 'Real@123', rememberMe: false })
     expect(res.token).toBe('real-token')
     expect(store.has('app_users')).toBe(false)
   })
