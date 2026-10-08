@@ -43,6 +43,7 @@ async function delay(ms: number): Promise<void> {
 }
 
 function seedUsers(): void {
+  if (config.realApi) return
   const existing = storage.get<User[]>(SESSION_CONFIG.userListKey)
   if (existing) return
 
