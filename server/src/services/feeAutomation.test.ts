@@ -3,8 +3,32 @@ import { v4 as uuid } from 'uuid'
 import { runMigrations } from '../database/schema.js'
 import { resetDb, getDb } from '../database/connection.js'
 import { markOverdueFees, sendPaymentReminders, buildDailySummary, notifyDailySummaryToAdmins, notifyPaymentReceived } from './feeAutomation.js'
+import { whatsappService } from './whatsapp.js'
+import { pushService } from './push.js'
 import { DEFAULT_SETTINGS } from './settingsService.js'
 import { generateMonthlyFees, ensureContractFees } from './monthlyFeeGenerator.js'
+
+vi.mock('./whatsapp.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./whatsapp.js')>()
+  return {
+    ...actual,
+    whatsappService: {
+      ...actual.whatsappService,
+      send: vi.fn(),
+    },
+  }
+})
+
+vi.mock('./push.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./push.js')>()
+  return {
+    ...actual,
+    pushService: {
+      ...actual.pushService,
+      send: vi.fn(),
+    },
+  }
+})
 
 process.env.DATABASE_PATH = ':memory:'
 
@@ -14,6 +38,8 @@ beforeAll(async () => {
 
 beforeEach(() => {
   resetDb()
+  vi.mocked(whatsappService.send).mockReset().mockResolvedValue({ success: true, messageId: 'mock' })
+  vi.mocked(pushService.send).mockReset().mockResolvedValue(0)
 })
 
 function seedPassenger(overrides: Record<string, any> = {}): string {
@@ -652,6 +678,86 @@ it('sends reminders for overdue fees', async () => {
     settings.communication.autoMessages = true
     const result = await sendPaymentReminders(getDb(), settings, today)
     expect(result.remindersSent).toBe(1)
+  })
+
+  it('creates in-app reminders for every fee even when WhatsApp throws', async () => {
+    const pid1 = seedPassenger()
+    const pid2 = seedPassenger({ phone: '(11) 98888-7777', cpf: '222.222.222-22' })
+    seedFee(pid1, { month: 7, year: 2026, dueDay: 1 })
+    seedFee(pid2, { month: 7, year: 2026, dueDay: 1, cpf: '222.222.222-22' })
+    const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
+    settings.communication.autoMessages = true
+    vi.mocked(whatsappService.send).mockRejectedValue(new Error('WhatsApp não configurado (Evolution API)'))
+
+    const result = await sendPaymentReminders(getDb(), settings, today)
+
+    expect(result.remindersSent).toBe(2)
+    expect(result.autoMessagesDisabled).toBe(false)
+    expect(vi.mocked(whatsappService.send)).toHaveBeenCalledTimes(2)
+    const notifications = getDb().prepare("SELECT * FROM notifications WHERE title = 'Lembrete de pagamento'").all()
+    expect(notifications.length).toBe(2)
+  })
+
+  it('creates the in-app reminder for a passenger with phone when WhatsApp is unconfigured', async () => {
+    const pid = seedPassenger()
+    seedFee(pid, { month: 7, year: 2026, dueDay: 1 })
+    const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
+    settings.communication.autoMessages = true
+    vi.mocked(whatsappService.send).mockRejectedValue(
+      new Error('WhatsApp não configurado (Evolution API). Defina EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE')
+    )
+
+    const result = await sendPaymentReminders(getDb(), settings, today)
+
+    expect(result.remindersSent).toBe(1)
+    expect(vi.mocked(whatsappService.send)).toHaveBeenCalledTimes(1)
+    const notifications = getDb().prepare("SELECT * FROM notifications WHERE title = 'Lembrete de pagamento'").all()
+    expect(notifications.length).toBe(1)
+    expect(notifications[0].user_id).toBe(pid)
+  })
+
+  it('creates the in-app reminder for a passenger without phone and skips WhatsApp', async () => {
+    const pid = seedPassenger({ phone: '' })
+    seedFee(pid, { month: 7, year: 2026, dueDay: 1 })
+    const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
+    settings.communication.autoMessages = true
+
+    const result = await sendPaymentReminders(getDb(), settings, today)
+
+    expect(result.remindersSent).toBe(1)
+    expect(vi.mocked(whatsappService.send)).not.toHaveBeenCalled()
+    const notifications = getDb().prepare("SELECT * FROM notifications WHERE title = 'Lembrete de pagamento'").all()
+    expect(notifications.length).toBe(1)
+    expect(notifications[0].user_id).toBe(pid)
+  })
+
+  it('keeps the in-app reminder when push fails', async () => {
+    const pid = seedPassenger()
+    seedFee(pid, { month: 7, year: 2026, dueDay: 1 })
+    const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
+    settings.communication.autoMessages = true
+    vi.mocked(pushService.send).mockRejectedValue(new Error('Push não disponível (VAPID ausente)'))
+
+    const result = await sendPaymentReminders(getDb(), settings, today)
+
+    expect(result.remindersSent).toBe(1)
+    expect(vi.mocked(pushService.send)).toHaveBeenCalledTimes(1)
+    const notifications = getDb().prepare("SELECT * FROM notifications WHERE title = 'Lembrete de pagamento'").all()
+    expect(notifications.length).toBe(1)
+  })
+
+  it('counts remindersSent by in-app notifications even when WhatsApp reports failure', async () => {
+    const pid = seedPassenger()
+    seedFee(pid, { month: 7, year: 2026, dueDay: 1 })
+    const settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS))
+    settings.communication.autoMessages = true
+    vi.mocked(whatsappService.send).mockResolvedValue({ success: false })
+
+    const result = await sendPaymentReminders(getDb(), settings, today)
+
+    expect(result.remindersSent).toBe(1)
+    const notifications = getDb().prepare("SELECT * FROM notifications WHERE title = 'Lembrete de pagamento'").all()
+    expect(notifications.length).toBe(1)
   })
 })
 

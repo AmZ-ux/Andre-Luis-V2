@@ -100,15 +100,31 @@ export async function sendPaymentReminders(db: any = getDb(), settings: AppSetti
       if (!isReminderWindow && !isOverdue) continue
 
       const message = buildMessage(fee, settings, today)
+      const title = 'Lembrete de pagamento'
+      const body = message.replace(/{nome}/g, fee.passenger_name)
       const phone = fee.phone || ''
 
-      if (phone) {
-        const result = await whatsappService.send(phone, message.replace(/{nome}/g, fee.passenger_name))
-        if (result.success) sent++
+      try {
+        addNotification(db, fee.passenger_id, title, body, '/mensalidades')
+        sent++
+      } catch (err) {
+        logger.warn({ feeId: fee.id, err }, 'Failed to create in-app payment reminder')
       }
 
-      addNotification(db, fee.passenger_id, 'Lembrete de pagamento', message.replace(/{nome}/g, fee.passenger_name), '/mensalidades')
-      await pushService.send(fee.passenger_id, 'Lembrete de pagamento', message.replace(/{nome}/g, fee.passenger_name))
+      if (phone) {
+        try {
+          const result = await whatsappService.send(phone, body)
+          if (!result.success) logger.warn({ feeId: fee.id }, 'WhatsApp payment reminder not delivered')
+        } catch (err) {
+          logger.warn({ feeId: fee.id, err }, 'WhatsApp payment reminder failed')
+        }
+      }
+
+      try {
+        await pushService.send(fee.passenger_id, title, body)
+      } catch (err) {
+        logger.warn({ feeId: fee.id, err }, 'Push payment reminder failed')
+      }
     } catch (err) {
       logger.warn({ feeId: fee.id, err }, 'Failed to send payment reminder')
     }
