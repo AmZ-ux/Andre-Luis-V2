@@ -415,6 +415,17 @@ router.post('/logout', authMiddleware, (req, res) => {
   res.json({ success: true })
 })
 
+function isValidPasswordPolicy(password: string): boolean {
+  return (
+    typeof password === 'string' &&
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[!@#$%^&*(),.?":{}|<>]/.test(password)
+  )
+}
+
 router.post('/forgot-password', validateBody('email'), async (req, res) => {
   const { email } = req.body
   const db = getDb()
@@ -443,6 +454,7 @@ router.post('/forgot-password', validateBody('email'), async (req, res) => {
     )
   } catch (err) {
     logger.error({ err: String(err) }, 'Password reset email failed')
+    db.prepare('UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE id = ?').run(user.id)
     res.status(503).json({ error: 'Envio de email indisponível no momento. Tente novamente mais tarde.' })
     return
   }
@@ -452,6 +464,10 @@ router.post('/forgot-password', validateBody('email'), async (req, res) => {
 
 router.post('/reset-password', validateBody('token', 'password'), (req, res) => {
   const { token, password } = req.body
+  if (!isValidPasswordPolicy(password)) {
+    res.status(400).json({ error: 'A senha não atende à política: mínimo 8 caracteres, com letra maiúscula, minúscula, número e caractere especial.' })
+    return
+  }
   const db = getDb()
 
   const user = db.prepare(

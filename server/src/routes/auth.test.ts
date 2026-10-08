@@ -659,6 +659,70 @@ describe('POST /api/auth/forgot-password', () => {
     expect(user.reset_token_expires).toBeGreaterThan(Date.now())
   })
 
+  it('should set the reset token expiry to 1 hour', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'login@teste.com' })
+    const user = db.prepare('SELECT reset_token_expires FROM users WHERE email = ?').get('login@teste.com') as any
+    const ttl = Number(user.reset_token_expires) - Date.now()
+    expect(ttl).toBeGreaterThan(3_590_000)
+    expect(ttl).toBeLessThanOrEqual(3_600_000)
+  })
+
+  it('should return indistinguishable responses for existing and non-existent emails', async () => {
+    const unknown = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'naoexiste@teste.com' })
+    const known = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'login@teste.com' })
+    expect(unknown.status).toBe(200)
+    expect(known.status).toBe(200)
+    expect(known.body).toEqual(unknown.body)
+  })
+
+  it('should not expose reset_token or demoCode in the response', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'login@teste.com' })
+    expect(res.status).toBe(200)
+    expect(Object.keys(res.body).sort()).toEqual(['message', 'success'])
+    expect(res.body.reset_token).toBeUndefined()
+    expect(res.body.demoCode).toBeUndefined()
+    expect(JSON.stringify(res.body)).not.toContain('reset_token')
+    expect(JSON.stringify(res.body)).not.toContain('demoCode')
+  })
+
+  it('should return 503 and clear the stored token when email sending fails', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const prevNodeEnv = process.env.NODE_ENV
+    const prevKey = process.env.RESEND_API_KEY
+    const prevDisabled = process.env.EMAIL_DISABLED
+    try {
+      process.env.NODE_ENV = 'production'
+      delete process.env.RESEND_API_KEY
+      delete process.env.EMAIL_DISABLED
+      const res = await request(app)
+        .post('/api/auth/forgot-password')
+        .send({ email: 'login@teste.com' })
+      expect(res.status).toBe(503)
+      expect(res.body.error).toContain('email')
+      expect(res.body.reset_token).toBeUndefined()
+      expect(res.body.demoCode).toBeUndefined()
+      const user = db.prepare('SELECT reset_token, reset_token_expires FROM users WHERE email = ?').get('login@teste.com') as any
+      expect(user.reset_token).toBeNull()
+      expect(user.reset_token_expires).toBeNull()
+    } finally {
+      if (prevNodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = prevNodeEnv
+      if (prevKey === undefined) delete process.env.RESEND_API_KEY
+      else process.env.RESEND_API_KEY = prevKey
+      if (prevDisabled === undefined) delete process.env.EMAIL_DISABLED
+      else process.env.EMAIL_DISABLED = prevDisabled
+    }
+  })
+
   it('should require email field', async () => {
     const res = await request(app)
       .post('/api/auth/forgot-password')
@@ -704,6 +768,48 @@ describe('POST /api/auth/reset-password', () => {
       .post('/api/auth/reset-password')
       .send({ token: user.reset_token, password: 'NovaSenha@123' })
     expect(res.status).toBe(400)
+  })
+
+  it('should reject a weak password without consuming the token', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'login@teste.com' })
+    const user = db.prepare('SELECT reset_token FROM users WHERE email = ?').get('login@teste.com') as any
+    expect(user.reset_token).toBeTruthy()
+
+    for (const weak of ['senha123', 'SENHA@123', 'Senha1234', 'Short@1', 'Sofisticada123']) {
+      const r = await request(app)
+        .post('/api/auth/reset-password')
+        .send({ token: user.reset_token, password: weak })
+      expect(r.status).toBe(400)
+      expect(r.body.error).toContain('política')
+    }
+
+    const still = db.prepare('SELECT reset_token FROM users WHERE email = ?').get('login@teste.com') as any
+    expect(still.reset_token).toBe(user.reset_token)
+
+    const valid = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: user.reset_token, password: 'NovaSenha@123' })
+    expect(valid.status).toBe(200)
+  })
+
+  it('should reject reuse of the same token after a successful reset', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'login@teste.com' })
+    const user = db.prepare('SELECT reset_token FROM users WHERE email = ?').get('login@teste.com') as any
+    const first = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: user.reset_token, password: 'NovaSenha@123' })
+    expect(first.status).toBe(200)
+    const second = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ token: user.reset_token, password: 'OutraSenha@123' })
+    expect(second.status).toBe(400)
+    expect(second.body.error).toContain('Token inválido ou expirado')
   })
 
   it('should require token and password', async () => {
