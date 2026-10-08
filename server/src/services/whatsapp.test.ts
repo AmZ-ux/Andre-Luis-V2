@@ -91,3 +91,56 @@ describe('whatsappService (com Evolution API)', () => {
     expect(result).toEqual({ sent: 0, failed: 2 })
   })
 })
+
+describe('whatsappService (produção sem Evolution API)', () => {
+  it('should reject instead of reporting fake success', async () => {
+    const prevEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      const { db, whatsappService } = await fresh()
+      await expect(whatsappService.send('(11) 99999-1234', 'Olá!')).rejects.toThrow('WhatsApp não configurado')
+      const rows = db.prepare("SELECT * FROM messages WHERE channel = 'whatsapp'").all()
+      expect(rows.length).toBe(0)
+    } finally {
+      if (prevEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = prevEnv
+    }
+  })
+
+  it('should count failures in sendBulk when unconfigured', async () => {
+    const prevEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      const { whatsappService } = await fresh()
+      const result = await whatsappService.sendBulk(
+        [{ phone: '(11) 11111-1111', name: 'Ana' }],
+        'Olá {nome}'
+      )
+      expect(result).toEqual({ sent: 0, failed: 1 })
+    } finally {
+      if (prevEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = prevEnv
+    }
+  })
+
+  it('should use the real Evolution API when configured', async () => {
+    const prevEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    process.env.EVOLUTION_API_URL = 'https://evo.example.com'
+    process.env.EVOLUTION_API_KEY = 'secret-key'
+    process.env.EVOLUTION_INSTANCE = 'instancia-1'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ key: { id: 'MSG-9' } }),
+    }))
+    try {
+      const { whatsappService } = await fresh()
+      const result = await whatsappService.send('11999991234', 'Olá!')
+      expect(result.success).toBe(true)
+      expect(result.messageId).toBe('MSG-9')
+    } finally {
+      if (prevEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = prevEnv
+    }
+  })
+})

@@ -44,11 +44,11 @@ class EvolutionProvider implements WhatsAppProvider {
   }
 }
 
-// Evolution em modo silencioso: registra apenas a intenção de envio (sem chamar a API).
 function evolutionConfigured(): boolean {
   return !!(process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE)
 }
 
+// Mock (apenas dev/teste): registra a intenção de envio sem chamar a API.
 class MockProvider implements WhatsAppProvider {
   async send(to: string, message: string): Promise<{ success: boolean; messageId?: string }> {
     logger.info({ to, preview: message.substring(0, 50) }, 'WhatsApp mock sent')
@@ -56,11 +56,20 @@ class MockProvider implements WhatsAppProvider {
   }
 }
 
+// Produção sem Evolution configurado: falha explícita — nunca reportar envio que não aconteceu.
+class UnconfiguredProvider implements WhatsAppProvider {
+  async send(): Promise<{ success: boolean; messageId?: string }> {
+    throw new Error('WhatsApp não configurado (Evolution API). Defina EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE')
+  }
+}
+
 let provider: WhatsAppProvider
 
 function getProvider(): WhatsAppProvider {
   if (!provider) {
-    provider = evolutionConfigured() ? new EvolutionProvider() : new MockProvider()
+    provider = evolutionConfigured()
+      ? new EvolutionProvider()
+      : (process.env.NODE_ENV === 'production' ? new UnconfiguredProvider() : new MockProvider())
   }
   return provider
 }
