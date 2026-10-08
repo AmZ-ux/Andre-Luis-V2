@@ -83,10 +83,10 @@ export const pushService = {
     db.prepare('DELETE FROM settings WHERE category = ?').run(key)
   },
 
-  async send(userId: string, title: string, body: string, data?: Record<string, any>): Promise<number> {
+  async sendDetailed(userId: string, title: string, body: string, data?: Record<string, any>): Promise<{ sent: number; total: number; available: boolean }> {
     if (!webPushAvailable) {
       logger.info({ userId, title }, 'Push not available (no VAPID keys)')
-      return 0
+      return { sent: 0, total: 0, available: false }
     }
 
     const db = getDb()
@@ -95,7 +95,7 @@ export const pushService = {
     const rows = db.prepare("SELECT category, data FROM settings WHERE category = ? OR category LIKE ?").all(legacyKey, newPrefix) as any[]
     if (!rows.length) {
       logger.warn({ userId }, 'Push send skipped: no subscriptions')
-      return 0
+      return { sent: 0, total: 0, available: true }
     }
 
     let sent = 0
@@ -116,7 +116,12 @@ export const pushService = {
     }
 
     logger.info({ userId, title, sent, total: rows.length }, 'Push send completed')
-    return sent
+    return { sent, total: rows.length, available: true }
+  },
+
+  async send(userId: string, title: string, body: string, data?: Record<string, any>): Promise<number> {
+    const result = await this.sendDetailed(userId, title, body, data)
+    return result.sent
   },
 
   async sendToAll(title: string, body: string, data?: Record<string, any>): Promise<number> {

@@ -25,22 +25,94 @@ function resolveTargetUserIds(db: any, message: any): string[] {
   return (db.prepare("SELECT id FROM users WHERE role = 'passenger'").all() as any[]).map((u: any) => u.id)
 }
 
-export function dispatchMessage(db: any, message: any): void {
-  const targetUserIds = resolveTargetUserIds(db, message)
+export type DispatchChannelResult = {
+  channel: string
+  status: 'sent' | 'skipped' | 'failed'
+  delivered?: number
+  attempted?: number
+  detail?: string
+}
 
-  if (message.channel === 'whatsapp' || message.channel === 'all') {
+export type DispatchResult = {
+  success: boolean
+  status: 'sent' | 'failed'
+  reason?: string
+  channels: DispatchChannelResult[]
+}
+
+const DISPATCH_TIMEOUT_MS = 10_000
+
+function truncate(value: string, max = 500): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, provider: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timeout ao aguardar provedor (${provider})`)), ms)
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value) },
+      (err) => { clearTimeout(timer); reject(err) }
+    )
+  })
+}
+
+function runAppSync(db: any, message: any, targetUserIds: string[]): DispatchChannelResult {
+  try {
+    if (targetUserIds.length === 0) {
+      return { channel: 'app', status: 'skipped', delivered: 0, attempted: 0, detail: 'nenhum destinatário' }
+    }
+    let delivered = 0
+    for (const userId of targetUserIds) {
+      db.prepare(`INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, 'info')`)
+        .run(uuid(), userId, message.title, message.body)
+      delivered++
+    }
+    return { channel: 'app', status: 'sent', delivered, attempted: targetUserIds.length }
+  } catch (err: any) {
+    logger.error({ err, messageId: message.id }, 'App channel notification insert failed')
+    return { channel: 'app', status: 'failed', attempted: targetUserIds.length, detail: String(err?.message || err) }
+  }
+}
+
+async function runWhatsApp(db: any, message: any): Promise<DispatchChannelResult> {
+  try {
     const recipients = (() => { try { return JSON.parse(message.recipients || '[]') } catch { return [] } })()
-    if (recipients.length > 0) {
-      for (const r of recipients) {
-        const phone = r?.phone || r?.value || ''
-        if (phone) whatsappService.send(phone, message.body).catch(() => {
-          alertIntegrationIssue(db, 'WhatsApp', `Falha ao enviar mensagem para ${phone}`)
-        })
+    const phones: string[] = []
+    for (const r of recipients) {
+      const phone = r?.phone || r?.value || ''
+      if (phone) phones.push(phone)
+    }
+    if (phones.length === 0) {
+      return { channel: 'whatsapp', status: 'skipped', delivered: 0, attempted: 0, detail: 'sem destinatários com telefone' }
+    }
+    const results = await Promise.all(phones.map(async (phone) => {
+      try {
+        await withTimeout(whatsappService.send(phone, message.body), DISPATCH_TIMEOUT_MS, 'whatsapp')
+        return { phone, ok: true as const, error: '' }
+      } catch (err: any) {
+        alertIntegrationIssue(db, 'WhatsApp', `Falha ao enviar mensagem para ${phone}`)
+        return { phone, ok: false as const, error: String(err?.message || err) }
+      }
+    }))
+    const delivered = results.filter((r) => r.ok).length
+    if (delivered > 0) {
+      return {
+        channel: 'whatsapp',
+        status: 'sent',
+        delivered,
+        attempted: phones.length,
+        ...(delivered < phones.length ? { detail: `parcial: ${delivered} de ${phones.length}` } : {}),
       }
     }
+    const failures = results.filter((r) => !r.ok).map((r) => `${r.phone}: ${r.error}`)
+    return { channel: 'whatsapp', status: 'failed', delivered: 0, attempted: phones.length, detail: failures.join('; ') }
+  } catch (err: any) {
+    return { channel: 'whatsapp', status: 'failed', detail: String(err?.message || err) }
   }
+}
 
-  if (message.channel === 'email' || message.channel === 'all') {
+async function runEmail(db: any, message: any, targetUserIds: string[]): Promise<DispatchChannelResult> {
+  try {
     const recipients = (() => { try { return JSON.parse(message.recipients || '[]') } catch { return [] } })()
     const emails: string[] = []
     for (const r of recipients) {
@@ -57,31 +129,142 @@ export function dispatchMessage(db: any, message: any): void {
       const all = db.prepare(`SELECT email FROM users WHERE id IN (${placeholders}) AND email != ''`).all(...targetUserIds) as any[]
       for (const u of all) if (u.email) emails.push(u.email)
     }
-    for (const email of [...new Set(emails)]) {
-      sendEmail(email, message.subject || message.title || 'Comunicado', `<p>${message.body}</p>`)
-        .catch((err) => {
-          logger.error({ email, err: String(err) }, 'Message email delivery failed')
-          alertIntegrationIssue(db, 'E-mail (Resend)', `Falha ao enviar email para ${email}: ${err}`)
-        })
+    const targets = [...new Set(emails)]
+    if (targets.length === 0) {
+      return { channel: 'email', status: 'skipped', delivered: 0, attempted: 0, detail: 'sem destinatários com e-mail' }
     }
+    const results = await Promise.all(targets.map(async (email) => {
+      try {
+        await withTimeout(sendEmail(email, message.subject || message.title || 'Comunicado', `<p>${message.body}</p>`), DISPATCH_TIMEOUT_MS, 'email')
+        return { email, ok: true as const, error: '' }
+      } catch (err: any) {
+        logger.error({ email, err: String(err) }, 'Message email delivery failed')
+        alertIntegrationIssue(db, 'E-mail (Resend)', `Falha ao enviar email para ${email}: ${err}`)
+        return { email, ok: false as const, error: String(err?.message || err) }
+      }
+    }))
+    const delivered = results.filter((r) => r.ok).length
+    if (delivered > 0) {
+      return {
+        channel: 'email',
+        status: 'sent',
+        delivered,
+        attempted: targets.length,
+        ...(delivered < targets.length ? { detail: `parcial: ${delivered} de ${targets.length}` } : {}),
+      }
+    }
+    const failures = results.filter((r) => !r.ok).map((r) => `${r.email}: ${r.error}`)
+    return { channel: 'email', status: 'failed', delivered: 0, attempted: targets.length, detail: failures.join('; ') }
+  } catch (err: any) {
+    return { channel: 'email', status: 'failed', detail: String(err?.message || err) }
+  }
+}
+
+async function runPush(message: any, targetUserIds: string[]): Promise<DispatchChannelResult> {
+  try {
+    if (targetUserIds.length === 0) {
+      return { channel: 'push', status: 'skipped', delivered: 0, attempted: 0, detail: 'nenhum destinatário' }
+    }
+    if (!pushService.isAvailable()) {
+      return { channel: 'push', status: 'skipped', delivered: 0, attempted: 0, detail: 'push não configurado (VAPID ausente)' }
+    }
+    const results = await Promise.all(targetUserIds.map(async (userId) => {
+      try {
+        return await withTimeout(pushService.sendDetailed(userId, message.title, message.body, { data: { path: '/' } }), DISPATCH_TIMEOUT_MS, 'push')
+      } catch {
+        return { sent: 0, total: 1, available: true }
+      }
+    }))
+    let sent = 0
+    let total = 0
+    for (const r of results) { sent += r.sent; total += r.total }
+    if (total === 0) {
+      return { channel: 'push', status: 'skipped', delivered: 0, attempted: 0, detail: 'nenhuma subscription' }
+    }
+    if (sent === 0) {
+      return { channel: 'push', status: 'failed', delivered: 0, attempted: total, detail: `falha ao enviar para ${total} subscription(s)` }
+    }
+    return {
+      channel: 'push',
+      status: 'sent',
+      delivered: sent,
+      attempted: total,
+      ...(sent < total ? { detail: `parcial: ${sent} de ${total}` } : {}),
+    }
+  } catch (err: any) {
+    return { channel: 'push', status: 'failed', detail: String(err?.message || err) }
+  }
+}
+
+function channelSummary(channels: DispatchChannelResult[]): string {
+  return channels.map((c) => `${c.channel}: ${c.status}${c.detail ? ` (${c.detail})` : ''}`).join('; ')
+}
+
+function markFailed(db: any, message: any, reason: string): void {
+  try {
+    const detail = truncate(reason)
+    db.prepare("UPDATE messages SET status = 'failed', failed_at = datetime('now'), error_message = ?, updated_at = datetime('now') WHERE id = ?").run(detail, message.id)
+    addHistory(db, message.id, 'failed', detail, 'system')
+  } catch (err: any) {
+    logger.error({ err, messageId: message.id }, 'Failed to persist message failure')
+  }
+}
+
+function finalize(db: any, message: any, channels: DispatchChannelResult[]): DispatchResult {
+  const summary = channelSummary(channels)
+  const hasFailure = channels.some((c) => c.status === 'failed')
+  const hasSent = channels.some((c) => c.status === 'sent')
+
+  if (!hasFailure && hasSent) {
+    db.prepare("UPDATE messages SET status = 'sent', sent_at = datetime('now'), error_message = '', updated_at = datetime('now') WHERE id = ?").run(message.id)
+    addHistory(db, message.id, 'sent', `Mensagem enviada via canal ${message.channel}`, 'system')
+    return { success: true, status: 'sent', channels }
   }
 
-  if (message.channel === 'push' || message.channel === 'all') {
-    const data = { data: { path: '/' } }
-    for (const userId of targetUserIds) {
-      pushService.send(userId, message.title, message.body, data).catch(() => {})
-    }
-  }
+  const reason = hasFailure ? summary : `Nenhum destinatário elegível — ${summary}`
+  markFailed(db, message, reason)
+  return { success: false, status: 'failed', reason, channels }
+}
 
-  if (message.channel === 'app' || message.channel === 'all') {
-    for (const userId of targetUserIds) {
-      db.prepare(`INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, 'info')`)
-        .run(uuid(), userId, message.title, message.body)
-    }
-  }
+/**
+ * Despacha a mensagem pelos canais selecionados e só marca `sent` após
+ * confirmação real de todos eles. Regra estrita:
+ * - qualquer canal `failed` → mensagem `failed`;
+ * - ≥1 canal `sent` e nenhum `failed` → `sent`;
+ * - todos `skipped` → `failed`.
+ * Nunca lança exceção; retorna resultado estruturado.
+ */
+export async function dispatchMessage(db: any, message: any): Promise<DispatchResult> {
+  try {
+    const channel = String(message.channel || 'app')
+    const targetUserIds = resolveTargetUserIds(db, message)
+    const supported = ['app', 'whatsapp', 'email', 'push']
+    const isAll = channel === 'all'
 
-  db.prepare("UPDATE messages SET status = 'sent', sent_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(message.id)
-  addHistory(db, message.id, 'sent', `Mensagem enviada via canal ${message.channel}`, 'system')
+    const pending: Promise<DispatchChannelResult>[] = []
+    if (isAll || channel === 'whatsapp') pending.push(runWhatsApp(db, message))
+    if (isAll || channel === 'email') pending.push(runEmail(db, message, targetUserIds))
+    if (isAll || channel === 'push') pending.push(runPush(message, targetUserIds))
+
+    const results: DispatchChannelResult[] = []
+    if (isAll || channel === 'app') {
+      results.push(runAppSync(db, message, targetUserIds))
+    } else if (!supported.includes(channel)) {
+      results.push({
+        channel,
+        status: 'failed',
+        detail: channel === 'sms' ? 'Canal sms não suportado' : `Canal desconhecido: ${channel}`,
+      })
+    }
+
+    results.push(...(await Promise.all(pending)))
+    return finalize(db, message, results)
+  } catch (err: any) {
+    logger.error({ err, messageId: message.id }, 'dispatchMessage failed')
+    const reason = `Erro interno de dispatch: ${String(err?.message || err)}`
+    markFailed(db, message, reason)
+    return { success: false, status: 'failed', reason, channels: [] }
+  }
 }
 
 router.get('/', requireAdmin, (_req, res) => {
@@ -89,27 +272,31 @@ router.get('/', requireAdmin, (_req, res) => {
   res.json(db.prepare('SELECT * FROM messages ORDER BY created_at DESC').all())
 })
 
-router.post('/', requireAdmin, (req, res) => {
+router.post('/', requireAdmin, async (req, res, next) => {
   const db = getDb()
-  const { title, subject, body, type, channel, recipients, scheduledAt, templateId, priority } = req.body
-  const id = uuid()
+  try {
+    const { title, subject, body, type, channel, recipients, scheduledAt, templateId, priority } = req.body
+    const id = uuid()
 
-  const recipientList = recipients || []
+    const recipientList = recipients || []
 
-  const status = scheduledAt ? 'scheduled' : 'draft'
+    const status = scheduledAt ? 'scheduled' : 'draft'
 
-  db.prepare(`
-    INSERT INTO messages (id, title, subject, body, type, channel, recipients, scheduled_at, template_id, priority, status, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, subject || '', body, type || 'individual', channel || 'app', JSON.stringify(recipientList), scheduledAt || null, templateId || '', priority || 'normal', status, req.user!.userId)
+    db.prepare(`
+      INSERT INTO messages (id, title, subject, body, type, channel, recipients, scheduled_at, template_id, priority, status, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, title, subject || '', body, type || 'individual', channel || 'app', JSON.stringify(recipientList), scheduledAt || null, templateId || '', priority || 'normal', status, req.user!.userId)
 
-  addHistory(db, id, status === 'scheduled' ? 'scheduled' : 'created', status === 'scheduled' ? `Agendada para ${scheduledAt}` : `Mensagem criada: ${title}`, req.user!.role === 'admin' ? 'Administrador' : 'Passageiro')
+    addHistory(db, id, status === 'scheduled' ? 'scheduled' : 'created', status === 'scheduled' ? `Agendada para ${scheduledAt}` : `Mensagem criada: ${title}`, req.user!.role === 'admin' ? 'Administrador' : 'Passageiro')
 
-  if (status !== 'scheduled') {
-    dispatchMessage(db, db.prepare('SELECT * FROM messages WHERE id = ?').get(id))
+    if (status !== 'scheduled') {
+      await dispatchMessage(db, db.prepare('SELECT * FROM messages WHERE id = ?').get(id))
+    }
+
+    res.status(201).json(db.prepare('SELECT * FROM messages WHERE id = ?').get(id))
+  } catch (err) {
+    next(err)
   }
-
-  res.status(201).json(db.prepare('SELECT * FROM messages WHERE id = ?').get(id))
 })
 
 router.get('/messages/:id', requireAdmin, (req, res) => {

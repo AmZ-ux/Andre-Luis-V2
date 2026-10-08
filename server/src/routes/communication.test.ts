@@ -153,6 +153,56 @@ describe('POST /api/communication', () => {
     expect(res.body.title).toBe('Test')
     expect(res.body.channel).toBe('app')
   })
+
+  it('should mark message as sent only after dispatch confirms the app channel', async () => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, role, password_hash) VALUES (?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Passenger', 'pass2@test.com', '333.333.333-33', bcrypt.hashSync('pass', 10))
+
+    const res = await request(app)
+      .post('/api/communication')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Confirmed', body: 'Body', channel: 'app', recipients: [passengerId] })
+    expect(res.status).toBe(201)
+    expect(res.body.status).toBe('sent')
+    expect(res.body.sent_at).toBeTruthy()
+    expect(res.body.failed_at).toBeNull()
+    expect(res.body.error_message).toBe('')
+  })
+
+  it('should mark unsupported sms channel as failed with diagnostics', async () => {
+    const res = await request(app)
+      .post('/api/communication')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Sms Try', body: 'Body', channel: 'sms', recipients: [] })
+    expect(res.status).toBe(201)
+    expect(res.body.status).toBe('failed')
+    expect(res.body.failed_at).toBeTruthy()
+    expect(res.body.sent_at).toBeNull()
+    expect(res.body.error_message).toContain('não suportado')
+
+    const history = getDb().prepare("SELECT * FROM message_history WHERE message_id = ? AND action = 'failed'").all(res.body.id) as any[]
+    expect(history).toHaveLength(1)
+  })
+
+  it('should keep scheduled messages untouched (no dispatch)', async () => {
+    const db = getDb()
+    const passengerId = uuid()
+    db.prepare("INSERT INTO users (id, name, email, cpf, role, password_hash) VALUES (?, ?, ?, ?, 'passenger', ?)")
+      .run(passengerId, 'Passenger', 'pass3@test.com', '444.444.444-44', bcrypt.hashSync('pass', 10))
+
+    const res = await request(app)
+      .post('/api/communication')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Future', body: 'Body', channel: 'app', recipients: [passengerId], scheduledAt: '2030-01-01T10:00:00' })
+    expect(res.status).toBe(201)
+    expect(res.body.status).toBe('scheduled')
+    expect(res.body.sent_at).toBeNull()
+
+    const notifs = db.prepare('SELECT COUNT(*) AS c FROM notifications').get() as any
+    expect(notifs.c).toBe(0)
+  })
 })
 
 describe('GET /api/communication/notifications', () => {
@@ -301,7 +351,7 @@ describe('dispatchMessage routing', () => {
     seedUser('Admin', 'adm@test.com', 'admin')
 
     const { dispatchMessage } = await import('../routes/communication.js')
-    dispatchMessage(db, {
+    await dispatchMessage(db, {
       id: uuid(), title: 'Test', subject: '', body: 'Body',
       type: 'all', channel: 'app', recipients: '[]',
     })
@@ -318,7 +368,7 @@ describe('dispatchMessage routing', () => {
     seedPushSub(passengerA, 'https://p/a')
 
     const { dispatchMessage } = await import('../routes/communication.js')
-    dispatchMessage(db, {
+    await dispatchMessage(db, {
       id: uuid(), title: 'Test', subject: '', body: 'Body',
       type: 'all', channel: 'app', recipients: '[]',
     })
@@ -334,7 +384,7 @@ describe('dispatchMessage routing', () => {
     const admin = seedUser('Admin', 'adm@test.com', 'admin')
 
     const { dispatchMessage } = await import('../routes/communication.js')
-    dispatchMessage(db, {
+    await dispatchMessage(db, {
       id: uuid(), title: 'Test', subject: '', body: 'Body',
       type: 'individual', channel: 'app',
       recipients: JSON.stringify([{ id: passengerA }]),
@@ -352,7 +402,7 @@ describe('dispatchMessage routing', () => {
     seedUser('Pass C', 'c@test.com', 'passenger')
 
     const { dispatchMessage } = await import('../routes/communication.js')
-    dispatchMessage(db, {
+    await dispatchMessage(db, {
       id: uuid(), title: 'Test', subject: '', body: 'Body',
       type: 'individual', channel: 'app',
       recipients: JSON.stringify([{ id: passengerA }, { id: passengerB }]),
@@ -370,7 +420,7 @@ describe('dispatchMessage routing', () => {
     seedUser('Admin', 'adm@test.com', 'admin')
 
     const { dispatchMessage } = await import('../routes/communication.js')
-    dispatchMessage(db, {
+    await dispatchMessage(db, {
       id: uuid(), title: 'Test', subject: '', body: 'Body',
       type: 'all', channel: 'all',
       recipients: '[]',
@@ -389,7 +439,7 @@ describe('dispatchMessage routing', () => {
     seedUser('Admin', 'adm@test.com', 'admin')
 
     const { dispatchMessage } = await import('../routes/communication.js')
-    dispatchMessage(db, {
+    await dispatchMessage(db, {
       id: uuid(), title: 'Test', subject: '', body: 'Body',
       type: 'all', channel: 'app',
       recipients: '[]',
@@ -405,13 +455,13 @@ describe('dispatchMessage routing', () => {
     seedUser('Pass A', 'a@test.com', 'passenger')
 
     const { dispatchMessage } = await import('../routes/communication.js')
-    expect(() => {
-      dispatchMessage(db, {
-        id: uuid(), title: 'Test', subject: '', body: 'Body',
-        type: 'all', channel: 'all',
-        recipients: '[]',
-      })
-    }).not.toThrow()
+    const result = await dispatchMessage(db, {
+      id: uuid(), title: 'Test', subject: '', body: 'Body',
+      type: 'all', channel: 'all',
+      recipients: '[]',
+    })
+    expect(result.success).toBe(true)
+    expect(result.status).toBe('sent')
 
     const notifs = db.prepare('SELECT * FROM notifications').all() as any[]
     expect(notifs.length).toBe(1)
