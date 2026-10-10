@@ -459,7 +459,7 @@ describe('PUT /api/auth/change-password', () => {
     resetDb()
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Change Password', email: 'changepw@teste.com', cpf: '654.987.321-00', password: 'Old@123' })
+      .send({ name: 'Change Password', email: 'changepw@teste.com', cpf: '654.987.321-00', password: 'Old@1234' })
     token = res.body.token
   })
 
@@ -467,18 +467,18 @@ describe('PUT /api/auth/change-password', () => {
     const res = await request(app)
       .put('/api/auth/change-password')
       .set('Authorization', `Bearer ${token}`)
-      .send({ currentPassword: 'Old@123', newPassword: 'New@123' })
+      .send({ currentPassword: 'Old@1234', newPassword: 'New@1234' })
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ success: true })
 
     const loginRes = await request(app)
       .post('/api/auth/login')
-      .send({ login: 'changepw@teste.com', password: 'New@123' })
+      .send({ login: 'changepw@teste.com', password: 'New@1234' })
     expect(loginRes.status).toBe(200)
 
     const oldRes = await request(app)
       .post('/api/auth/login')
-      .send({ login: 'changepw@teste.com', password: 'Old@123' })
+      .send({ login: 'changepw@teste.com', password: 'Old@1234' })
     expect(oldRes.status).toBe(401)
   })
 
@@ -486,7 +486,7 @@ describe('PUT /api/auth/change-password', () => {
     const res = await request(app)
       .put('/api/auth/change-password')
       .set('Authorization', `Bearer ${token}`)
-      .send({ currentPassword: 'Wrong@123', newPassword: 'New@456' })
+      .send({ currentPassword: 'Wrong@123', newPassword: 'New@4567' })
     expect(res.status).toBe(400)
     expect(res.body.error).toBe('Senha atual incorreta')
   })
@@ -494,7 +494,7 @@ describe('PUT /api/auth/change-password', () => {
   it('should require authentication', async () => {
     const res = await request(app)
       .put('/api/auth/change-password')
-      .send({ currentPassword: 'Old@123', newPassword: 'New@123' })
+      .send({ currentPassword: 'Old@1234', newPassword: 'New@1234' })
     expect(res.status).toBe(401)
   })
 })
@@ -668,6 +668,51 @@ describe('POST /api/auth/forgot-password', () => {
     const ttl = Number(user.reset_token_expires) - Date.now()
     expect(ttl).toBeGreaterThan(3_590_000)
     expect(ttl).toBeLessThanOrEqual(3_600_000)
+  })
+
+  it('should find the user when the email is typed in uppercase', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const reg = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Esqueci Caixa Alta', email: 'EsqueciAlta@Teste.COM', cpf: '998.998.998-09', password: 'Test@123' })
+    expect(reg.status).toBe(201)
+    expect(reg.body.user.email).toBe('esquecialta@teste.com')
+
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'ESQUECIALTA@TESTE.COM' })
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.message).toContain('Se o email existir')
+
+    const user = db.prepare('SELECT reset_token, reset_token_expires FROM users WHERE email = ?').get('esquecialta@teste.com') as any
+    expect(user.reset_token).toBeTruthy()
+    expect(user.reset_token_expires).toBeGreaterThan(Date.now())
+  })
+
+  it('should find the user when the email is typed in lowercase and keep the response generic', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const reg = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Esqueci Caixa Baixa', email: 'EsqueciBaixa@Teste.COM', cpf: '997.997.997-09', password: 'Test@123' })
+    expect(reg.status).toBe(201)
+
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'esquecibaixa@teste.com' })
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.message).toContain('Se o email existir')
+
+    const user = db.prepare('SELECT reset_token FROM users WHERE email = ?').get('esquecibaixa@teste.com') as any
+    expect(user.reset_token).toBeTruthy()
+
+    // A resposta continua indistinguível de um e-mail inexistente
+    const unknown = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'naoexiste@teste.com' })
+    expect(unknown.status).toBe(200)
+    expect(res.body).toEqual(unknown.body)
   })
 
   it('should return indistinguishable responses for existing and non-existent emails', async () => {
@@ -924,3 +969,184 @@ describe('POST /api/auth/end-contract', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('POST /api/auth/register — password policy (P1)', () => {
+  const weakCases: Array<[string, string]> = [
+    ['without uppercase', 'senha@123'],
+    ['without lowercase', 'SENHA@123'],
+    ['without digit', 'Senha@abcde'],
+    ['without special char', 'Senha12345'],
+    ['shorter than 8 chars', 'S3@abc'],
+  ]
+
+  it.each(weakCases)('should reject a password %s', async (_label, password) => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Politica Senha', email: `politica-${Math.random().toString(36).slice(2)}@teste.com`, cpf: '909.909.909-09', password })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('política')
+  })
+
+  it('should not create user or passenger when the password fails the policy', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const email = 'semusuario@teste.com'
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Sem Usuario', email, cpf: '919.919.919-09', password: 'fraca123' })
+    expect(res.status).toBe(400)
+    expect(db.prepare('SELECT id FROM users WHERE email = ?').get(email)).toBeUndefined()
+    expect(db.prepare('SELECT id FROM passengers WHERE email = ?').get(email)).toBeUndefined()
+  })
+
+  it('should reject a weak newPassword on change-password and keep the current one', async () => {
+    resetDb()
+    const reg = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Troca Politica', email: 'trocapolitica@teste.com', cpf: '929.929.929-09', password: 'Atual@1234' })
+    expect(reg.status).toBe(201)
+
+    const res = await request(app)
+      .put('/api/auth/change-password')
+      .set('Authorization', `Bearer ${reg.body.token}`)
+      .send({ currentPassword: 'Atual@1234', newPassword: 'fraca123' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('política')
+
+    const stillWorks = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'trocapolitica@teste.com', password: 'Atual@1234' })
+    expect(stillWorks.status).toBe(200)
+  })
+})
+
+describe('POST /api/auth/register — email and CPF validation/normalization (P1)', () => {
+  it('should normalize the email to lowercase on users and passengers', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Email Caixa', email: '  CaixaAlta@Teste.COM ', cpf: '939.939.939-09', password: 'Test@123' })
+    expect(res.status).toBe(201)
+    expect(res.body.user.email).toBe('caixaalta@teste.com')
+
+    const user = db.prepare('SELECT email FROM users WHERE id = ?').get(res.body.user.id) as { email: string }
+    const passenger = db.prepare('SELECT email FROM passengers WHERE id = ?').get(res.body.user.id) as { email: string }
+    expect(user.email).toBe('caixaalta@teste.com')
+    expect(passenger.email).toBe('caixaalta@teste.com')
+  })
+
+  it('should accept a CPF without mask and persist it formatted', async () => {
+    const db = (await import('../database/connection.js')).getDb()
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Cpf Sem Mascara', email: 'cpfsem@example.com', cpf: '52998224725', password: 'Test@123' })
+    expect(res.status).toBe(201)
+    expect(res.body.user.cpf).toBe('529.982.247-25')
+
+    const user = db.prepare('SELECT cpf FROM users WHERE id = ?').get(res.body.user.id) as { cpf: string }
+    const passenger = db.prepare('SELECT cpf FROM passengers WHERE id = ?').get(res.body.user.id) as { cpf: string }
+    expect(user.cpf).toBe('529.982.247-25')
+    expect(passenger.cpf).toBe('529.982.247-25')
+  })
+
+  it('should reject an invalid email with 400', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Email Ruim', email: 'sem-arroba', cpf: '949.949.949-09', password: 'Test@123' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('Email inválido')
+  })
+
+  it('should reject a CPF with fewer than 11 digits with 400', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Cpf Curto', email: 'cpfcurto@teste.com', cpf: '123.456.789-0', password: 'Test@123' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('CPF inválido')
+  })
+
+  it('should reject a CPF made of repeated digits with 400', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Cpf Repetido', email: 'cpfrepetido@teste.com', cpf: '111.111.111-11', password: 'Test@123' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('CPF inválido')
+  })
+
+  it('should reject a duplicate CPF typed without mask', async () => {
+    const first = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Cpf Original', email: 'cpforiginal@teste.com', cpf: '979.979.979-09', password: 'Test@123' })
+    expect(first.status).toBe(201)
+
+    const second = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Cpf Duplicado', email: 'cpfduplicado@teste.com', cpf: '97997997909', password: 'Test@123' })
+    expect(second.status).toBe(409)
+    expect(second.body.error).toBe('Usuário já existe')
+  })
+
+  it('should reject a duplicate email typed with a different case', async () => {
+    const first = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Email Original', email: 'emailoriginal@teste.com', cpf: '959.959.959-09', password: 'Test@123' })
+    expect(first.status).toBe(201)
+
+    const second = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Email Duplicado', email: 'EmailOriginal@TESTE.com', cpf: '969.969.969-09', password: 'Test@123' })
+    expect(second.status).toBe(409)
+    expect(second.body.error).toBe('Usuário já existe')
+  })
+})
+
+describe('POST /api/auth/login — CPF with and without mask (P1)', () => {
+  beforeAll(async () => {
+    resetDb()
+    await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Login Cpf', email: 'logincpf@teste.com', cpf: '529.982.247-25', password: 'Senha@123' })
+  })
+
+  it('should login with the CPF in digits only', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ login: '52998224725', password: 'Senha@123' })
+    expect(res.status).toBe(200)
+    expect(res.body.user.cpf).toBe('529.982.247-25')
+  })
+
+  it('should login with the CPF masked', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ login: '529.982.247-25', password: 'Senha@123' })
+    expect(res.status).toBe(200)
+  })
+
+  it('should still login with email', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'logincpf@teste.com', password: 'Senha@123' })
+    expect(res.status).toBe(200)
+  })
+
+  it('should reject an unknown CPF in digits only with 401', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ login: '12345678901', password: 'Senha@123' })
+    expect(res.status).toBe(401)
+  })
+
+  it('should login with the email regardless of case', async () => {
+    const reg = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Email Case', email: 'CaseLogin@Teste.COM', cpf: '989.989.989-09', password: 'Senha@123' })
+    expect(reg.status).toBe(201)
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'caselogin@TESTE.com', password: 'Senha@123' })
+    expect(res.status).toBe(200)
+    expect(res.body.user.email).toBe('caselogin@teste.com')
+  })
+})
+

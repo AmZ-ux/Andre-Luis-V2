@@ -13,6 +13,25 @@ import { logger } from '../utils/logger.js'
 
 const router = Router()
 
+const PASSWORD_POLICY_ERROR = 'A senha não atende à política: mínimo 8 caracteres, com letra maiúscula, minúscula, número e caractere especial.'
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function normalizeEmail(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
+function cpfDigitsOnly(value: unknown): string {
+  return typeof value === 'string' ? value.replace(/\D/g, '') : ''
+}
+
+function isValidCpfDigits(digits: string): boolean {
+  return /^\d{11}$/.test(digits) && !/^(\d)\1{10}$/.test(digits)
+}
+
+function formatCpf(digits: string): string {
+  return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')
+}
+
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: Number(process.env.LOGIN_RATE_LIMIT_MAX) || 5,
@@ -25,7 +44,21 @@ router.post('/login', loginLimiter, validateBody('login', 'password'), (req, res
   const { login, password } = req.body
   const db = getDb()
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ? OR cpf = ?').get(login, login) as any
+  // Login por CPF aceita com ou sem máscara (11 dígitos). E-mail é comparado
+  // sem distinção de maiúsculas, já que o cadastro o grava em minúsculas.
+  const loginValue = typeof login === 'string' ? login.trim() : login
+  const loginDigits = typeof loginValue === 'string' ? loginValue.replace(/\D/g, '') : ''
+  const isCpfLogin =
+    typeof loginValue === 'string' &&
+    !loginValue.includes('@') &&
+    /^[0-9.\-/ ]+$/.test(loginValue) &&
+    loginDigits.length === 11
+
+  const user = (isCpfLogin
+    ? db.prepare('SELECT * FROM users WHERE lower(email) = lower(?) OR cpf = ? OR cpf = ?')
+        .get(loginValue, formatCpf(loginDigits), loginDigits)
+    : db.prepare('SELECT * FROM users WHERE lower(email) = lower(?) OR cpf = ?')
+        .get(loginValue, loginValue)) as any
   if (!user) {
     db.prepare('INSERT INTO app_logs (id, action, description, user_name, user_role, category) VALUES (?, ?, ?, ?, ?, ?)')
       .run(uuid(), 'login_failed', `Tentativa de login com usuário inexistente (${String(login).slice(0, 60)})${req.ip ? ` — IP ${req.ip}` : ''}`, 'Desconhecido', 'unknown', 'security')
@@ -88,7 +121,29 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
   const { name, email, cpf, password, phone, transportType, pickupPoint, destination, contractStartDate, birthDate, routeId } = req.body
   const db = getDb()
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ? OR cpf = ?').get(email, cpf)
+  // Política de senha (mesma regra de /reset-password e do front-end)
+  if (!isValidPasswordPolicy(password)) {
+    res.status(400).json({ error: PASSWORD_POLICY_ERROR })
+    return
+  }
+
+  // E-mail e CPF são normalizados antes de persistir e de checar duplicidade
+  const normalizedEmail = normalizeEmail(email)
+  const cpfDigits = cpfDigitsOnly(cpf)
+  if (!EMAIL_PATTERN.test(normalizedEmail)) {
+    res.status(400).json({ error: 'Email inválido' })
+    return
+  }
+  if (!isValidCpfDigits(cpfDigits)) {
+    res.status(400).json({ error: 'CPF inválido' })
+    return
+  }
+  const normalizedCpf = formatCpf(cpfDigits)
+
+  // Duplicidade comparada nos dois formatos de CPF já existentes no banco
+  const existing = db.prepare(
+    'SELECT id FROM users WHERE lower(email) = ? OR cpf = ? OR cpf = ?'
+  ).get(normalizedEmail, normalizedCpf, cpfDigits)
   if (existing) {
     res.status(409).json({ error: 'Usuário já existe' })
     return
@@ -100,7 +155,7 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
   db.prepare(`
     INSERT INTO users (id, name, email, cpf, phone, role, password_hash)
     VALUES (?, ?, ?, ?, ?, 'passenger', ?)
-  `).run(id, name, email, cpf, phone || '', passwordHash)
+  `).run(id, name, normalizedEmail, normalizedCpf, phone || '', passwordHash)
 
   const validTypes = ['university', 'school', 'contract']
   const type = validTypes.includes(transportType) ? transportType : 'university'
@@ -154,9 +209,9 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
   `).run(
-    id, name, cpf,
+    id, name, normalizedCpf,
     (birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate)) ? birthDate : '2000-01-01',
-    phone || '', email, type,
+    phone || '', normalizedEmail, type,
     pickupPoint || '', destination || '', contractStartDate || '', dueDay, feeValue,
     resolvedRouteId
   )
@@ -169,7 +224,7 @@ router.post('/register', validateBody('name', 'email', 'cpf', 'password'), (req,
 
   const token = signToken({ userId: id, role: 'passenger' })
   res.status(201).json({
-    user: { id, name, email, cpf, phone: phone || '', photo: '', role: 'passenger', superAdmin: false, emailVerified: false, createdAt: new Date().toISOString(), lastAccess: new Date().toISOString() },
+    user: { id, name, email: normalizedEmail, cpf: normalizedCpf, phone: phone || '', photo: '', role: 'passenger', superAdmin: false, emailVerified: false, createdAt: new Date().toISOString(), lastAccess: new Date().toISOString() },
     token,
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
   })
@@ -396,6 +451,10 @@ router.put('/change-password', authMiddleware, (req, res) => {
     res.status(400).json({ error: 'Senha atual incorreta' })
     return
   }
+  if (!isValidPasswordPolicy(newPassword)) {
+    res.status(400).json({ error: PASSWORD_POLICY_ERROR })
+    return
+  }
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
     .run(bcrypt.hashSync(newPassword, 10), req.user.userId)
   res.json({ success: true })
@@ -430,7 +489,7 @@ router.post('/forgot-password', validateBody('email'), async (req, res) => {
   const { email } = req.body
   const db = getDb()
 
-  const user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(email) as any
+  const user = db.prepare('SELECT id, name, email FROM users WHERE lower(email) = lower(?)').get(email) as any
   if (!user) {
     res.json({ success: true, message: 'Se o email existir, você receberá instruções.' })
     return
@@ -465,7 +524,7 @@ router.post('/forgot-password', validateBody('email'), async (req, res) => {
 router.post('/reset-password', validateBody('token', 'password'), (req, res) => {
   const { token, password } = req.body
   if (!isValidPasswordPolicy(password)) {
-    res.status(400).json({ error: 'A senha não atende à política: mínimo 8 caracteres, com letra maiúscula, minúscula, número e caractere especial.' })
+    res.status(400).json({ error: PASSWORD_POLICY_ERROR })
     return
   }
   const db = getDb()

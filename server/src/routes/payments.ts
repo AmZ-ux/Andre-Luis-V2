@@ -127,6 +127,73 @@ paymentsWebhookRouter.post('/webhook', async (req, res) => {
 
 // Tabela pix_charges e usada como registro generico de cobrancas (PIX e cartao)
 
+type PendingCharge = {
+  id: string
+  payment_intent_id: string
+  pix_code: string | null
+  qr_image: string | null
+  amount: number
+}
+
+function findPendingCharge(db: any, monthlyFeeId: string): PendingCharge | undefined {
+  return db
+    .prepare(
+      "SELECT id, payment_intent_id, pix_code, qr_image, amount FROM pix_charges WHERE monthly_fee_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1"
+    )
+    .get(monthlyFeeId)
+}
+
+function supersedeCharge(db: any, chargeId: string): void {
+  db.prepare(
+    "UPDATE pix_charges SET status = 'superseded', superseded_at = datetime('now'), updated_at = datetime('now') WHERE id = ?"
+  ).run(chargeId)
+}
+
+function supersedeAllPending(db: any, monthlyFeeId: string): void {
+  db.prepare(
+    "UPDATE pix_charges SET status = 'superseded', superseded_at = datetime('now'), updated_at = datetime('now') WHERE monthly_fee_id = ? AND status = 'pending'"
+  ).run(monthlyFeeId)
+}
+
+// Toda cobrança criada no MP é gravada, mesmo quando perde a corrida pelo
+// índice único: dinheiro confirmado nunca pode ficar invisível (Regra de Ouro).
+function insertCharge(
+  db: any,
+  charge: {
+    paymentIntentId: string
+    monthlyFeeId: string
+    amount: number
+    status: 'pending' | 'superseded'
+    pixCode?: string
+    qrImage?: string
+  }
+): void {
+  db.prepare(`
+    INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status, pix_code, qr_image)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    uuid(),
+    charge.paymentIntentId,
+    charge.monthlyFeeId,
+    charge.amount,
+    charge.status,
+    charge.pixCode ?? null,
+    charge.qrImage ?? null
+  )
+}
+
+function pixResponse(paymentId: string, amount: number, pixCode: string, qrImage: string, breakdown: unknown) {
+  return {
+    paymentId,
+    amount,
+    currency: 'brl',
+    breakdown,
+    method: 'pix',
+    pixCode,
+    qrImage,
+  }
+}
+
 paymentsRouter.post('/create', async (req, res) => {
   const db = getDb()
   const { monthlyFeeId, method = 'pix' } = req.body || {}
@@ -162,9 +229,7 @@ paymentsRouter.post('/create', async (req, res) => {
       // index idx_one_pending_per_fee). If one exists:
       //   • valid + has QR data  → return cached QR (no MP call)
       //   • expired / no QR      → supersede it, then create a new one below
-      const existingPending = db.prepare(
-        "SELECT id, payment_intent_id, pix_code, qr_image, amount FROM pix_charges WHERE monthly_fee_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1"
-      ).get(monthlyFeeId) as any
+      const existingPending = findPendingCharge(db, monthlyFeeId)
 
       if (existingPending) {
         const isExpired = db.prepare(
@@ -173,9 +238,7 @@ paymentsRouter.post('/create', async (req, res) => {
 
         if (isExpired || !existingPending.pix_code || !existingPending.qr_image) {
           // Supersede: keep the charge trackable but mark it as no longer payable
-          db.prepare(
-            "UPDATE pix_charges SET status = 'superseded', superseded_at = datetime('now'), updated_at = datetime('now') WHERE id = ?"
-          ).run(existingPending.id)
+          supersedeCharge(db, existingPending.id)
           // Fall through to create a new charge
         } else {
           // Valid pending charge with QR data — return cached response
@@ -219,20 +282,63 @@ paymentsRouter.post('/create', async (req, res) => {
         throw new MpError('O Mercado Pago não retornou o QR Code do PIX. Tente novamente.')
       }
 
-      db.prepare(`
-        INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status, pix_code, qr_image)
-        VALUES (?, ?, ?, ?, 'pending', ?, ?)
-      `).run(uuid(), String(payment.id), monthlyFeeId, breakdown.total, txn.qr_code, `data:image/png;base64,${txn.qr_code_base64}`)
+      const paymentIntentId = String(payment.id)
+      const qrCode = txn.qr_code
+      const qrImage = `data:image/png;base64,${txn.qr_code_base64}`
 
-      res.json({
-        paymentId: String(payment.id),
+      // ── Idempotência da gravação ────────────────────────────────────────
+      // Enquanto aguardávamos o MP outra requisição pode ter gravado uma
+      // cobrança pendente. Nunca inserimos uma segunda pendente (índice
+      // único) e nunca descartamos a cobrança que acabou de ser criada no MP.
+      const concurrent = findPendingCharge(db, monthlyFeeId)
+
+      if (concurrent) {
+        if (concurrent.payment_intent_id === paymentIntentId) {
+          // Mesmo pagamento do MP já registrado por uma requisição paralela
+          if (!concurrent.pix_code || !concurrent.qr_image) {
+            db.prepare('UPDATE pix_charges SET pix_code = ?, qr_image = ?, updated_at = datetime(\'now\') WHERE id = ?')
+              .run(qrCode, qrImage, concurrent.id)
+          }
+          res.json(pixResponse(
+            concurrent.payment_intent_id,
+            concurrent.amount,
+            concurrent.pix_code || qrCode,
+            concurrent.qr_image || qrImage,
+            breakdown
+          ))
+          return
+        }
+
+        if (concurrent.pix_code && concurrent.qr_image) {
+          // Já existe pendente utilizável (devolvida a outra requisição):
+          // ela segue pendente e a nova é gravada como superseded (o QR
+          // dela nunca foi entregue), preservando o registro do pagamento.
+          insertCharge(db, {
+            paymentIntentId,
+            monthlyFeeId,
+            amount: breakdown.total,
+            status: 'superseded',
+            pixCode: qrCode,
+            qrImage,
+          })
+          res.json(pixResponse(concurrent.payment_intent_id, concurrent.amount, concurrent.pix_code, concurrent.qr_image, breakdown))
+          return
+        }
+
+        // Pendente sem dados de QR (ilegível) → superseded e seguimos
+        supersedeCharge(db, concurrent.id)
+      }
+
+      insertCharge(db, {
+        paymentIntentId,
+        monthlyFeeId,
         amount: breakdown.total,
-        currency: 'brl',
-        breakdown,
-        method: 'pix',
-        pixCode: txn.qr_code,
-        qrImage: `data:image/png;base64,${txn.qr_code_base64}`,
+        status: 'pending',
+        pixCode: qrCode,
+        qrImage,
       })
+
+      res.json(pixResponse(paymentIntentId, breakdown.total, qrCode, qrImage, breakdown))
       return
     }
 
@@ -244,10 +350,17 @@ paymentsRouter.post('/create', async (req, res) => {
       payerName: fee.passenger_name || passenger?.name || 'Passageiro',
     })
 
-    db.prepare(`
-      INSERT INTO pix_charges (id, payment_intent_id, monthly_fee_id, amount, status)
-      VALUES (?, ?, ?, ?, 'pending')
-    `).run(uuid(), preference.id, monthlyFeeId, breakdown.total)
+    // Uma cobrança pendente anterior (ex.: QR PIX) não pode coexistir com a
+    // nova (índice único): superseded a ela imediatamente antes do INSERT,
+    // sem janela de corrida (trecho síncrono após o await).
+    supersedeAllPending(db, monthlyFeeId)
+
+    insertCharge(db, {
+      paymentIntentId: preference.id,
+      monthlyFeeId,
+      amount: breakdown.total,
+      status: 'pending',
+    })
 
     res.json({
       paymentId: preference.id,

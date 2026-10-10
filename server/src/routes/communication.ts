@@ -15,6 +15,9 @@ function addHistory(db: any, messageId: string, action: string, description: str
     .run(uuid(), messageId, action, description || '', performedBy)
 }
 
+// Canais aceitos na criação de mensagens (mesmos do dispatchMessage + 'all')
+const ALLOWED_CHANNELS = ['app', 'whatsapp', 'email', 'push', 'sms', 'all']
+
 function resolveTargetUserIds(db: any, message: any): string[] {
   const raw = message.recipients || '[]'
   const parsed = (() => { try { return JSON.parse(raw) } catch { return [] } })()
@@ -276,6 +279,12 @@ router.post('/', requireAdmin, async (req, res, next) => {
   const db = getDb()
   try {
     const { title, subject, body, type, channel, recipients, scheduledAt, templateId, priority } = req.body
+    if (channel !== undefined && channel !== null && channel !== '') {
+      if (typeof channel !== 'string' || !ALLOWED_CHANNELS.includes(channel)) {
+        res.status(400).json({ error: `Canal inválido. Use um de: ${ALLOWED_CHANNELS.join(', ')}` })
+        return
+      }
+    }
     const id = uuid()
 
     const recipientList = recipients || []
